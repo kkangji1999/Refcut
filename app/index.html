@@ -4433,7 +4433,7 @@ if(!IS_EL) on$("updBtn","onclick",async()=>{
        새 버전을 자동으로 받으려면 최신 <b>index.html</b> 이 올라가 있는 주소가 필요합니다.
        <ol>
          <li>새 파일을 웹에 한 번 올립니다 (예: Netlify Drop)</li>
-         <li>설치 폴더 <b>%LOCALAPPDATA%Refcut</b> 의
+         <li>설치 폴더 <b>%LOCALAPPDATA%\Refcut</b> 의
              <b>update_url.txt</b> 에 그 주소를 붙여넣습니다</li>
          <li>다음부터는 앱을 켤 때마다 자동으로 최신 버전이 됩니다</li>
        </ol>
@@ -4568,7 +4568,7 @@ async function askOutDirOnce(){
          <b>모든 것이 폴더 하나에 들어갑니다.</b><br>
          이미지도 기록도 같은 곳이라, 그 폴더만 복사하면 백업입니다.
        </div>
-       <div class="wpath">${(root||"문서\Refcut").replace(/</g,"&lt;")}</div>
+       <div class="wpath">${(root||"문서\\Refcut").replace(/</g,"&lt;")}</div>
      </div>`,
     [{k:"ok", t:"이대로 쓸게요", d:"위 폴더를 그대로 씁니다. 나중에 바꿔도 됩니다."},
      {k:"pick", t:"다른 폴더로 정할래요", d:"저장할 위치를 직접 고릅니다."},
