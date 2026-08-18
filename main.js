@@ -12,7 +12,8 @@
    2) 저장 공간 제한이 없다
       IndexedDB 대신 디스크에 그대로 쓴다. 전체 경로도 그대로 보여줄 수 있다.
    ========================================================================= */
-const { app, BrowserWindow, ipcMain, dialog, shell, net } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, shell, net,
+        clipboard, nativeImage } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
@@ -743,6 +744,17 @@ ipcMain.handle("writeFile", (_e, { path: p, data }) => {
   try {
     fs.mkdirSync(path.dirname(p), { recursive: true });
     fs.writeFileSync(p, Buffer.from(data));
+    return { ok: true };
+  } catch (e) { return { ok: false, error: String(e) }; }
+});
+
+/* 그림을 윈도우 클립보드에 직접 넣는다.
+   화면 쪽(navigator.clipboard)이 막히거나 실패해도 여기로 돌아오면 복사가 된다. */
+ipcMain.handle("copyImage", (_e, data) => {
+  try {
+    const img = nativeImage.createFromBuffer(Buffer.from(data));
+    if (img.isEmpty()) return { ok: false, error: "빈 그림" };
+    clipboard.writeImage(img);
     return { ok: true };
   } catch (e) { return { ok: false, error: String(e) }; }
 });

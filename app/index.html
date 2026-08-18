@@ -3249,15 +3249,16 @@ function toggleInfo(){
   b.classList.add("on");
 }
 async function copyFrame(){
-  if(!hasVideo()) return toast("영상이 없습니다");
+  if(!hasVideo()) return toast("영상이 없습니다 — 컷을 골라서 복사해 주세요");
+  if(!pv.videoWidth) return toast("영상을 아직 읽는 중입니다 — 잠시 뒤에 다시");
   try{
     const c=document.createElement("canvas");
     c.width=pv.videoWidth; c.height=pv.videoHeight;
     c.getContext("2d").drawImage(pv,0,0);
     const png=await new Promise(r=>c.toBlob(r,"image/png"));
-    await navigator.clipboard.write([new ClipboardItem({"image/png":png})]);
-    toast("현재 화면을 복사했습니다");
-  }catch(e){ toast("복사 실패"); }
+    if(!await putPNG(png)) throw new Error("clipboard");
+    toast("현재 화면을 복사했습니다 · Ctrl+V 로 붙여넣기");
+  }catch(e){ toast("복사 실패 — ⬇ 저장을 써주세요"); }
 }
 function buildKeybar(){
   const defs=[
@@ -3727,14 +3728,31 @@ function closeLB(){
   if(document.fullscreenElement===$("lb")) document.exitFullscreen().catch(()=>{});
   $("lb").classList.remove("on");
 }
+/* PNG 한 장을 클립보드에 넣는다.
+   앱(Electron)에서는 브라우저 클립보드가 막히는 경우가 있어,
+   실패하면 곧바로 앱 자체 복사로 다시 시도한다. */
+async function putPNG(png){
+  try{
+    await navigator.clipboard.write([new ClipboardItem({"image/png":png})]);
+    return true;
+  }catch(e){}
+  try{
+    if(IS_EL && window.CG && window.CG.copyImage){
+      const r=await window.CG.copyImage(new Uint8Array(await png.arrayBuffer()));
+      if(r && r.ok) return true;
+    }
+  }catch(e){}
+  return false;
+}
 async function copyBlob(blob){
   try{
+    if(!blob) throw new Error("no blob");
     const bmp=await createImageBitmap(blob);
     const c=document.createElement("canvas");
     c.width=bmp.width; c.height=bmp.height;
     c.getContext("2d").drawImage(bmp,0,0);
     const png=await new Promise(r=>c.toBlob(r,"image/png"));
-    await navigator.clipboard.write([new ClipboardItem({"image/png":png})]);
+    if(!await putPNG(png)) throw new Error("clipboard");
     toast("복사했습니다 · Ctrl+V 로 붙여넣기");
     return true;
   }catch(e){ toast("복사 실패 — ⬇ 저장을 써주세요"); return false; }
@@ -4419,6 +4437,22 @@ document.addEventListener("keydown",e=>{
     else if((e.ctrlKey||e.metaKey)&&e.key==="-"){ e.preventDefault(); zoomBy(1/1.3); }
     return;
   }
+  /* ---------- Ctrl+C : 어디서 눌러도 반드시 대답한다 ----------
+     예전에는 이 처리가 저 아래 '원본 영상이 붙어 있을 때'라는 조건 뒤에 있었다.
+     그래서 기록에서 연 결과처럼 영상이 없으면 눌러도 아무 일도, 아무 말도 없었다. */
+  if((e.ctrlKey||e.metaKey) && !e.shiftKey && !e.altKey
+     && String(e.key||"").toLowerCase()==="c"
+     && !$("dlg").classList.contains("on") && !$("fmodal").classList.contains("on")){
+    /* 제목처럼 글자를 끌어서 선택해 뒀거나 입력칸 안이라면 글자 복사에 맡긴다 */
+    const sel=window.getSelection();
+    if(sel && !sel.isCollapsed && String(sel).trim()) return;
+    const ae=document.activeElement;
+    if(ae && (ae.tagName==="INPUT" || ae.tagName==="TEXTAREA" || ae.isContentEditable)) return;
+    e.preventDefault();
+    if(!res.classList.contains("on")){
+      toast("복사할 것이 없습니다 — 먼저 영상에서 컷을 뽑아주세요"); return; }
+    copyNow(); return;
+  }
   if(!res.classList.contains("on")) return;
   if(e.key==="Enter"){ e.preventDefault(); toggleFull($("vPane")); return; }
   if(e.key==="Escape" && document.fullscreenElement){
@@ -4445,18 +4479,25 @@ document.addEventListener("keydown",e=>{
   else if(k==="i"){ e.preventDefault(); $("setIn").click(); }
   else if(k==="o"){ e.preventDefault(); $("setOut").click(); }
   else if(e.key==="Tab"){ e.preventDefault(); toggleInfo(); }
-  else if((e.ctrlKey||e.metaKey)&&k==="c"){
-    /* 제목처럼 글자를 끌어서 선택해 둔 상태라면 글자를 복사해야 한다.
-       예전에는 무조건 화면/컷을 복사해서 글 복사가 아예 안 됐다. */
-    const sel=window.getSelection();
-    if(sel && !sel.isCollapsed && String(sel).trim()) return;   // 브라우저 기본 복사에 맡김
-    e.preventDefault();
-    const list=selShots();
-    // 전체화면이거나 마지막으로 영상을 만졌으면 '지금 보는 화면'을 복사
-    if(document.fullscreenElement || S.focusArea==="video" || !list.length) copyFrame();
-    else fullBlob(list[0]).then(b=>copyBlob(b));
-  }
 });
+
+/* 지금 화면에서 '복사할 것'을 스스로 골라 복사한다.
+   순서: 전체화면/영상을 보고 있으면 그 화면 → 골라둔 컷 → 지금 위치의 컷 → 영상 화면.
+   무엇도 없으면 무엇을 하면 되는지 알려준다 (조용히 끝나지 않는다). */
+async function copyNow(){
+  if((document.fullscreenElement || S.focusArea==="video") && hasVideo() && pv.videoWidth)
+    return copyFrame();
+  const list=selShots();
+  if(list.length){
+    if(list.length>1) toast("한 장만 복사됩니다 (첫 번째 선택)");
+    return copyBlob(await fullBlob(list[0]));
+  }
+  const shots=curShots();
+  if(S.curShot>=0 && shots[S.curShot]) return copyBlob(await fullBlob(shots[S.curShot]));
+  if(hasVideo() && pv.videoWidth) return copyFrame();
+  if(shots.length) return toast("복사할 컷을 먼저 클릭해서 골라주세요");
+  toast("복사할 컷이 없습니다");
+}
 
 /* ---------- 앱 설정(매니페스트) / 오프라인 준비 ---------- */
 (()=>{

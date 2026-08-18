@@ -101,6 +101,9 @@ contextBridge.exposeInMainWorld("CG", {
   openExternal: (u) => ipcRenderer.invoke("openExternal", u),
   dirSize: (p) => ipcRenderer.invoke("dirSize", p),
 
+  /* 그림 복사 (화면 쪽 복사가 막혔을 때 쓰는 확실한 길) */
+  copyImage: (bytes) => ipcRenderer.invoke("copyImage", bytes),
+
   /* 파일 읽고 쓰기 */
   readFile: (p) => ipcRenderer.invoke("readFile", p),
   writeFile: (p, data) => ipcRenderer.invoke("writeFile", { path: p, data }),
