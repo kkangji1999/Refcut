@@ -39,7 +39,8 @@
       {
         "provider": "github",
         "owner": "kkangji1999",
-        "repo": "Refcut"
+        "repo": "Refcut",
+        "releaseType": "release"
       }
     ],
     "extraResources": [
@@ -72,6 +73,9 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Refcut"
+    },
+    "releaseInfo": {
+      "releaseNotes": "이번에 바뀐 내용\n\n· 업데이트가 자동이 됩니다 — 새 버전이 있으면 프로그램이 직접 받아서, 다시 켤 때 갈아끼웁니다\n· 받는 동안 얼마나 받았는지 보여줍니다. 더 이상 내려받는 폴더로 넘어가지 않습니다\n· 화면에 뜨는 버전 번호가 설치된 진짜 버전을 따라갑니다\n\n※ 이번 한 번만 손으로 설치해 주세요. 다음 버전부터는 저절로 됩니다."
     }
   },
   "allowScripts": {
