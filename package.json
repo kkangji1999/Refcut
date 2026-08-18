@@ -1,7 +1,7 @@
 {
   "name": "refcut",
   "productName": "Refcut",
-  "version": "26.8.1814",
+  "version": "26.8.2501",
   "description": "영상에서 컷이 바뀔 때마다 대표 프레임을 자동으로 뽑아주는 도구",
   "main": "main.js",
   "author": "FreeWillusion",

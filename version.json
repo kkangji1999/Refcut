@@ -1,5 +1,5 @@
 {
-  "version": "26.8.1814",
-  "notes": "첫 배포",
+  "version": "26.8.2501",
+  "notes": "이번에 바뀐 내용\n\n· TVCF 처럼 재생 창이 열리는 사이트는, 주소를 붙여넣는 순간 안내가 먼저 나옵니다\n· 유튜브 · 비메오 · TVCF 영상은 사이트에 적힌 제목을 그대로 가져옵니다\n· 즐겨찾기에서 Ctrl+C / Ctrl+V 로 같은 사진을 다른 폴더에도 넣을 수 있습니다",
   "url": "https://drive.google.com/drive/folders/1pCXhNme7PDT-x8wecyS45-OgKhh3rsuE?usp=sharing"
 }

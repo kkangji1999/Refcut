@@ -609,12 +609,19 @@ ipcMain.handle("sniffOpen", async (e, pageUrl) => {
         /* 주소 안에 720p 같은 표기가 있으면 화질 힌트로 쓴다.
            playlist(전체 목록)가 chunklist(조각 목록)보다 낫다. */
         const hm = u.match(/(\d{3,4})[pP][^\d]/) || u.match(/[_-](\d{3,4})p/);
+        /* ★ 스트림 주소에는 제목이 없다. 그 영상이 올라와 있던 웹페이지의
+           제목을 같이 보내, 사이트에 적힌 제목 그대로 쓸 수 있게 한다. */
+        let pageTitle = "";
+        try {
+          if (sniffWin && !sniffWin.isDestroyed()) pageTitle = sniffWin.webContents.getTitle() || "";
+        } catch (x) {}
         e.sender.send("sniffFound", {
           url: u,
           kind: /\.m3u8/i.test(u) ? "HLS" : /\.mpd/i.test(u) ? "DASH" : "MP4",
           height: hm ? parseInt(hm[1], 10) : 0,
           master: /playlist|master|index/i.test(key) && !/chunk/i.test(key),
           name: decodeURIComponent(key.split("/").pop() || "").slice(0, 60),
+          pageTitle,
         });
       }
     }
