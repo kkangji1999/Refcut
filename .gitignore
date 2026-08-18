@@ -1,0 +1,19 @@
+# 의존성 — npm install 로 다시 받는다
+node_modules/
+
+# 빌드 결과물
+dist/
+out/
+
+# 로그
+*.log
+npm-debug.log*
+
+# 작업용 메모 (저장소에 올리지 않는다)
+요청*.txt
+
+# OS / 편집기 찌꺼기
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/

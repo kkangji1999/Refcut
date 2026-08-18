@@ -1,0 +1,69 @@
+{
+  "name": "refcut",
+  "productName": "Refcut",
+  "version": "26.8.1814",
+  "description": "영상에서 컷이 바뀔 때마다 대표 프레임을 자동으로 뽑아주는 도구",
+  "main": "main.js",
+  "author": "FreeWillusion",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --x64",
+    "dist:dir": "electron-builder --dir"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "dependencies": {
+    "ffmpeg-static": "^5.2.0"
+  },
+  "build": {
+    "appId": "com.freewillusion.refcut",
+    "productName": "Refcut",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "app/**/*",
+      "build/icon.*"
+    ],
+    "extraResources": [
+      {
+        "from": "node_modules/ffmpeg-static",
+        "to": "bin",
+        "filter": [
+          "ffmpeg*",
+          "!**/*.md",
+          "!package.json",
+          "!index.js"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Refcut"
+    }
+  },
+  "allowScripts": {
+    "electron@31.7.7": true,
+    "ffmpeg-static@5.3.0": true
+  }
+}
