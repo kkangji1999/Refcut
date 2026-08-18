@@ -37,6 +37,7 @@ window.addEventListener("change", (e) => {
 
 contextBridge.exposeInMainWorld("CG", {
   isElectron: true,
+  version: ipcRenderer.sendSync("appVersion"),   /* 설치된 진짜 버전 */
   pathOf,                         /* 개별 파일의 위치 (되면) */
   lastDropped: () => LAST_DROP.slice(),   /* 방금 넣은 파일들의 위치 */
 
@@ -70,6 +71,15 @@ contextBridge.exposeInMainWorld("CG", {
   getRoot: () => ipcRenderer.invoke("getRoot"),
   setRoot: (d) => ipcRenderer.invoke("setRoot", d),
   checkUpdate: () => ipcRenderer.invoke("checkUpdate"),
+
+  /* 새 버전 내려받기 — onProgress(받은양, 전체, 퍼센트) 가 계속 불린다 */
+  downloadUpdate: (onProgress) => {
+    const h = (_e, m) => onProgress && onProgress(m);
+    ipcRenderer.on("updProgress", h);
+    return ipcRenderer.invoke("downloadUpdate")
+      .finally(() => ipcRenderer.removeListener("updProgress", h));
+  },
+  installUpdate: () => ipcRenderer.invoke("installUpdate"),
 
   /* 영상 링크로 받기 */
   ytInfo: (url, useCookies, referer) =>

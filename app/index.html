@@ -1488,7 +1488,8 @@ function download(blob,name){
    26.8.1601  =  2026년 8월 16일, 그날의 1번째 빌드
    같은 날 두 번째로 내보내면 26.8.1602 로 올린다.
    업데이트 확인은 마디마다 숫자로 비교하므로(verNum) 자리수가 달라도 안전하다. */
-const APP_VERSION = "26.8.2501";
+/* 앱으로 켰으면 설치된 진짜 버전을 그대로 쓴다 (여기 숫자는 웹으로 열 때의 몫) */
+const APP_VERSION = (window.CG && window.CG.version) || "26.8.2503";
 const APP_DATE    = "2026.08.18";
 /* 최신 index.html 이 올라가 있는 주소.
    여기에 넣어두면 [업데이트] 버튼이 새 버전을 확인합니다.
@@ -4568,17 +4569,66 @@ async function checkUpdateEl(quiet){
       if(!quiet) toast(`이미 최신입니다 (v${APP_VERSION})`);
       return;
     }
-    const go=await appConfirm(
-      `<b>새 버전이 있습니다</b><br><br>`
-      +`지금 버전 <b>v${APP_VERSION}</b> → 새 버전 <b>v${r.version}</b><br><br>`
+    const head=`지금 버전 <b>v${APP_VERSION}</b> → 새 버전 <b>v${r.version}</b><br><br>`
       +(r.notes?`<div style="background:#12141a;border:1px solid #262a33;border-radius:8px;
            padding:10px 12px;font-size:12px;line-height:1.7;white-space:pre-wrap">${
-           String(r.notes).replace(/</g,"&lt;")}</div><br>`:"")
-      +`받으시겠습니까? 브라우저에서 내려받는 창이 열립니다.<br>`
-      +`<small>내려받은 파일을 실행하면 설치됩니다. 기록과 이미지는 그대로 유지됩니다.</small>`,
-      "업데이트");
-    if(go && r.url) await window.CG.openExternal(r.url);
+           String(r.notes).replace(/</g,"&lt;")}</div><br>`:"");
+
+    /* 옛 방식 — 릴리스를 읽지 못했을 때만. 예전처럼 내려받는 곳을 열어준다. */
+    if(r.manual){
+      const go=await appConfirm(`<b>새 버전이 있습니다</b><br><br>`+head
+        +`받으시겠습니까? 브라우저에서 내려받는 창이 열립니다.<br>`
+        +`<small>내려받은 파일을 실행하면 설치됩니다. 기록과 이미지는 그대로 유지됩니다.</small>`,
+        "업데이트");
+      if(go && r.url) await window.CG.openExternal(r.url);
+      return;
+    }
+
+    /* 자동 — 프로그램이 직접 받아서 갈아끼운다 */
+    const go=await appConfirm(`<b>새 버전이 있습니다</b><br><br>`+head
+      +`지금 받을까요?<br>`
+      +`<small>받는 동안 하던 일은 그대로 하셔도 됩니다. 다 받으면 다시 켤 때 적용되고,`
+      +` 기록과 이미지는 그대로 유지됩니다.</small>`, "업데이트");
+    if(!go) return;
+
+    updProgOpen(r.version);
+    const d=await window.CG.downloadUpdate(m=>updProgSet(m));
+    updProgClose();
+    if(!d || !d.ok){
+      appAlert(`내려받지 못했습니다.<br><br>인터넷 연결을 확인하고 다시 눌러주세요.`
+        +`<br><small>${String((d&&d.error)||"").replace(/</g,"&lt;")}</small>`,"업데이트");
+      return;
+    }
+    const now=await appConfirm(`<b>다 받았습니다 (v${r.version})</b><br><br>`
+      +`지금 다시 켜서 새 버전으로 바꿀까요?<br>`
+      +`<small>나중에 하셔도 됩니다 — 프로그램을 끌 때 저절로 적용됩니다.</small>`,"업데이트");
+    if(now) await window.CG.installUpdate();
   }finally{ if(b && !quiet){ b.textContent=old; b.disabled=false; } }
+}
+/* 내려받는 동안 보여주는 창. 버튼이 없다 — 끝나면 저절로 닫힌다. */
+function updProgOpen(ver){
+  $("dlgTitle").textContent="업데이트";
+  $("dlgBody").innerHTML=`<b>v${ver} 를 받고 있습니다</b><br><br>
+    <div style="height:10px;background:#12141a;border:1px solid #262a33;
+                border-radius:6px;overflow:hidden">
+      <div id="updBar" style="height:100%;width:0%;background:#ffd400;
+                              transition:width .2s"></div></div>
+    <div id="updNum" style="margin-top:8px;font-size:12px;color:#b2bac8">준비 중...</div>
+    <br><small>다 받으면 알려드립니다. 그동안 하던 일은 그대로 하셔도 됩니다.</small>`;
+  $("dlgBtns").style.display="none";
+  $("dlg").onclick=null;
+  $("dlg").classList.add("on");
+}
+function updProgSet(m){
+  const bar=$("updBar"), num=$("updNum"); if(!bar||!num) return;
+  const pc=Math.max(0,Math.min(100,+m.percent||0));
+  const mb=x=>((+x||0)/1048576).toFixed(1);
+  bar.style.width=pc.toFixed(1)+"%";
+  num.textContent=`${pc.toFixed(0)}%  ·  ${mb(m.transferred)} / ${mb(m.total)} MB`
+    +(m.speed?`  ·  ${mb(m.speed)} MB/s`:"");
+}
+function updProgClose(){
+  $("dlg").classList.remove("on"); $("dlgBtns").style.display="";
 }
 if(IS_EL){
   on$("updBtn","onclick",()=>checkUpdateEl(false));

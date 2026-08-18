@@ -1,7 +1,7 @@
 {
   "name": "refcut",
   "productName": "Refcut",
-  "version": "26.8.2502",
+  "version": "26.8.2503",
   "description": "영상에서 컷이 바뀔 때마다 대표 프레임을 자동으로 뽑아주는 도구",
   "main": "main.js",
   "author": "FreeWillusion",
@@ -9,13 +9,15 @@
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win --x64",
-    "dist:dir": "electron-builder --dir"
+    "dist:dir": "electron-builder --dir",
+    "release": "electron-builder --win --x64 --publish always"
   },
   "devDependencies": {
     "electron": "^31.0.0",
     "electron-builder": "^24.13.3"
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "ffmpeg-static": "^5.2.0"
   },
   "build": {
@@ -29,7 +31,16 @@
       "main.js",
       "preload.js",
       "app/**/*",
-      "build/icon.*"
+      "build/icon.*",
+      "node_modules/**/*",
+      "!node_modules/ffmpeg-static/**"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "kkangji1999",
+        "repo": "Refcut"
+      }
     ],
     "extraResources": [
       {
@@ -54,6 +65,7 @@
       ],
       "icon": "build/icon.ico"
     },
+    "artifactName": "${productName}-Setup-${version}.${ext}",
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,

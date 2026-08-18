@@ -258,20 +258,85 @@ ipcMain.handle("revealFolder", async (_e, p) => {
 
 ipcMain.handle("defaultOutDir", () => rootDir());
 
-/* ---------- 업데이트 확인 (GitHub) ----------
-   저장소에 version.json 하나만 올려두면 된다:
-     { "version": "26.8.1801", "notes": "무엇이 바뀌었는지", "url": "설치파일 주소" }
-   프로그램은 켤 때와 [업데이트] 버튼을 누를 때 이 파일만 확인한다. */
+/* 화면에 보여줄 지금 버전. 손으로 적어둔 숫자를 쓰면 올리는 것을 잊는 순간
+   "이미 최신" 같은 거짓말을 하게 되므로, 설치된 진짜 버전을 그대로 준다. */
+ipcMain.on("appVersion", (e) => { e.returnValue = app.getVersion(); });
+
+/* =========================================================================
+   업데이트
+   -------------------------------------------------------------------------
+   깃허브 릴리스에 올려둔 설치 파일을 프로그램이 스스로 받아서 갈아끼운다.
+   사람이 할 일은 없다 — 받겠다고 한 번 답하고, 다 받으면 다시 켜기만 하면 된다.
+
+   릴리스에는 설치 파일(.exe)과 목록(latest.yml)이 함께 올라가 있어야 한다.
+   `npm run release` 가 둘 다 만들어 올린다.
+
+   릴리스를 찾지 못하는 옛 방식도 남겨뒀다. 그때는 예전처럼 version.json 을
+   보고 내려받는 곳을 열어준다 (자동은 아니지만 길은 끊기지 않는다).
+   ========================================================================= */
+const { autoUpdater } = require("electron-updater");
+autoUpdater.autoDownload = false;          // 물어보고 받는다
+autoUpdater.autoInstallOnAppQuit = true;   // 받아뒀으면 끌 때 갈아끼운다
+autoUpdater.logger = null;
+
 const UPDATE_URL =
   "https://raw.githubusercontent.com/kkangji1999/Refcut/main/version.json";
-ipcMain.handle("checkUpdate", async () => {
+
+/* 옛 방식 — 릴리스를 못 쓸 때만 쓰는 뒷길 */
+async function checkByFile() {
   try {
     const res = await net.fetch(UPDATE_URL, { cache: "no-store" });
     if (!res.ok) return { ok: false, error: "확인 실패 (" + res.status + ")" };
     const j = await res.json();
-    return { ok: true, version: j.version, notes: j.notes || "", url: j.url || "",
-             current: app.getVersion() };
+    return { ok: true, manual: true, version: j.version, notes: j.notes || "",
+             url: j.url || "", current: app.getVersion() };
   } catch (e) { return { ok: false, error: String(e.message || e) }; }
+}
+
+ipcMain.handle("checkUpdate", async () => {
+  if (isDev) return checkByFile();          // 개발 중에는 릴리스 정보가 없다
+  try {
+    const r = await autoUpdater.checkForUpdates();
+    const v = r && r.updateInfo && r.updateInfo.version;
+    if (!v) return checkByFile();
+    let notes = r.updateInfo.releaseNotes || "";
+    if (Array.isArray(notes)) notes = notes.map((n) => n.note || "").join("\n");
+    notes = String(notes).replace(/<[^>]+>/g, "").trim();
+    return { ok: true, manual: false, version: v, notes,
+             current: app.getVersion() };
+  } catch (e) {
+    const f = await checkByFile();          // 릴리스가 없거나 못 읽으면 옛 방식으로
+    if (f.ok) return f;
+    return { ok: false, error: String((e && e.message) || e) };
+  }
+});
+
+/* 내려받기 — 얼마나 받았는지 화면에 계속 알려준다 */
+ipcMain.handle("downloadUpdate", async () => {
+  return new Promise((resolve) => {
+    const send = (ch, m) => { try { win && win.webContents.send(ch, m); } catch (x) {} };
+    const onProg = (p) => send("updProgress", {
+      percent: p.percent || 0, transferred: p.transferred || 0,
+      total: p.total || 0, speed: p.bytesPerSecond || 0 });
+    const done = (r) => {
+      autoUpdater.removeListener("download-progress", onProg);
+      autoUpdater.removeListener("update-downloaded", onOk);
+      autoUpdater.removeListener("error", onErr);
+      resolve(r);
+    };
+    const onOk = () => done({ ok: true });
+    const onErr = (e) => done({ ok: false, error: String((e && e.message) || e) });
+    autoUpdater.on("download-progress", onProg);
+    autoUpdater.once("update-downloaded", onOk);
+    autoUpdater.once("error", onErr);
+    autoUpdater.downloadUpdate().catch(onErr);
+  });
+});
+
+/* 다시 켜면서 갈아끼우기 */
+ipcMain.handle("installUpdate", () => {
+  setImmediate(() => autoUpdater.quitAndInstall(false, true));
+  return { ok: true };
 });
 ipcMain.handle("openExternal", (_e, u) => { shell.openExternal(u); return { ok: true }; });
 
