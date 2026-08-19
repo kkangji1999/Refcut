@@ -809,6 +809,167 @@ ipcMain.handle("ytDownload", async (e, { url, dest, jobId, height, plan, useCook
    이 방법은 대부분의 사이트에서 통한다.
    ★ 로그인이 필요하면 그 창에서 그냥 로그인하시면 되고, 그 상태는 다음에도 남는다.
    ========================================================================= */
+/* ---------- 주소에서 화질 읽기 ----------
+   스트림 주소에는 대개 화질이 적혀 있다 (720p · 1280x720 · /1080/ 처럼).
+   그 표기를 읽어 "이 주소는 몇 p 짜리인가" 를 짐작한다. */
+const TIERS = [2160, 1440, 1080, 900, 720, 576, 540, 480, 360, 240];
+const TIER_W = { 2160: 3840, 1440: 2560, 1080: 1920, 900: 1600, 720: 1280,
+                 576: 1024, 540: 960, 480: 854, 360: 640, 240: 426 };
+function heightFromUrl(u) {
+  const s = String(u || "");
+  let m = s.match(/(\d{3,4})[pP](?![a-zA-Z0-9])/);          // 720p
+  if (m && +m[1] >= 144) return +m[1];
+  m = s.match(/(\d{3,4})[xX](\d{3,4})/);                    // 1280x720
+  if (m && +m[2] >= 144) return +m[2];
+  for (const h of TIERS) {                                  // /1080/ · _1080 · -1080
+    if (new RegExp("(?:^|[^0-9])" + h + "(?:[^0-9]|$)").test(s)) return h;
+  }
+  return 0;
+}
+/* 전체 목록(master)처럼 보이는가 — 조각 목록보다 이쪽이 낫다 */
+function looksMaster(key) {
+  return /playlist|master|index|manifest/i.test(key) && !/chunk|seg|frag/i.test(key);
+}
+
+/* ---------- 화질 올려잡기 ----------
+   재생 창에서 잡히는 주소는 "그때 재생되던 화질" 하나뿐이다.
+   플레이어가 720p 로 시작하면, 1080p 가 있는 영상이라도 720p 주소만 잡힌다.
+   (TVCF 에서 최고 화질을 골라도 720p 로 나오던 것이 바로 이것이다)
+   그래서 잡은 주소에서 더 높은 화질의 형제 주소를 직접 찾아본다.
+     · HLS 조각 목록이면 → 전체 목록(master)을 찾아 올린다.
+       전체 목록에는 화질이 다 들어 있어서 yt-dlp 가 최고 화질을 고른다.
+     · 주소에 화질이 박혀 있으면 → 그 자리를 높은 숫자로 바꿔 보고,
+       실제로 응답하는 것만 쓴다.
+   확인되지 않은 후보는 버리므로, 못 찾으면 원래 주소 그대로다. */
+function peek(url, referer, ms, range) {
+  return new Promise((resolve) => {
+    let body = "", done = false, req = null;
+    const fin = (v) => {
+      if (done) return;
+      done = true; clearTimeout(t);
+      try { if (req) req.abort(); } catch (x) {}
+      resolve(v);
+    };
+    const t = setTimeout(() => fin(null), ms || 6000);
+    try {
+      const { session } = require("electron");
+      req = net.request({ url, session: session.fromPartition("persist:sniff"),
+                          useSessionCookies: true });
+    } catch (x) { return fin(null); }
+    try {
+      req.setHeader("User-Agent", UA);
+      if (referer) {
+        req.setHeader("Referer", referer);
+        const o = originOf(referer).replace(/\/$/, "");
+        if (o) req.setHeader("Origin", o);
+      }
+      if (range) req.setHeader("Range", range);
+    } catch (x) {}
+    req.on("response", (res) => {
+      const pick = (k) => {
+        const h = res.headers || {};
+        const kk = Object.keys(h).find((x) => x.toLowerCase() === k);
+        return kk ? String([].concat(h[kk])[0] || "") : "";
+      };
+      const info = { code: res.statusCode || 0, type: pick("content-type"),
+                     len: parseInt(pick("content-length"), 10) || 0, body: "" };
+      res.on("data", (c) => { if (body.length < 200000) body += c.toString("utf8"); });
+      res.on("end", () => { info.body = body; fin(info); });
+      res.on("error", () => { info.body = body; fin(info); });
+    });
+    req.on("error", () => fin(null));
+    try { req.end(); } catch (x) { fin(null); }
+  });
+}
+const isMasterM3U = (t) => /#EXT-X-STREAM-INF/i.test(String(t || ""));
+function maxHeightOfMaster(t) {
+  let best = 0, m;
+  const re = /RESOLUTION=(\d+)[xX](\d+)/g;
+  while ((m = re.exec(String(t || "")))) best = Math.max(best, parseInt(m[2], 10));
+  return best;
+}
+/* 같은 폴더와 그 윗 폴더에서, 전체 목록으로 흔히 쓰는 이름들을 찾아본다 */
+function masterCandidates(url) {
+  const outs = [];
+  try {
+    const u = new URL(url);
+    const segs = u.pathname.split("/");
+    const file = segs.pop() || "";
+    const names = ["master.m3u8", "playlist.m3u8", "index.m3u8", "manifest.m3u8"];
+    for (let up = 0; up <= 2; up++) {
+      const dir = segs.slice(0, segs.length - up);
+      if (dir.length < 1) break;
+      for (const n of names) {
+        if (up === 0 && n === file) continue;
+        outs.push(u.origin + dir.join("/") + "/" + n + u.search);
+      }
+    }
+  } catch (x) {}
+  return outs;
+}
+/* 주소에 박힌 화질 표기를 더 높은 화질로 바꾼 후보들 */
+function qualitySwaps(url, from, to) {
+  const outs = new Set();
+  const put = (a, b) => { if (a && url.includes(a)) outs.add(url.split(a).join(b)); };
+  put(from + "p", to + "p");
+  put(from + "P", to + "P");
+  put("_" + from, "_" + to);
+  put("-" + from, "-" + to);
+  put("/" + from + "/", "/" + to + "/");
+  put("=" + from, "=" + to);
+  put("x" + from, "x" + to);
+  if (TIER_W[from] && TIER_W[to])
+    put(TIER_W[from] + "x" + from, TIER_W[to] + "x" + to);
+  outs.delete(url);
+  return [...outs];
+}
+async function upgradeStream(url, referer, want) {
+  const cur = heightFromUrl(url);
+  const out = { url, height: cur, from: cur, upgraded: false };
+  const isM3U = /\.m3u8(\?|$)/i.test(url);
+  const cap = want && want > 0 ? want : 4320;
+  let tried = 0;
+
+  if (isM3U) {
+    const r = await peek(url, referer, 7000);
+    if (r && r.body && isMasterM3U(r.body)) {
+      out.height = maxHeightOfMaster(r.body) || cur;
+      return out;                    // 이미 전체 목록이다 — 손댈 것이 없다
+    }
+    for (const c of masterCandidates(url)) {
+      if (tried++ > 10) break;
+      const g = await peek(c, referer, 5000);
+      if (!g || g.code < 200 || g.code >= 300) continue;
+      if (!isMasterM3U(g.body)) continue;
+      const h = maxHeightOfMaster(g.body);
+      if (cur && h && h < cur) continue;          // 오히려 낮아지면 쓰지 않는다
+      out.url = c; out.height = h || cur; out.upgraded = true;
+      return out;
+    }
+  }
+  if (!cur) return out;              // 화질이 어디에 적혔는지 모르면 손대지 않는다
+  for (const t of TIERS) {           // 높은 것부터 — 처음 되는 것이 최선이다
+    if (t <= cur || t > cap) continue;
+    for (const c of qualitySwaps(url, cur, t)) {
+      if (tried++ > 16) return out;
+      const g = await peek(c, referer, 5000, isM3U ? null : "bytes=0-1");
+      if (!g || g.code < 200 || g.code >= 300) continue;
+      if (isM3U) { if (!/#EXTM3U/i.test(g.body || "")) continue; }
+      else if (!/video|mp4|octet-stream|mpegurl/i.test(g.type || "")) continue;
+      out.url = c; out.height = t; out.upgraded = true;
+      return out;
+    }
+  }
+  return out;
+}
+/* 화면 쪽에서 "이 주소보다 좋은 것이 있나" 하고 물어본다 */
+ipcMain.handle("streamUpgrade", async (_e, { url, referer, want }) => {
+  try {
+    const r = await upgradeStream(String(url || ""), referer || "", want || 0);
+    return { ok: true, ...r };
+  } catch (err) { return { ok: false, url, height: 0, upgraded: false }; }
+});
+
 let sniffWin = null;
 ipcMain.handle("sniffOpen", async (e, pageUrl) => {
   if (sniffWin) { try { sniffWin.close(); } catch (x) {} sniffWin = null; }
@@ -816,32 +977,52 @@ ipcMain.handle("sniffOpen", async (e, pageUrl) => {
   const part = session.fromPartition("persist:sniff");   // 로그인 상태를 기억한다
   const found = new Map();
 
+  /* 찾은 주소 하나를 화면 쪽으로 넘긴다 */
+  const report = (u, ctype) => {
+    const key = u.split("?")[0];
+    if (found.has(key) || found.size > 40) return;
+    found.set(key, u);
+    /* ★ 스트림 주소에는 제목이 없다. 그 영상이 올라와 있던 웹페이지의
+       제목을 같이 보내, 사이트에 적힌 제목 그대로 쓸 수 있게 한다. */
+    let pageTitle = "";
+    try {
+      if (sniffWin && !sniffWin.isDestroyed()) pageTitle = sniffWin.webContents.getTitle() || "";
+    } catch (x) {}
+    const tag = u + " " + (ctype || "");
+    e.sender.send("sniffFound", {
+      url: u,
+      kind: /\.m3u8|mpegurl/i.test(tag) ? "HLS" : /\.mpd|dash\+xml/i.test(tag) ? "DASH" : "MP4",
+      /* 주소 안에 720p · 1280x720 · /1080/ 같은 표기가 있으면 화질 힌트로 쓴다.
+         playlist(전체 목록)가 chunklist(조각 목록)보다 낫다. */
+      height: heightFromUrl(u),
+      master: looksMaster(key),
+      name: decodeURIComponent(key.split("/").pop() || "").slice(0, 60),
+      pageTitle,
+    });
+  };
+  /* 조각 파일은 후보가 아니다 (수십 개가 흘러와 창이 닫히지 않게 된다) */
+  const isSegment = (u) =>
+    /\.(ts|m4s)(\?|$)/i.test(u) || /seg[-_]?\d|chunk|frag[-_]?\d/i.test(u);
+
   part.webRequest.onBeforeRequest({ urls: ["<all_urls>"] }, (details, cb) => {
     const u = details.url;
     if (/\.(m3u8|mpd)(\?|$)/i.test(u) ||
-        (/\.mp4(\?|$)/i.test(u) && !/thumb|poster|preview/i.test(u))) {
-      const key = u.split("?")[0];
-      if (!found.has(key)) {
-        found.set(key, u);
-        /* 주소 안에 720p 같은 표기가 있으면 화질 힌트로 쓴다.
-           playlist(전체 목록)가 chunklist(조각 목록)보다 낫다. */
-        const hm = u.match(/(\d{3,4})[pP][^\d]/) || u.match(/[_-](\d{3,4})p/);
-        /* ★ 스트림 주소에는 제목이 없다. 그 영상이 올라와 있던 웹페이지의
-           제목을 같이 보내, 사이트에 적힌 제목 그대로 쓸 수 있게 한다. */
-        let pageTitle = "";
-        try {
-          if (sniffWin && !sniffWin.isDestroyed()) pageTitle = sniffWin.webContents.getTitle() || "";
-        } catch (x) {}
-        e.sender.send("sniffFound", {
-          url: u,
-          kind: /\.m3u8/i.test(u) ? "HLS" : /\.mpd/i.test(u) ? "DASH" : "MP4",
-          height: hm ? parseInt(hm[1], 10) : 0,
-          master: /playlist|master|index/i.test(key) && !/chunk/i.test(key),
-          name: decodeURIComponent(key.split("/").pop() || "").slice(0, 60),
-          pageTitle,
-        });
-      }
-    }
+        (/\.mp4(\?|$)/i.test(u) && !/thumb|poster|preview/i.test(u) && !isSegment(u)))
+      report(u, "");
+    cb({});
+  });
+  /* ★ 주소 끝이 .mp4 가 아닌 영상도 있다 — 물음표 뒤에 이름을 숨기거나,
+     확장자 없이 내려주는 곳이 있다. 그때는 돌아온 응답의 종류를 보고 알아본다.
+     (주소만 봐서는 모르는 곳도 이렇게 하면 잡힌다) */
+  part.webRequest.onHeadersReceived({ urls: ["<all_urls>"] }, (details, cb) => {
+    try {
+      const h = details.responseHeaders || {};
+      const kk = Object.keys(h).find((k) => k.toLowerCase() === "content-type");
+      const ct = kk ? String([].concat(h[kk])[0] || "") : "";
+      if (/mpegurl|dash\+xml|video\/(mp4|webm|quicktime|x-m4v)/i.test(ct) &&
+          !/thumb|poster|preview/i.test(details.url) && !isSegment(details.url))
+        report(details.url, ct);
+    } catch (x) {}
     cb({});
   });
 
@@ -853,6 +1034,7 @@ ipcMain.handle("sniffOpen", async (e, pageUrl) => {
   });
   sniffWin.on("closed", () => {
     try { part.webRequest.onBeforeRequest(null); } catch (x) {}
+    try { part.webRequest.onHeadersReceived(null); } catch (x) {}
     sniffWin = null;
     try { e.sender.send("sniffClosed"); } catch (x) {}
   });

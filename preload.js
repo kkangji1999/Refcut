@@ -112,6 +112,8 @@ contextBridge.exposeInMainWorld("CG", {
     return ipcRenderer.invoke("sniffOpen", pageUrl);
   },
   sniffClose: () => ipcRenderer.invoke("sniffClose"),
+  /* 잡은 스트림 주소보다 더 좋은 화질이 있는지 찾아본다 */
+  streamUpgrade: (o) => ipcRenderer.invoke("streamUpgrade", o||{}),
   openExternal: (u) => ipcRenderer.invoke("openExternal", u),
   dirSize: (p) => ipcRenderer.invoke("dirSize", p),
 
