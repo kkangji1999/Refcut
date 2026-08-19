@@ -855,7 +855,7 @@
     <div id="drop">
       <div id="dIcon">🎬</div>
       <div id="dMain">영상 파일을 끌어다 놓으세요</div>
-      <div id="dSub">여기를 눌러 폴더에서 고를 수도 있습니다 · 여러 개도 한 번에</div>
+      <div id="dSub">눌러서 고르기 · 여러 개 한 번에</div>
     </div>
 
     <!-- 영상을 넣는 두 번째 길. 파일과 같은 무게로 보이게 카드로 세운다.
@@ -883,7 +883,7 @@
         <button class="mini" id="sniffDone">그만두기</button></div>
       <div class="sniffTip" id="sniffTip"></div>
     </div>
-    <div id="linkHint">유튜브 · 비메오 · 인스타 · TVCF 등 — 내려받은 뒤 바로 분석합니다</div>
+    <div id="linkHint">유튜브 · 비메오 · 인스타 · TVCF — 받아서 바로 분석합니다</div>
 
     <input type="file" id="file" accept="video/*" multiple hidden>
     <input type="file" id="reattach" accept="video/*" hidden>
@@ -917,7 +917,6 @@
     <div class="sideHead" style="margin-top:4px">
       <div class="sideTitle">추출 기록 <b id="histCount"></b></div>
     </div>
-    <div id="outDirLine"></div>
     <div id="hist"></div>
     <div class="sideFoot">
       <div class="usageRow"><span id="usage"></span></div>
@@ -933,7 +932,7 @@
         <span class="hIcon">♥</span> 즐겨찾기 <b id="favCount">0</b>
       </button>
     </div>
-    <div class="sub">영상을 넣으면 컷·포커스·카메라가 바뀔 때마다 자동으로 프레임을 뽑습니다</div>
+    <div class="sub">영상을 넣으면 컷이 바뀔 때마다 대표 프레임을 한 장씩 뽑습니다</div>
     <div id="update"></div>
 
 
@@ -1006,9 +1005,8 @@
                 title="컷마다 한 장 — 그 컷이 시작되는 첫 프레임입니다.&#10;컷이 어디서 나뉘는지 확인할 때 좋습니다.">스타트 프레임</button>
             </span>
           </div>
-          <div id="startNote">컷이 나뉘는 자리마다 그 컷의 <b>첫 프레임</b>을 한 장씩 뽑습니다.
-            분석 프레임과 컷 번호가 서로 같습니다.
-            디졸브처럼 서서히 넘어가는 전환은 시작점이 한두 장 밀릴 수 있습니다.</div>
+          <div id="startNote">컷마다 <b>첫 프레임</b> 한 장 · 분석 프레임과 컷 번호가 같습니다.
+            디졸브처럼 서서히 넘어가는 전환은 한두 장 밀릴 수 있습니다.</div>
           <div class="selBar" id="selBar">
             <b id="gSelCount"></b>
             <button class="mini" id="gFav">♥ 즐겨찾기</button>
@@ -1287,6 +1285,12 @@ async function scanEl(item,tag){
   for(let i=1;i<F.length;i++){ const g=F[i].t-F[i-1].t; if(g>1e-6) gaps.push(g); }
   gaps.sort((a,b)=>a-b);
   F._unit = gaps.length ? gaps[gaps.length>>1] : 1/fps;
+  /* ★ 초당 장수를 간격 하나로 재면 안 된다.
+     프레임 시각은 그릇의 눈금(1/1000초 · 1/24000초 …)에 맞춰 반올림되어 온다.
+     그래서 간격 하나만 보면 23.976 인 영상이 23.975·23.981 처럼 어긋난다.
+     처음과 끝을 잇는 전체 평균으로 보면 그 반올림이 서로 상쇄된다. */
+  const span=F.length>1 ? F[F.length-1].t-F[0].t : 0;
+  F._rate = span>0 ? (F.length-1)/span : (F._unit>0 ? 1/F._unit : fps);
   F._filled = 0;                 // 되짚어 채울 필요가 없다 — 애초에 빠지지 않는다
   return F;
 }
@@ -1661,7 +1665,7 @@ function download(blob,name){
    같은 날 두 번째로 내보내면 26.8.1602 로 올린다.
    업데이트 확인은 마디마다 숫자로 비교하므로(verNum) 자리수가 달라도 안전하다. */
 /* 앱으로 켰으면 설치된 진짜 버전을 그대로 쓴다 (여기 숫자는 웹으로 열 때의 몫) */
-const APP_VERSION = (window.CG && window.CG.version) || "26.8.2506";
+const APP_VERSION = (window.CG && window.CG.version) || "26.8.2507";
 const APP_DATE    = "2026.08.19";
 /* 최신 index.html 이 올라가 있는 주소.
    여기에 넣어두면 [업데이트] 버튼이 새 버전을 확인합니다.
@@ -1746,6 +1750,26 @@ const baseOf=f=>safeName(f.name.replace(/\.[^.]+$/,""));
 const clock=s=>{ if(!isFinite(s)) s=0;
   const m=Math.floor(s/60); return `${m}:${(s-m*60).toFixed(2).padStart(5,"0")}`; };
 const gcd=(a,b)=>b?gcd(b,a%b):a;
+/* 실제로 쓰이는 초당 장수는 정해져 있다. 잰 값이 그중 하나에 아주 가까우면
+   그 값으로 되돌려 놓는다 (23.9751 → 23.976). 24000/1001 처럼 나누어떨어지지
+   않는 값이라 반올림된 채로 두면 긴 영상에서 시각이 조금씩 밀린다. */
+const FPS_STD=[24000/1001, 24, 25, 30000/1001, 30, 48000/1001, 48, 50,
+               60000/1001, 60, 120000/1001, 120];
+function snapFps(v){
+  if(!v || !isFinite(v) || v<=0) return 0;
+  for(const s of FPS_STD) if(Math.abs(v-s)/s < 0.002) return s;
+  return v;
+}
+/* 파일이 알려준 값과 영상에서 잰 값을 맞춰 본다.
+   파일 값(24000/1001 같은 분수)이 더 정확하므로, 잰 값이 그와 거의 같으면
+   파일 값을 그대로 쓴다. 크게 다르면 진짜로 다른 영상이므로 잰 값을 쓴다. */
+function resolveFps(declared, measured){
+  const m=snapFps(measured);
+  if(declared>0 && measured>0 && Math.abs(declared-measured)/measured < 0.02)
+    return {fps:snapFps(declared)||declared, src:"파일 표기 그대로"};
+  if(m>0) return {fps:m, src:"영상에서 잰 값"};
+  return {fps:declared||24, src:"파일 표기 그대로"};
+}
 /* 프레임레이트는 소수점 셋째 자리까지만 (23.976 / 30 / 59.94) */
 const fmtFps=n=>{
   if(!isFinite(n)||!n) return "-";
@@ -1927,6 +1951,33 @@ function jobBytes(j){
   if(j.startSheet&&j.startSheet.size) n+=j.startSheet.size;
   return n;
 }
+/* 기록 하나가 쓰는 폴더 (…/영상이름_CUTS).
+   기록에 적힌 outDir 은 폴더를 옮기면 낡을 수 있으므로, 실제 파일 경로에서
+   거슬러 올라가는 쪽을 먼저 쓴다. */
+function jobFolder(j){
+  const s=((j.shots||[])[0])||((j.startShots||[])[0])||null;
+  const f=s&&s.file;
+  if(f){
+    const seg=String(f).split(/[\\/]/);
+    const i=seg.findIndex(x=>/_CUTS$/i.test(x));
+    if(i>0) return seg.slice(0,i+1).join("/");
+  }
+  if(j.outDir && j.base) return `${j.outDir}/${j.base}_CUTS`;
+  return "";
+}
+/* ★ 기록 하나가 실제로 차지하는 공간 = 그 기록의 폴더 크기.
+   예전의 jobBytes 는 '브라우저 안에 담긴 blob' 만 셌다. 앱(Electron)은 캡쳐를
+   폴더에 파일로 저장하므로 blob 이 아예 없어서, 저장 공간 목록이 무엇을 눌러도
+   0 MB 로만 보였다.
+   폴더째로 재는 이유는 그것이 곧 "이 기록을 지우면 비워지는 공간" 이기 때문이다.
+   주소로 받은 원본 영상도 그 폴더 안에 있어서, 파일만 골라 세면 실제와 크게
+   어긋난다 (합계가 폴더 전체와 맞지 않았다). */
+async function jobSizes(list){
+  if(!IS_EL || !window.CG || !window.CG.dirSizes) return list.map(jobBytes);
+  try{ const r=await window.CG.dirSizes(list.map(jobFolder));
+    return (r&&r.length===list.length) ? r : list.map(jobBytes); }
+  catch(e){ return list.map(jobBytes); }
+}
 $("storeClose").onclick=()=>$("storeBox").classList.remove("on");
 $("storeBox").onclick=e=>{ if(e.target.id==="storeBox") $("storeBox").classList.remove("on"); };
 /* 사용자가 고른 컴퓨터 폴더에 결과를 자동으로 저장한다.
@@ -2028,8 +2079,10 @@ $("storeBtn").onclick=async()=>{
   await renderHist();                       // HIST 를 최신으로 맞춘다
   const LIVE=HIST.filter(j=>!j.archived);
   const KEPT=HIST.filter(j=>j.archived);    // 즐겨찾기만 남긴 보관본
-  const rows=LIVE.map(j=>({j,b:jobBytes(j)})).sort((a,b)=>b.b-a.b);
-  const keptBytes=KEPT.reduce((n,j)=>n+jobBytes(j),0);
+  const sizes=await jobSizes([...LIVE,...KEPT]);   // 실제로 차지하는 공간
+  const keptSize=new Map(KEPT.map((j,i)=>[j.id, sizes[LIVE.length+i]||0]));
+  const rows=LIVE.map((j,i)=>({j,b:sizes[i]||0})).sort((a,b)=>b.b-a.b);
+  const keptBytes=KEPT.reduce((n,j)=>n+(keptSize.get(j.id)||0),0);
   const liveBytes=rows.reduce((n,r)=>n+r.b,0);
 
   const outH=await getOutDir();
@@ -2041,6 +2094,12 @@ $("storeBtn").onclick=async()=>{
        그래서 '경로 메모' 같은 우회 수단이 필요 없다 — 있는 그대로 보여준다. */
     const root=await window.CG.getRoot();
     let used=0; try{ used=await window.CG.dirSize(root); }catch(e){}
+    /* ★ 폴더 전체 크기는 Reftown 이 쓰는 공간이 아니다. 저장 폴더 안에 다른
+       파일이 함께 들어 있으면(문서 폴더를 그대로 쓰는 경우가 흔하다) 몇 배로
+       부풀어 보인다. 그래서 기록들 + _기록 만 더한 값을 앞에 내세운다. */
+    let recB=0;
+    try{ recB=(await window.CG.dirSizes([root+"/_기록"]))[0]||0; }catch(e){}
+    const mine=liveBytes+keptBytes+recB;
     fb.innerHTML=
       `<div class="storeSec">
          <div class="storeSecHead"><span class="num">📁</span>
@@ -2060,7 +2119,10 @@ $("storeBtn").onclick=async()=>{
              <button class="mini" id="copyPath">경로 복사</button>
            </div>
          </div>
-         <div class="storeNote">차지하는 공간 <b>${fmtMB(used)}</b> ·
+         <div class="storeNote">Reftown 이 쓰는 공간 <b>${fmtMB(mine)}</b>${
+           used>mine+52428800
+             ? ` · 이 폴더에는 다른 파일도 함께 있어 전체로는 ${fmtMB(used)} 입니다`
+             : ""} ·
            폴더를 바꾸면 기록도 함께 따라갑니다.</div>
        </div>`;
     on$("openRoot","onclick",()=>window.CG.revealFolder(root));
@@ -2116,7 +2178,8 @@ $("storeBtn").onclick=async()=>{
 
   const box=$("storeBody");
   box.innerHTML=
-    (IS_EL ? `<div class="storeSec"><div class="storeLine"><b>영상별 사용량</b></div></div>`
+    (IS_EL ? `<div class="storeSec"><div class="storeLine"><b>기록마다 차지하는 공간</b> <span style="color:#5d6472">모두 ${fmtMB(liveBytes+keptBytes)}</span></div>
+       <div class="storeNote">캡쳐한 PNG 와 주소로 받은 원본 영상까지, 그 기록의 폴더 전체입니다 — 지우면 그만큼 비워집니다.</div></div>`
     : `<div class="storeSec">
        <div class="storeSecHead"><span class="num">2</span>
          <div><b>프로그램이 기억하는 목록</b>
@@ -2142,7 +2205,7 @@ $("storeBtn").onclick=async()=>{
            기록은 지웠지만 즐겨찾기를 남겨둔 것들입니다. 목록에는 보이지 않습니다.</div>`+
         KEPT.map(j=>
         `<div class="jobSize"><span class="nm">${j.name}</span>`+
-        `<span class="sz">${fmtMB(jobBytes(j))}</span>`+
+        `<span class="sz">${fmtMB(keptSize.get(j.id)||0)}</span>`+
         `<button class="mini warn" data-purge="${j.id}">완전 삭제</button></div>`).join("")
       : "");
 
@@ -2165,17 +2228,27 @@ $("storeBtn").onclick=async()=>{
   $("storeBox").classList.add("on");
 };
 
+/* ★ 저장 폴더는 [저장 공간] 안에서 전체 경로까지 보여준다.
+   목록 위에 따로 한 줄을 두면 기록을 밀어내기만 해서, 그 버튼 옆에
+   폴더 이름만 짧게 붙인다. */
 async function paintOutDir(){
-  const el=$("outDirLine"); if(!el) return;
   const h=await getOutDir();
   let memo={}; try{ memo=(await jobGet("__outmemo__"))||{}; }catch(e){}
-  el.innerHTML = h
-    ? `캡쳐 저장 폴더 <b>${h.name||"지정됨"}</b>`+(memo.path?`<br><span style="color:#4a5262">${memo.path}</span>`:"")
-    : `캡쳐 저장 폴더 <span style="color:#6b7385">지정 안 됨</span>`;
+  const full = h ? (memo.path||h.name||"지정됨") : "";
+  const btn=$("storeBtn");
+  if(btn) btn.title = full ? `저장 폴더 · ${full}` : "저장 폴더와 사용량";
+  const el=$("outDirLine");
+  if(el) el.innerHTML = h ? `캡쳐 저장 폴더 <b>${h.name||"지정됨"}</b>`
+                          : `캡쳐 저장 폴더 <span style="color:#6b7385">지정 안 됨</span>`;
+  if(!IS_EL) return;
+  const u=$("usage");
+  if(u) u.innerHTML = h
+    ? `📁 ${String(h.name||"").split(/[\\/]/).filter(Boolean).pop()||"지정됨"}`
+    : `📁 <span style="color:#6b7385">폴더 미지정</span>`;
 }
 async function showUsage(){
+  if(IS_EL) return;                      // 폴더에 저장하므로 뜻이 없다 (폴더 이름만 붙인다)
   try{ const e=await navigator.storage.estimate();
-    if(IS_EL){ $("usage").textContent=""; return; }   // 폴더에 저장하므로 뜻이 없다
     $("usage").textContent=`미리보기 ${(e.usage/1048576).toFixed(0)} MB`;
   }catch(err){}
 }
@@ -2331,24 +2404,16 @@ function showLinkNotice(u){
   /* ★ '무엇을 하는지' 만 적혀 있으면 사용자는 왜 이런 번거로운 일을 시키는지
      알 수 없다. 이유부터 적고, 그 다음에 할 일과 그 뒤에 벌어질 일을 적는다. */
   if(kind==="sniff"){
-    $("sniffTitle").textContent="이 사이트는 재생 창이 열립니다";
+    $("sniffTitle").textContent="재생 창이 열립니다";
     $("sniffTip").innerHTML=
-      "이 사이트는 프로그램이 영상을 바로 가져가지 못하게 막아 둡니다."
-      +"<br>그래서 <b>진짜 브라우저 창</b>을 열어 사람이 보는 것과 똑같이 재생하고,"
-      +" 그때 오가는 통신에서 <b>영상 주소만</b> 받아옵니다."
-      +"<br><b>재생 버튼만 눌러주시면 됩니다.</b> 주소를 찾는 즉시 창이 스스로 닫히고,"
-      +" <b>추출이 곧바로 시작됩니다</b> — 따로 누르실 것은 없습니다."
-      +"<br><b>재생 창에 화질 고르기가 있으면 가장 높은 화질로 맞춰주세요.</b>"
-      +" 그 화질 그대로 받아옵니다 — 프로그램도 더 높은 화질이 있는지 한 번 더 찾아봅니다."
-      +"<br><span style='color:#5d6472'>로그인이 필요하면 그 창에서 하시면 됩니다."
-      +" 한 번 해두면 다음부터는 기억합니다.</span>";
+      "<b>재생 버튼만 눌러주세요.</b>"
+      +"<br><span style='color:#5d6472'>찾는 즉시 창이 닫히고 추출이 시작됩니다"
+      +"<br>화질은 가장 높게 · 로그인은 그 창에서</span>";
   }else{
     $("sniffTitle").textContent="재생 창이 열릴 수 있습니다";
     $("sniffTip").innerHTML=
-      "이 사이트는 바로 가져오지 못하면 <b>브라우저 창</b>을 엽니다."
-      +" 영상이 <b>실제로 재생될 때만</b> 주소가 드러나는 사이트이기 때문입니다."
-      +"<br>창이 뜨면 <b>재생 버튼</b>만 눌러주세요."
-      +" 주소를 찾으면 창이 닫히고 <b>추출이 곧바로 시작됩니다</b>.";
+      "막히면 재생 창이 열립니다. <b>재생 버튼만 눌러주세요.</b>"
+      +"<br><span style='color:#5d6472'>찾는 즉시 창이 닫히고 추출이 시작됩니다</span>";
   }
   box.classList.add("on");
 }
@@ -2363,11 +2428,9 @@ function openSniff(page){
     $("sniffDone").style.display="";        // 이제는 그만둘 수 있다
     $("sniffTitle").textContent="열린 창에서 재생 버튼을 눌러주세요";
     $("sniffTip").innerHTML=
-      "이 사이트는 영상이 <b>실제로 재생될 때만</b> 주소가 드러납니다."
-      +" 그래서 창을 열었습니다 — 재생되는 것을 옆에서 보고 주소를 받아옵니다."
-      +"<br><b>화질 고르기가 있으면 가장 높은 화질로 맞춰주세요</b> — 그 화질 그대로 받아옵니다."
-      +"<br>주소를 찾으면 <b>창은 스스로 닫히고, 추출이 곧바로 시작됩니다</b>."
-      +"<br><span style='color:#5d6472'>로그인이 필요하면 그 창에서 하시면 됩니다.</span>";
+      "열린 창에서 <b>재생 버튼</b>을 눌러주세요."
+      +"<br><span style='color:#5d6472'>찾는 즉시 창이 닫히고 추출이 시작됩니다"
+      +"<br>화질은 가장 높게</span>";
     $("sniffBox").classList.add("on");
     window.CG.sniffOpen(page, m=>{
       if(m && m.pageTitle) _sniffPageTitle=m.pageTitle;
@@ -2536,7 +2599,7 @@ async function addLink(url, referer, pageTitle, fallbackUrl){
   if(referer && placeholder.heights.length){
     const top=placeholder.heights[0];
     if(top<1080 && (!want || want>top))
-      toast(`이 주소에서는 ${top}p 까지만 찾았습니다 — 재생 창에서 화질을 올린 뒤 다시 넣어보세요`);
+      toast(`${top}p 까지만 있습니다 — 재생 창에서 화질을 올리면 그 화질로 받습니다`);
   }
   /* ★ 주소로 넣은 것도 대기열에 그림이 뜨게 한다.
      사이트가 대표 그림을 주면 그것을 쓰고, 안 주면 (TVCF 처럼 스트림 주소를
@@ -2863,10 +2926,12 @@ async function runOneEl(item,tag,t0){
       +"왼쪽 드롭존을 눌러 파일을 직접 골라주세요.");
   const F=await scanEl(item,tag);
   if(F.length<2) throw new Error("영상에서 프레임을 읽지 못했습니다.");
-  /* 초당 장수도 진짜 시각에서 다시 잡는다.
-     영상 정보에 적힌 값은 반올림되어 있거나(23.98) 실제와 다를 수 있는데,
-     이 값으로 한 장씩 앞뒤로 움직이므로 정확할수록 좋다. */
-  if(F._unit>0 && isFinite(F._unit)) item.fps=1/F._unit;
+  /* 초당 장수를 진짜 시각에서 다시 잡는다.
+     영상 정보에 적힌 값은 반올림되어 있을 수 있고(23.98), 내려받은 영상은
+     실제와 다르기도 하다. 이 값으로 한 장씩 앞뒤로 움직이므로 정확할수록 좋다.
+     잰 값이 파일 표기와 거의 같으면 파일 표기를 그대로 둔다 — 그쪽이 정확하다. */
+  { const r=resolveFps(item.fps, F._rate);
+    item.fps=r.fps; item.fpsSrc=r.src; }
   prog(63,tag+"컷 나누는 중...","");
   const cutIdx=findCuts(F);
   const picks=choose(F,cutIdx,item.duration);
@@ -2905,7 +2970,7 @@ async function runOneEl(item,tag,t0){
 
   const job={ id:String(Date.now())+"-"+Math.random().toString(36).slice(2,7),
     name:item.name, base, size:item.size, duration:item.duration, fps:item.fps,
-    w:item.w, h:item.h, type:item.type,
+    fpsSrc:item.fpsSrc||null, w:item.w, h:item.h, type:item.type,
     createdAt:new Date().toISOString(),
     srcPath:item.path, outDir, sheetPath, onDisk:true, startVer:0,
     shots:shots.map(x=>({idx:x.idx,t:x.t,inT:x.inT,outT:x.outT,sT:x.sT,
@@ -2922,7 +2987,7 @@ async function runOneEl(item,tag,t0){
            srcPath:item.path,outDir,sheetPath};
     S.fps=item.fps; S.playFile=item.file||null; S.jobId=job.id;
     S.meta={name:item.name,duration:item.duration,size:item.size,fps:item.fps,
-            w:item.w,h:item.h,type:item.type};
+            fpsSrc:item.fpsSrc||null, w:item.w,h:item.h,type:item.type};
     resTitle.textContent=`✓ ${item.name} — ${shots.length}장 · `
       +`${((performance.now()-t0)/1000).toFixed(1)}초 · 폴더에 저장됨`;
     showResultEl(item);
@@ -3524,7 +3589,7 @@ function toggleInfo(){
     `형식       ${m.type||"-"}\n`+
     `해상도     ${w}×${h}   (${w&&h?`${w/g}:${h/g}`:"-"})\n`+
     `길이       ${clock(dur)}\n`+
-    `프레임     ${fmtFps(m.fps||S.fps)} fps\n`+
+    `프레임     ${fmtFps(m.fps||S.fps)} fps${m.fpsSrc?`   (${m.fpsSrc})`:""}\n`+
     `용량       ${((m.size||0)/1048576).toFixed(1)} MB\n`+
     `비트레이트 ${br?br.toFixed(2)+" Mbps":"-"}\n`+
     `캡쳐       ${MARKS.length}컷\n`+
@@ -4078,7 +4143,9 @@ async function renderHist(){
     info.innerHTML=`<div class="jname">${j.name}</div>`;
     top.append(no,th,info);
     const sub=document.createElement("div"); sub.className="jsub";
-    sub.textContent=`${fmtDate(j.createdAt)} · ${j.shots.length}장 · ${(j.size/1048576).toFixed(0)}MB`;
+    /* 여기 적히는 MB 는 '원본 영상' 의 크기다 — 캡쳐가 차지하는 공간과는 다르다.
+       어느 쪽인지 적어두지 않으면 [저장 공간] 의 숫자와 달라 보여 헷갈린다. */
+    sub.textContent=`${fmtDate(j.createdAt)} · ${j.shots.length}장 · 영상 ${(j.size/1048576).toFixed(0)}MB`;
     const btns=document.createElement("div"); btns.className="jbtns";
     const hb=document.createElement("button");
     hb.className="mini heart"+(j.fav?" on":""); hb.textContent=j.fav?"♥":"♡";
@@ -4182,7 +4249,7 @@ async function loadJob(id){
   releaseOut(); resetViewState(); detachVideo();
   S.jobId=id; S.fps=j.fps||24; S.curShot=-1;
   S.meta={name:j.name,duration:j.duration,size:j.size,fps:j.fps||24,
-          w:j.w,h:j.h,type:j.type};
+          fpsSrc:j.fpsSrc||null, w:j.w,h:j.h,type:j.type};
   const mk = x => IS_EL
     ? {...x, base:x.base||j.base, url:x.url||fileURL(x.thumb||x.file), thumbOnly:true}
     : {...x, base:x.base||j.base, url:URL.createObjectURL(x.blob)};

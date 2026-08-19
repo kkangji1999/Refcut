@@ -119,6 +119,9 @@ contextBridge.exposeInMainWorld("CG", {
 
   /* 그림 복사 (화면 쪽 복사가 막혔을 때 쓰는 확실한 길) */
   copyImage: (bytes) => ipcRenderer.invoke("copyImage", bytes),
+  /* 기록마다 실제로 차지하는 공간 (파일 묶음별 합계) */
+  pathsSize: (groups) => ipcRenderer.invoke("pathsSize", groups || []),
+  dirSizes: (dirs) => ipcRenderer.invoke("dirSizes", dirs || []),
 
   /* 파일 읽고 쓰기 */
   readFile: (p) => ipcRenderer.invoke("readFile", p),

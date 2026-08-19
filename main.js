@@ -189,7 +189,7 @@ ipcMain.handle("probe", async (_e, filePath) => {
           ok: true,
           width: s.width, height: s.height,
           codec: s.codec_name,
-          fps: d ? n / d : 24,
+          fps: snapFps(d ? n / d : 24),
           duration: parseFloat((j.format || {}).duration || 0),
           size: parseInt((j.format || {}).size || 0, 10),
         });
@@ -1201,7 +1201,19 @@ ipcMain.handle("copyImage", (_e, data) => {
   } catch (e) { return { ok: false, error: String(e) }; }
 });
 
-ipcMain.handle("dirSize", (_e, p) => {
+/* 파일 묶음마다 실제로 차지하는 공간을 잰다.
+   ★ 화면 쪽은 예전에 '브라우저 안에 담긴 blob 크기'만 셌다. 앱은 캡쳐를 파일로
+     저장하므로 blob 이 아예 없어서, 저장 공간 목록이 전부 0 MB 로만 보였다. */
+ipcMain.handle("pathsSize", (_e, groups) => {
+  return (groups || []).map((list) => {
+    let n = 0;
+    for (const p of list || []) {
+      try { n += fs.statSync(p).size; } catch (e) {}
+    }
+    return n;
+  });
+});
+function dirSizeOf(p) {
   let n = 0;
   const walk = (d) => {
     let list = [];
@@ -1212,6 +1224,10 @@ ipcMain.handle("dirSize", (_e, p) => {
       else { try { n += fs.statSync(q).size; } catch (e) {} }
     }
   };
-  walk(p);
+  if (p) walk(p);
   return n;
-});
+}
+ipcMain.handle("dirSize", (_e, p) => dirSizeOf(p));
+/* 기록마다 자기 폴더 하나를 쓴다. 그 폴더 크기가 곧 "지우면 비워지는 만큼" 이다
+   (캡쳐한 PNG + 목록용 작은 그림 + 주소로 받은 원본 영상까지 그 안에 있다) */
+ipcMain.handle("dirSizes", (_e, dirs) => (dirs || []).map((d) => dirSizeOf(d)));
