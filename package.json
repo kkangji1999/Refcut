@@ -1,8 +1,8 @@
 {
-  "name": "refcut",
-  "productName": "Refcut",
-  "version": "26.8.2503",
-  "description": "영상에서 컷이 바뀔 때마다 대표 프레임을 자동으로 뽑아주는 도구",
+  "name": "reftown",
+  "productName": "Reftown",
+  "version": "26.8.2504",
+  "description": "영상에서 컷이 바뀔 때마다 대표 프레임을 자동으로 뽑아주는 도구 (레퍼런스 타운)",
   "main": "main.js",
   "author": "FreeWillusion",
   "license": "UNLICENSED",
@@ -22,7 +22,7 @@
   },
   "build": {
     "appId": "com.freewillusion.refcut",
-    "productName": "Refcut",
+    "productName": "Reftown",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -72,10 +72,10 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Refcut"
+      "shortcutName": "Reftown"
     },
     "releaseInfo": {
-      "releaseNotes": "이번에 바뀐 내용\n\n· 업데이트가 자동이 됩니다 — 새 버전이 있으면 프로그램이 직접 받아서, 다시 켤 때 갈아끼웁니다\n· 받는 동안 얼마나 받았는지 보여줍니다. 더 이상 내려받는 폴더로 넘어가지 않습니다\n· 화면에 뜨는 버전 번호가 설치된 진짜 버전을 따라갑니다\n\n※ 이번 한 번만 손으로 설치해 주세요. 다음 버전부터는 저절로 됩니다."
+      "releaseNotes": "이번에 바뀐 내용\n\n· 이름이 Reftown(레프타운) 으로 바뀌었습니다\n· ffmpeg 가 깔려 있지 않은 컴퓨터에서 추출이 아예 안 되던 것을 고쳤습니다 — 가장 큰 문제였습니다\n· [폴더에서 고르기] 로 영상을 넣으면 아무 일도 일어나지 않던 것을 고쳤습니다\n· 주소를 붙여넣고 Enter 만 눌러도 대기열에 들어갑니다\n· 주소 넣는 칸을 눈에 띄게 키웠습니다\n· 주소로 넣은 영상(TVCF 등)도 대기열에 미리보기 그림이 뜹니다\n· 받다가 응답이 끊기면 끝없이 기다리지 않고 다른 방식으로 넘어갑니다"
     }
   },
   "allowScripts": {

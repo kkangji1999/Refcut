@@ -1,4 +1,4 @@
-/* Refcut(레프컷) — Electron 메인 프로세스
+/* Reftown(레프타운) — Electron 메인 프로세스
    =========================================================================
    브라우저판과 가장 크게 다른 점 두 가지:
 
@@ -23,26 +23,43 @@ const isDev = !app.isPackaged;
 
 /* ---------- ffmpeg 실행 파일 찾기 ----------
    순서: 동봉본 → ffmpeg-static → 시스템 PATH
-   동봉하지 않아도 시스템에 설치되어 있으면 그대로 쓴다. */
+   동봉하지 않아도 시스템에 설치되어 있으면 그대로 쓴다.
+
+   ★ 설치 파일에는 ffmpeg 만 들어간다 (ffprobe 는 없다).
+     그래서 ffprobe 가 없는 컴퓨터에서는 영상 정보 읽기가 통째로 실패했다.
+     — 만든 사람 컴퓨터에는 ffmpeg 가 따로 깔려 있어서 이 구멍이 보이지 않았다.
+     이제 ffprobe 가 없으면 ffmpeg 가 대신 읽는다 (probeViaFfmpeg). */
+function binIn(dir, name) {
+  const exe = process.platform === "win32" ? name + ".exe" : name;
+  const p = path.join(dir, exe);
+  return fs.existsSync(p) ? p : null;
+}
+function bundledBin(name) {
+  return binIn(isDev ? path.join(__dirname, "bin")
+                     : path.join(process.resourcesPath, "bin"), name);
+}
 function ffmpegPath() {
-  const exe = process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
-  const bundled = isDev
-    ? path.join(__dirname, "bin", exe)
-    : path.join(process.resourcesPath, "bin", exe);
-  if (fs.existsSync(bundled)) return bundled;
+  const b = bundledBin("ffmpeg");
+  if (b) return b;
   try {
     const p = require("ffmpeg-static");
     if (p && fs.existsSync(p)) return p;
   } catch (e) {}
-  return exe;                       // PATH 에 있기를 기대
+  return process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";  // PATH 에 있기를 기대
 }
 function ffprobePath() {
-  const exe = process.platform === "win32" ? "ffprobe.exe" : "ffprobe";
-  const bundled = isDev
-    ? path.join(__dirname, "bin", exe)
-    : path.join(process.resourcesPath, "bin", exe);
-  if (fs.existsSync(bundled)) return bundled;
-  return exe;
+  const b = bundledBin("ffprobe");
+  if (b) return b;
+  return process.platform === "win32" ? "ffprobe.exe" : "ffprobe";
+}
+/* yt-dlp 에게 "ffmpeg 은 여기 있다" 고 알려주는 옵션.
+   ★ 이걸 안 주면 yt-dlp 는 시스템 PATH 에서만 ffmpeg 를 찾는다.
+     없으면 영상과 소리를 합치지 못해 (특히 HLS·유튜브) 받기 자체가 실패한다.
+     이것이 "대기열에는 들어가는데 추출이 안 되던" 진짜 원인이었다. */
+function ffmpegLocArgs() {
+  const p = ffmpegPath();
+  return path.isAbsolute(p) && fs.existsSync(p)
+    ? ["--ffmpeg-location", path.dirname(p)] : [];
 }
 
 let win = null;
@@ -58,7 +75,7 @@ function createWindow() {
     show: false,                    // 준비되면 페이드로 띄운다
     backgroundColor: "#16181d",
     autoHideMenuBar: true,
-    title: "Refcut",
+    title: "Reftown",
     icon: path.join(__dirname, "build", process.platform === "win32" ? "icon.ico" : "icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -112,8 +129,50 @@ app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) creat
 /* =========================================================================
    영상 정보 읽기
    ========================================================================= */
-ipcMain.handle("probe", async (_e, filePath) => {
+/* ffmpeg 이 찍어주는 초당 장수는 소수 둘째 자리까지다 (23.98).
+   실제로 쓰는 값은 24000/1001 = 23.976... 이므로, 아주 가까우면
+   정확한 값으로 되돌려 놓는다. 긴 영상에서 시각이 조금씩 밀리는 것을 막는다. */
+function snapFps(v) {
+  if (!v || !isFinite(v)) return 24;
+  for (const b of [24, 30, 60, 120]) {
+    const ntsc = b * 1000 / 1001;
+    if (Math.abs(v - ntsc) < 0.02) return ntsc;
+    if (Math.abs(v - b) < 0.02) return b;
+  }
+  return v;
+}
+/* ffprobe 가 없을 때의 대체 경로.
+   ffmpeg 는 출력 파일을 안 주면 오류로 끝나지만, 그 전에 영상 정보를
+   먼저 찍어준다. 그 글을 읽어 길이·크기·초당 장수를 뽑아낸다. */
+function probeViaFfmpeg(filePath) {
   return new Promise((resolve) => {
+    execFile(ffmpegPath(), ["-hide_banner", "-i", filePath],
+      { maxBuffer: 1 << 22, windowsHide: true }, (err, stdout, stderr) => {
+        const txt = String(stderr || "") + String(stdout || "");
+        const dm = txt.match(/Duration:\s*(\d+):(\d\d):(\d\d(?:\.\d+)?)/);
+        const vm = txt.match(/Stream #\d+:\d+[^\n]*?:\s*Video:\s*([^\s,(]+)([^\n]*)/);
+        const rest = vm ? vm[2] : "";
+        const rm = rest.match(/[,\s](\d{2,5})x(\d{2,5})/);
+        const fm = rest.match(/,\s*([\d.]+)\s*fps/);
+        if (!dm && !vm)
+          return resolve({ ok: false, error: "영상 정보를 읽지 못했습니다" });
+        let size = 0;
+        try { size = fs.statSync(filePath).size; } catch (e) {}
+        resolve({
+          ok: true,
+          width: rm ? parseInt(rm[1], 10) : 0,
+          height: rm ? parseInt(rm[2], 10) : 0,
+          codec: vm ? vm[1] : "",
+          fps: snapFps(fm ? parseFloat(fm[1]) : 24),
+          duration: dm ? (+dm[1]) * 3600 + (+dm[2]) * 60 + parseFloat(dm[3]) : 0,
+          size,
+        });
+      });
+  });
+}
+
+ipcMain.handle("probe", async (_e, filePath) => {
+  const byProbe = await new Promise((resolve) => {
     execFile(ffprobePath(), [
       "-v", "error",
       "-select_streams", "v:0",
@@ -137,6 +196,52 @@ ipcMain.handle("probe", async (_e, filePath) => {
       } catch (e) { resolve({ ok: false, error: String(e) }); }
     });
   });
+  if (byProbe.ok) return byProbe;
+  return probeViaFfmpeg(filePath);   // ffprobe 가 없거나 실패하면 ffmpeg 가 읽는다
+});
+
+/* =========================================================================
+   미리보기 그림 한 장 뽑기
+   -------------------------------------------------------------------------
+   대기열에 뜨는 작은 그림이다. 파일이든 스트림 주소든 상관없이
+   ffmpeg 로 한 장만 떠서 곧바로 돌려준다.
+   ★ TVCF 처럼 주소로 넣은 영상은 그림이 없어 "🔗" 만 떠 있었다.
+     이제는 아직 내려받기 전이어도 그림이 뜬다.
+   ========================================================================= */
+ipcMain.handle("thumbAt", async (_e, { src, time, referer }) => {
+  const tmp = path.join(os.tmpdir(),
+    "reftown_th_" + Date.now() + Math.random().toString(36).slice(2, 7) + ".jpg");
+  const head = referer
+    ? ["-headers", "Referer: " + referer + "\r\nUser-Agent: " + UA + "\r\n"]
+    : [];
+  const once = (at) => new Promise((resolve) => {
+    const args = ["-v", "error", ...head];
+    if (at > 0) args.push("-ss", String(at));
+    args.push("-i", src, "-frames:v", "1",
+      "-vf", "scale=480:-2", "-q:v", "5", "-y", tmp);
+    const ff = spawn(ffmpegPath(), args, { windowsHide: true });
+    let over = false;
+    const t = setTimeout(() => {
+      over = true; try { ff.kill("SIGKILL"); } catch (x) {} resolve(false);
+    }, 25000);
+    ff.on("error", () => { if (!over) { clearTimeout(t); resolve(false); } });
+    ff.on("close", () => {
+      if (over) return;
+      clearTimeout(t);
+      resolve(fs.existsSync(tmp) && fs.statSync(tmp).size > 0);
+    });
+  });
+  try {
+    let ok = await once(Math.max(0, Number(time) || 0));
+    if (!ok && (Number(time) || 0) > 0) ok = await once(0);   // 그 지점이 없으면 맨 앞으로
+    if (!ok) return { ok: false };
+    const data = "data:image/jpeg;base64," + fs.readFileSync(tmp).toString("base64");
+    return { ok: true, data };
+  } catch (e) {
+    return { ok: false, error: String(e.message || e) };
+  } finally {
+    try { fs.unlinkSync(tmp); } catch (e) {}
+  }
 });
 
 /* =========================================================================
@@ -469,6 +574,16 @@ function runYt(exe, args, ms) {
   });
 }
 
+/* 사이트가 알려주는 대표 그림 중 가장 큰 것을 고른다.
+   없으면 빈 문자열 — 그때는 화면 쪽이 ffmpeg 로 한 장 떠서 쓴다. */
+function pickThumb(j) {
+  if (j.thumbnail) return String(j.thumbnail);
+  const list = (j.thumbnails || []).filter((t) => t && t.url);
+  if (!list.length) return "";
+  list.sort((a, b) => (b.width || b.preference || 0) - (a.width || a.preference || 0));
+  return String(list[0].url);
+}
+
 /* 링크 정보만 먼저 읽어온다 (제목·길이) — 대기열에 보여주기 위해 */
 ipcMain.handle("ytInfo", async (_e, url, useCookies, referer) => {
   let exe, last = "";
@@ -487,7 +602,7 @@ ipcMain.handle("ytInfo", async (_e, url, useCookies, referer) => {
     try {
       const out = await runYt(exe, ["--dump-single-json", "--no-warnings",
         "--no-playlist", "--socket-timeout", "10", "--retries", "1",
-        ...extra, url], 18000);
+        ...ffmpegLocArgs(), ...extra, url], 18000);
       const j = JSON.parse(out);
       /* 이 영상이 실제로 제공하는 화질만 추린다 */
       const heights = [...new Set((j.formats || [])
@@ -495,6 +610,7 @@ ipcMain.handle("ytInfo", async (_e, url, useCookies, referer) => {
         .map((f) => f.height))].sort((a, b) => b - a);
       return { ok: true, title: j.title || "영상", duration: j.duration || 0,
                ext: j.ext || "mp4", site: j.extractor_key || "",
+               thumb: pickThumb(j),    // 대기열에 띄울 대표 그림 (있으면)
                heights,                // 고를 수 있는 화질
                plan: extra };          // 성공한 방식을 기억해 두었다가 받을 때 그대로 쓴다
     } catch (e) { errs.push(String(e.message || e)); }
@@ -510,13 +626,14 @@ ipcMain.handle("ytInfo", async (_e, url, useCookies, referer) => {
       try {
         const out = await runYt(exe, ["--dump-single-json", "--no-warnings",
           "--no-playlist", "--socket-timeout", "10", "--retries", "1",
-          "--cookies-from-browser", br, url], 7000);
+          ...ffmpegLocArgs(), "--cookies-from-browser", br, url], 7000);
         const j = JSON.parse(out);
         const heights = [...new Set((j.formats || [])
           .filter((f) => f.vcodec && f.vcodec !== "none" && f.height)
           .map((f) => f.height))].sort((a, b) => b - a);
         return { ok: true, title: j.title || "영상", duration: j.duration || 0,
                  ext: j.ext || "mp4", site: j.extractor_key || "", heights,
+                 thumb: pickThumb(j),
                  plan: ["--cookies-from-browser", br] };
       } catch (e) { errs.push(String(e.message || e)); }
     }
@@ -579,24 +696,44 @@ ipcMain.handle("ytDownload", async (e, { url, dest, jobId, height, plan, useCook
       ? `bv*${cap}+ba/b${cap}/bv*+ba/b/best`
       : `bv*+ba/b/best`;
 
-    const run = (extra) => new Promise((res, rej) => {
+    /* ★ 예전에는 한 번의 시도에 시간 제한이 아예 없었다.
+       그래서 사이트가 응답을 멈추면 그 자리에서 영영 멈춰 있었다
+       ("로딩만 계속 걸리고 끝나지 않는다"는 증상이 이것이다).
+       이제는 아무 소식도 없이 조용한 시간이 이어지면 끊고 다음 방식으로 넘어간다. */
+    const QUIET_MS = 120000;             // 2분 동안 아무 소식이 없으면 끊는다
+    const run = (extra, fmtSel) => new Promise((res, rej) => {
       const args = [
-        "--no-warnings", "--no-playlist", "--no-part",
-        "-f", fmt, "--merge-output-format", "mp4",
+        "--no-warnings", "--no-playlist", "--no-part", "--newline",
+        "-f", fmtSel || fmt, "--merge-output-format", "mp4",
+        ...ffmpegLocArgs(),              // ffmpeg 위치를 알려준다 (없으면 합치기가 실패한다)
         ...extra, "-o", dest, url,
       ];
       const p2 = spawn(exe, args, { windowsHide: true });
-      CANCEL.set("yt" + jobId, () => { killed = true; try { p2.kill("SIGKILL"); } catch (x) {} });
-      let err = "";
+      let over = false, err = "", lastAt = Date.now();
+      const finish = (fn, v) => {
+        if (over) return;
+        over = true; clearInterval(watch); fn(v);
+      };
+      const watch = setInterval(() => {
+        if (over) return;
+        if (Date.now() - lastAt > QUIET_MS) {
+          try { p2.kill("SIGKILL"); } catch (x) {}
+          finish(rej, new Error("응답이 없어 중단했습니다 (2분)"));
+        }
+      }, 5000);
+      CANCEL.set("yt" + jobId, () => {
+        killed = true; try { p2.kill("SIGKILL"); } catch (x) {}
+      });
       p2.stdout.on("data", (d) => {
+        lastAt = Date.now();
         const s2 = d.toString();
         const m = s2.match(/\[download\]\s+([\d.]+)%/);
         if (m) send({ percent: parseFloat(m[1]) });
         if (s2.includes("[Merger]")) send({ text: "영상과 소리를 합치는 중..." });
       });
-      p2.stderr.on("data", (d) => (err += d));
-      p2.on("close", (c) => (c === 0 ? res() : rej(new Error(err.slice(0, 400)))));
-      p2.on("error", rej);
+      p2.stderr.on("data", (d) => { lastAt = Date.now(); err += d; });
+      p2.on("close", (c) => (c === 0 ? finish(res) : finish(rej, new Error(err.slice(0, 400)))));
+      p2.on("error", (e) => finish(rej, e));
     });
 
     /* 정보를 읽을 때 성공했던 방식을 먼저 쓰고, 안 되면 나머지를 차례로 */
@@ -619,23 +756,8 @@ ipcMain.handle("ytDownload", async (e, { url, dest, jobId, height, plan, useCook
       send({ text: "화질 조건을 풀고 다시 시도하는 중...", percent: 0 });
       for (const extra of plans) {
         if (killed) break;
-        try {
-          await new Promise((res, rej) => {
-            const p3 = spawn(exe, ["--no-warnings", "--no-playlist", "--no-part",
-              "-f", "best", "--merge-output-format", "mp4",
-              ...extra, "-o", dest, url], { windowsHide: true });
-            CANCEL.set("yt" + jobId, () => { killed = true; try { p3.kill("SIGKILL"); } catch (x) {} });
-            let e2 = "";
-            p3.stdout.on("data", (d) => {
-              const m = d.toString().match(/\[download\]\s+([\d.]+)%/);
-              if (m) send({ percent: parseFloat(m[1]) });
-            });
-            p3.stderr.on("data", (d) => (e2 += d));
-            p3.on("close", (c) => (c === 0 ? res() : rej(new Error(e2.slice(0, 400)))));
-            p3.on("error", rej);
-          });
-          done = true; break;
-        } catch (e) { allErrs.push(String(e.message || e)); }
+        try { await run(extra, "best"); done = true; break; }
+        catch (e) { allErrs.push(String(e.message || e)); }
       }
     }
     if (!done && !killed) throw new Error(pickError(allErrs));
@@ -715,7 +837,19 @@ ipcMain.handle("sniffClose", () => {
 
 /* 진단 — 어디서 막히는지 직접 확인한다 */
 ipcMain.handle("ytDiag", async () => {
-  const out = { exePath: YTEXE(), exists: false, size: 0, version: "", test: "", error: "" };
+  const out = { exePath: YTEXE(), exists: false, size: 0, version: "", test: "", error: "",
+                ffmpeg: ffmpegPath(), ffmpegOk: false, ffprobeOk: false };
+  try {
+    const fp = ffmpegPath();
+    out.ffmpegOk = await new Promise((r) => {
+      const c = spawn(fp, ["-version"], { windowsHide: true });
+      c.on("error", () => r(false)); c.on("close", (x) => r(x === 0));
+    });
+    out.ffprobeOk = await new Promise((r) => {
+      const c = spawn(ffprobePath(), ["-version"], { windowsHide: true });
+      c.on("error", () => r(false)); c.on("close", (x) => r(x === 0));
+    });
+  } catch (e) {}
   try {
     out.exists = fs.existsSync(out.exePath);
     if (out.exists) out.size = fs.statSync(out.exePath).size;
@@ -739,6 +873,31 @@ ipcMain.handle("ytCancel", (_e, jobId) => {
   const fn = CANCEL.get("yt" + jobId); if (fn) fn(); return { ok: true };
 });
 
+/* ---------- 이름이 Refcut 이던 시절의 짐을 옮겨온다 ----------
+   프로그램 이름이 바뀌면 윈도우가 잡아주는 개인 폴더 자리도 함께 바뀐다.
+   그대로 두면 설정도, 받아둔 영상 받기 도구도 처음부터 다시가 된다.
+   켤 때 한 번만, 조용히 옮겨온다. */
+function migrateFromRefcut() {
+  try {
+    const now = app.getPath("userData");
+    const old = path.join(path.dirname(now), "Refcut");
+    if (path.resolve(now) === path.resolve(old) || !fs.existsSync(old)) return;
+    const cfg = path.join(now, "settings.json");
+    if (!fs.existsSync(cfg) && fs.existsSync(path.join(old, "settings.json"))) {
+      fs.mkdirSync(now, { recursive: true });
+      fs.copyFileSync(path.join(old, "settings.json"), cfg);
+    }
+    /* 영상 받기 도구도 함께 — 다시 내려받지 않아도 되게 */
+    const exe = process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp";
+    const from = path.join(old, "bin", exe), to = path.join(now, "bin", exe);
+    if (fs.existsSync(from) && !fs.existsSync(to)) {
+      fs.mkdirSync(path.dirname(to), { recursive: true });
+      fs.copyFileSync(from, to);
+    }
+  } catch (e) {}
+}
+migrateFromRefcut();     // 창이 뜨기 전에 끝내둔다
+
 /* =========================================================================
    저장소 — IndexedDB 대신 JSON 파일 (요청 1번)
    기록마다 파일 하나. 사람이 직접 열어 확인·수정할 수 있다.
@@ -747,6 +906,7 @@ ipcMain.handle("ytCancel", (_e, jobId) => {
    예전에는 프로그램 내부(AppData)에 따로 흩어져서
    "폴더를 지정해도 의미가 없다"는 문제가 있었다.
    이제 이미지와 기록이 한 폴더에 모이므로, 그 폴더만 복사하면 통째로 백업된다. */
+
 const settingsFile = () => path.join(app.getPath("userData"), "settings.json");
 function readSettings() {
   try { return JSON.parse(fs.readFileSync(settingsFile(), "utf8")); } catch (e) { return {}; }
@@ -756,7 +916,13 @@ function writeSettings(o) {
 }
 function rootDir() {
   const s = readSettings();
-  return s.outDir || path.join(os.homedir(), "Documents", "Refcut");
+  if (s.outDir) return s.outDir;
+  const now = path.join(os.homedir(), "Documents", "Reftown");
+  /* 이름이 Refcut 이던 시절에 쓰던 폴더가 있으면 그것을 계속 쓴다.
+     새 폴더를 만들어 버리면 그동안 뽑아둔 기록이 통째로 사라진 것처럼 보인다. */
+  const old = path.join(os.homedir(), "Documents", "Refcut");
+  if (!fs.existsSync(now) && fs.existsSync(old)) return old;
+  return now;
 }
 const dataDir = () => {
   const d = path.join(rootDir(), "_기록");

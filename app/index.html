@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Refcut</title>
+<title>Reftown</title>
 <meta name="theme-color" content="#16181d">
 <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAdklEQVR42mNgQAPyytr/aYkZCIEBcwCtLSbokAFzAL0txnDIkHPAmw/ficKbdp0A46HngP9XGPDiUQeMOoBSPOqAoeMAMQlZFEyqRbj0jzpg6DhgNBfgClJig374OQBX4iI1sQ5+Bxycx0BTPPgcMNozGvG9YwABY+umj9aXngAAAABJRU5ErkJggg==">
 <link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAYAAABS3GwHAAACvElEQVR42u3cIQ7CQBBA0TkFwZAKJHfuIZC4Og7AMRC4ylb0ArTJwk7mbfI9zM5zzUY0PsP1tkhHi+zHJQoACQAJAAkACQAJAAkACQAJAAkAqWMALkWlwRiyAJAAkACQAJAAkACQAJAAkACQAJA6BmBoKg3GEASABIAEgASABIAEgASABIAEgASABECZ3p+5VPfHc1cAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAANQBsLwidQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAtAWAAABAAAAgAAAQAAAIAAAEAAACAAABAIAAAEAAACAAABAAAAgAAAQAAAIAAAEAgAAAQAAAIAAAEAAACAAABAAAAuC/AE7nS9MsVa75AwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGDJAQBAAAAgAAAQAAAIAAAEAAAAAOBhLHkYCwABAIAAAEAAACAAABAAAAgAAAQAAAIAAAEAgAAAQAD0D6Dax3PZ/y8AFgIAACwEAABYCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAyPJQlIfAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADIAmAaQzocAAIAAAEAgAAAQAAAIAAAEAAACAAABAAAAgAAAQCAAPgewN7T+gdJP11oAAQAAAIAAAEAgAAAQAAAIAAAEAAACAAABAAAAsCQVRgAMCq90AAIAAAEAAACAAABAIAAAEAAACAAABAAAAgAAASAS1S/AFYRiSUk1Y6EHgAAAABJRU5ErkJggg==">
@@ -254,7 +254,7 @@
   #drop.hot{border-color:var(--accent); background:#232833}
   #dIcon{font-size:32px; line-height:1}
   #dMain{font-size:15.5px; font-weight:700; margin-top:9px}
-  #dSub{font-size:12px; color:var(--muted); margin-top:6px}
+  #dSub{font-size:12px; color:var(--muted); margin-top:6px; word-break:keep-all}
 
   #queueWrap{display:none; margin-top:14px}
   .qHead{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px}
@@ -507,17 +507,34 @@
   .ioGroup .mini{border:0; background:transparent; padding:4px 7px}
   .ioGroup .mini:hover{background:#323846}
   .ioLabel{font-size:11px; color:#5d6472}
-  /* 영상 주소 입력 */
-  #linkRow{display:none; gap:5px; flex:0 0 auto}
+  /* 영상 주소 입력 — 파일 넣기와 같은 무게의 '두 번째 길' 로 보이게 한다 */
+  #orLine{display:none; align-items:center; gap:8px; flex:0 0 auto;
+    font-size:10.5px; color:#5d6472; margin:1px 0}
+  #orLine.on{display:flex}
+  #orLine::before,#orLine::after{content:""; flex:1; height:1px; background:var(--border)}
+  #linkRow{display:none; flex-direction:column; gap:8px; flex:0 0 auto;
+    border:1.5px solid #3c4455; border-radius:12px; padding:10px 10px 11px;
+    background:linear-gradient(180deg,#1c2028,#15181e);
+    transition:border-color .15s}
   #linkRow.on{display:flex}
-  #linkIn{flex:1; min-width:0; background:#0e1015; border:1px solid var(--border);
-    border-radius:8px; padding:8px 10px; color:var(--fg); font-family:inherit;
-    font-size:11.5px}
-  #linkIn:focus{outline:none; border-color:var(--accent)}
-  #linkRow button{flex:0 0 auto}
+  #linkRow:hover{border-color:#4d566b}
+  #linkRow:focus-within{border-color:var(--accent)}
+  .linkTop{display:flex; align-items:center; justify-content:space-between; gap:8px}
+  .linkTag{font-size:12.5px; font-weight:700; color:var(--fg); letter-spacing:-.2px}
+  .linkField{display:flex; gap:6px}
+  #linkIn{flex:1; min-width:0; background:#0b0d11; border:1.5px solid #454e61;
+    border-radius:9px; padding:11px 12px; color:var(--fg); font-family:inherit;
+    font-size:13px}
+  #linkIn::placeholder{color:#69707f}
+  #linkIn:focus{outline:none; border-color:var(--accent); background:#0e1116}
+  #linkAdd{flex:0 0 auto; padding:0 17px; border:0; border-radius:9px;
+    background:var(--accent); color:#1a1a1a; font-family:inherit;
+    font-size:13px; font-weight:700; cursor:pointer}
+  #linkAdd:hover{filter:brightness(1.08)}
+  #linkAdd:active{transform:translateY(1px)}
   #linkRes{flex:0 0 auto; background:#0e1015; border:1px solid var(--border);
-    border-radius:8px; color:var(--fg); font-family:inherit; font-size:11px;
-    padding:7px 4px}
+    border-radius:7px; color:var(--muted); font-family:inherit; font-size:10.5px;
+    padding:4px 3px}
   #linkRes:focus{outline:none; border-color:var(--accent)}
   #sniffBox{display:none; flex-direction:column; gap:7px; flex:0 0 auto;
     border:1px solid var(--accent); border-radius:9px; padding:10px; background:#15171d}
@@ -525,7 +542,8 @@
   .sniffHead{display:flex; align-items:center; justify-content:space-between; gap:8px}
   .sniffHead b{font-size:12px; color:var(--accent)}
   .sniffTip{font-size:10.5px; color:#6b7385; line-height:1.6}
-  #linkHint{display:none; font-size:10px; color:#5d6472; padding:0 2px; flex:0 0 auto}
+  #linkHint{display:none; font-size:10px; color:#5d6472; padding:0 2px; flex:0 0 auto;
+    word-break:keep-all}
   #linkHint.on{display:block}
   .qthumb.qlink{display:flex; align-items:center; justify-content:center;
     background:var(--panel2); font-size:15px}
@@ -540,18 +558,24 @@
   .job .jname{overflow-wrap:anywhere}
   /* 단축키 줄이 길어지면 그 안에서만 스크롤되게 (창 밖으로 밀려나지 않음) */
   /* 여러 갈래 중 고르는 버튼 */
+  /* ★ .dlgBody 는 줄글을 그대로 보여주려고 white-space:pre-wrap 이다.
+     그런데 여기 내용은 HTML 이라, 소스에 넣은 들여쓰기와 줄바꿈까지
+     빈 줄로 찍혀 그림과 글 사이가 벌어지고 버튼이 창 밖으로 밀려났다.
+     이 안에서는 그 규칙을 끈다. */
+  .choiceList,.choiceBtn,.welcome{white-space:normal}
   .choiceList{display:flex; flex-direction:column; gap:8px; margin-top:14px}
   .choiceBtn{text-align:left; background:var(--panel2); border:1px solid var(--border);
     border-radius:9px; padding:11px 13px; color:var(--fg); font-family:inherit;
     cursor:pointer; display:flex; flex-direction:column; gap:3px}
   .choiceBtn:hover{border-color:var(--accent); background:#20242c}
   .choiceBtn b{font-size:13px}
-  .choiceBtn span{font-size:11.5px; color:var(--muted); line-height:1.5}
+  .choiceBtn span{font-size:11.5px; color:var(--muted); line-height:1.5;
+    word-break:keep-all}
   .choiceBtn.warn:hover{border-color:var(--err)}
   /* 첫 실행 안내 — 글자보다 그림으로 */
   .welcome{text-align:center}
   .wsvg{width:100%; max-width:320px; height:auto; display:block; margin:2px auto 12px}
-  .wtext{font-size:12.5px; line-height:1.75; color:var(--muted)}
+  .wtext{font-size:12.5px; line-height:1.75; color:var(--muted); word-break:keep-all}
   .wtext b{color:var(--fg)}
   .wpath{margin-top:10px; background:#0e1015; border:1px solid var(--border);
     border-radius:7px; padding:8px 11px; font-size:11.5px; color:#9fb4d0;
@@ -731,7 +755,7 @@
     box-shadow:0 20px 60px rgba(0,0,0,.6)}
   .dlgTitle{font-size:15px; font-weight:700; margin-bottom:10px}
   .dlgBody{font-size:13px; color:var(--muted); line-height:1.8; white-space:pre-wrap;
-    max-height:50vh; overflow-y:auto}
+    max-height:72vh; overflow-y:auto}
   .dlgBody b{color:var(--fg)}
   .dlgBtns{display:flex; gap:7px; margin-top:16px}
   .dlgBtns button{flex:1; padding:11px}
@@ -791,32 +815,41 @@
 <div class="wrap">
   <aside>
     <div class="sideHead">
-      <div class="sideTitle">Refcut</div>
+      <div class="sideTitle">Reftown</div>
     </div>
 
     <div id="drop">
       <div id="dIcon">🎬</div>
-      <div id="dMain">여기에 영상을 끌어다 놓으세요</div>
-      <div id="dSub">여러 개를 한 번에 넣으면 순서대로 · 클릭해서 선택</div>
+      <div id="dMain">영상 파일을 끌어다 놓으세요</div>
+      <div id="dSub">여기를 눌러 폴더에서 고를 수도 있습니다 · 여러 개도 한 번에</div>
     </div>
+
+    <!-- 영상을 넣는 두 번째 길. 파일과 같은 무게로 보이게 카드로 세운다.
+         (예전에는 얇은 한 줄이라 옆에서 보고 있으면 그냥 지나쳤다) -->
+    <div id="orLine"><span>또는</span></div>
     <div id="linkRow">
-      <input id="linkIn" type="text" placeholder="영상 주소를 붙여넣으세요  (유튜브 · 비메오 등)">
-      <select id="linkRes" title="원하는 화질 — 영상에 없으면 그 아래 가장 좋은 것으로 받습니다">
-        <option value="0">최고 화질</option>
-        <option value="2160">4K 까지</option>
-        <option value="1440">1440p 까지</option>
-        <option value="1080" selected>1080p 까지</option>
-        <option value="720">720p 까지</option>
-        <option value="480">480p 까지</option>
-      </select>
-      <button class="mini" id="linkAdd">추가</button>
+      <div class="linkTop">
+        <span class="linkTag">🔗 영상 주소로 넣기</span>
+        <select id="linkRes" title="원하는 화질 — 영상에 없으면 그 아래 가장 좋은 것으로 받습니다">
+          <option value="0">최고 화질</option>
+          <option value="2160">4K 까지</option>
+          <option value="1440">1440p 까지</option>
+          <option value="1080" selected>1080p 까지</option>
+          <option value="720">720p 까지</option>
+          <option value="480">480p 까지</option>
+        </select>
+      </div>
+      <div class="linkField">
+        <input id="linkIn" type="text" placeholder="주소를 붙여넣고 Enter">
+        <button id="linkAdd">추가</button>
+      </div>
     </div>
     <div id="sniffBox">
       <div class="sniffHead"><b id="sniffTitle">영상을 찾는 중...</b>
         <button class="mini" id="sniffDone">그만두기</button></div>
       <div class="sniffTip" id="sniffTip"></div>
     </div>
-    <div id="linkHint">유튜브 · 비메오 · 인스타 등 · 내려받은 뒤 바로 분석합니다</div>
+    <div id="linkHint">유튜브 · 비메오 · 인스타 · TVCF 등 — 내려받은 뒤 바로 분석합니다</div>
 
     <input type="file" id="file" accept="video/*" multiple hidden>
     <input type="file" id="reattach" accept="video/*" hidden>
@@ -861,7 +894,7 @@
 
   <main>
     <div class="head">
-      <h1>Refcut</h1>
+      <h1>Reftown</h1>
       <button id="openFav" title="즐겨찾기 보관함 — 내가 담은 프레임">
         <span class="hIcon">♥</span> 즐겨찾기 <b id="favCount">0</b>
       </button>
@@ -1489,8 +1522,8 @@ function download(blob,name){
    같은 날 두 번째로 내보내면 26.8.1602 로 올린다.
    업데이트 확인은 마디마다 숫자로 비교하므로(verNum) 자리수가 달라도 안전하다. */
 /* 앱으로 켰으면 설치된 진짜 버전을 그대로 쓴다 (여기 숫자는 웹으로 열 때의 몫) */
-const APP_VERSION = (window.CG && window.CG.version) || "26.8.2503";
-const APP_DATE    = "2026.08.18";
+const APP_VERSION = (window.CG && window.CG.version) || "26.8.2504";
+const APP_DATE    = "2026.08.19";
 /* 최신 index.html 이 올라가 있는 주소.
    여기에 넣어두면 [업데이트] 버튼이 새 버전을 확인합니다.
    설치 폴더의 update_url.txt 에 같은 주소를 적어두면
@@ -2033,6 +2066,27 @@ function videoMeta(file){
     v.src=url;
   });
 }
+/* 진짜 파일(Blob)인지 확인한다.
+   ★ [폴더에서 고르기] 로 넣은 것은 이름과 경로만 있는 '가짜 파일'이다.
+     예전에는 이것을 videoMeta() 에 그대로 넘겼는데, 거기서 오류가 나면서
+     넣기가 통째로 조용히 실패했다 — 끌어다 놓기는 되는데 클릭해서 고르면
+     아무 일도 일어나지 않던 원인이 이것이다. */
+const isRealFile=f=>{ try{ return f instanceof Blob; }catch(e){ return false; } };
+
+/* 대기열에 띄울 작은 그림을 뒤늦게라도 채워 넣는다.
+   기다리게 하지 않고, 준비되는 대로 그 자리에 끼워 넣는다. */
+async function ensureThumb(item){
+  if(!IS_EL || item.thumb || !window.CG || !window.CG.thumbAt) return;
+  const src=item.path||item.url; if(!src) return;
+  if(item._thumbTried) return;
+  item._thumbTried=true;
+  const at=Math.min(3, Math.max(0,(item.duration||8)*0.25));
+  try{
+    const r=await window.CG.thumbAt(src, at, item.referer||null);
+    if(r && r.ok && r.data && S.queue.includes(item)){ item.thumb=r.data; renderQueue(); }
+  }catch(e){}
+}
+
 async function addFiles(items){
   if(!items.length) return;
   /* 추출 중에 새 영상을 넣는 경우, 보고 있던 결과 화면을 지우면 안 된다 */
@@ -2047,17 +2101,27 @@ async function addFiles(items){
     let p = it.path || null;
     if(!p && IS_EL && window.CG.pathOf){ try{ p=window.CG.pathOf(f); }catch(e){} }
     if(!p && f && f.path) p=f.path;
-    let m;
+    let m=null, size=f.size||0;
     if(IS_EL && p){
-      const q=await window.CG.probe(p);
-      m = q && q.ok
-        ? {duration:q.duration, w:q.width, h:q.height, fps:q.fps, thumb:null}
-        : await videoMeta(f);
-    } else m = await videoMeta(f);
-    S.queue.push({file:f, path:p, handle:it.handle||null, name:f.name, size:f.size,
-      type:f.type, duration:m.duration, w:m.w, h:m.h, fps:m.fps||24, thumb:m.thumb,
-      dup:findDup(f.size,m.duration), status:"wait"});
+      try{
+        const q=await window.CG.probe(p);
+        if(q && q.ok){
+          m={duration:q.duration, w:q.width, h:q.height, fps:q.fps, thumb:null};
+          if(!size) size=q.size||0;
+        }
+      }catch(e){}
+    }
+    /* 프로그램 쪽이 못 읽었을 때만 화면 쪽 <video> 로 다시 시도한다.
+       가짜 파일이면 이 길은 애초에 쓸 수 없으므로 건너뛴다. */
+    if(!m && isRealFile(f)){ try{ m=await videoMeta(f); }catch(e){} }
+    if(!m) m={duration:0,w:0,h:0,fps:24,thumb:null};
+    const item={file:isRealFile(f)?f:null, path:p, handle:it.handle||null,
+      name:f.name, size, type:f.type||"",
+      duration:m.duration, w:m.w, h:m.h, fps:m.fps||24, thumb:m.thumb,
+      dup:findDup(size,m.duration), status:"wait"};
+    S.queue.push(item);
     renderQueue();
+    ensureThumb(item);            // 그림은 기다리지 않고 준비되는 대로 채운다
   }
 }
 function resetResult(){
@@ -2231,6 +2295,7 @@ async function addLink(url, referer, pageTitle){
            <b style="color:#8a94a8">상태 확인</b><br>
            도구 설치 · ${d.exists?`예 (${(d.size/1048576).toFixed(1)} MB)`:"<b>아니오</b>"}<br>
            버전 · ${d.version||"확인 실패"}<br>
+           ffmpeg · ${d.ffmpegOk?"정상":"<b>없음</b>"}${d.ffprobeOk?"":" (ffprobe 없음 — ffmpeg 가 대신 읽습니다)"}<br>
            연결 시험 · ${d.test||"-"}${d.error?`<br>오류 · ${String(d.error).slice(0,120)}`:""}
          </div>`;
     }catch(e){}
@@ -2290,20 +2355,35 @@ async function addLink(url, referer, pageTitle){
   const want=parseInt(($("linkRes")||{}).value||"1080",10)||0;
   placeholder.height=pickHeight(placeholder.heights, want);
   placeholder.checking=false;
+  /* ★ 주소로 넣은 것도 대기열에 그림이 뜨게 한다.
+     사이트가 대표 그림을 주면 그것을 쓰고, 안 주면 (TVCF 처럼 스트림 주소를
+     직접 잡은 경우) ffmpeg 로 한 장 떠서 채운다. */
+  if(r.thumb) placeholder.thumb=r.thumb;
   renderQueue();
+  if(!placeholder.thumb) ensureThumb(placeholder);
   toast(`대기열에 추가했습니다 — ${r.title}`);
 }
 if(IS_EL){
   /* ★ on$ 는 이 아래에서 정의되므로 여기서 쓰면 스크립트가 통째로 멈춘다.
      (그러면 추출 시작·파일 넣기까지 전부 죽는다) 직접 연결한다. */
   $("linkRow").classList.add("on");
+  $("orLine").classList.add("on");
   $("linkHint").classList.add("on");
   /* 고른 화질을 기억해 둔다 */
   try{ const sv=localStorage.getItem("cg_linkres"); if(sv!==null) $("linkRes").value=sv; }catch(e){}
   $("linkRes").onchange=()=>{ try{ localStorage.setItem("cg_linkres",$("linkRes").value); }catch(e){} };
   /* ★ 붙여넣거나 입력하는 즉시 안내 (창이 열리기 전에 미리 읽을 수 있게) */
   $("linkIn").oninput=()=>showLinkNotice($("linkIn").value);
-  $("linkAdd").onclick=()=>{ const v=$("linkIn").value; $("linkIn").value=""; addLink(v); };
+  const submitLink=()=>{
+    const v=$("linkIn").value.trim();
+    if(!v) return;
+    $("linkIn").value=""; addLink(v);
+  };
+  $("linkAdd").onclick=submitLink;
+  /* ★ 붙여넣고 Enter 만 눌러도 들어간다 — [추가] 를 찾아 누르지 않아도 된다 */
+  $("linkIn").onkeydown=e=>{
+    if(e.key==="Enter"){ e.preventDefault(); e.stopPropagation(); submitLink(); }
+  };
   $("sniffDone").onclick=()=>finishSniff(null);
 
   /* 드롭존에 주소를 끌어다 놓거나 붙여넣어도 인식한다 */
@@ -2379,12 +2459,25 @@ function renderQueue(){
     if(it.url) row.dataset.q=it.url;
     const num=document.createElement("div");
     num.className="qnum"; num.textContent=it.status==="done"?"✓":(i+1);
-    const th=document.createElement("img");
-    th.className="qthumb"; if(it.thumb) th.src=it.thumb;
-    if(it.isLink && !it.thumb){ th.replaceWith(Object.assign(
-      document.createElement("div"),{className:"qthumb qlink",textContent:"🔗"})); }
-    th.onmouseenter=e=>showPreview(it.thumb,e);
-    th.onmousemove=movePreview; th.onmouseleave=hidePreview;
+    let th;
+    if(it.thumb){
+      th=document.createElement("img");
+      th.className="qthumb"; th.src=it.thumb;
+      th.onmouseenter=e=>showPreview(it.thumb,e);
+      th.onmousemove=movePreview; th.onmouseleave=hidePreview;
+      /* 사이트가 준 그림 주소가 열리지 않으면 (막힌 사이트가 있다)
+         한 번만 ffmpeg 로 직접 떠서 대신 채운다 */
+      th.onerror=()=>{
+        if(it._thumbFallback) return;
+        it._thumbFallback=true; it.thumb=null; it._thumbTried=false;
+        renderQueue(); ensureThumb(it);
+      };
+    }else{
+      /* 아직 그림을 못 구했을 때 — 빈 칸 대신 무엇인지 알려주는 표시를 둔다 */
+      th=document.createElement("div");
+      th.className="qthumb qlink";
+      th.textContent=it.checking? "···" : (it.isLink? "🔗" : "🎬");
+    }
     const body=document.createElement("div"); body.className="qbody";
     const mm=Math.floor(it.duration/60), ss=Math.round(it.duration%60);
     body.innerHTML=`<div class="qname">${it.name}</div>`;
@@ -2407,7 +2500,11 @@ function renderQueue(){
       body.appendChild(d2);
     }
     const sub=document.createElement("div"); sub.className="qsub";
-    sub.append(`${mm}분 ${ss}초 · ${(it.size/1048576).toFixed(0)}MB`);
+    const bits=[];
+    if(it.duration>0) bits.push(`${mm}분 ${ss}초`);
+    if(it.size>0) bits.push(`${(it.size/1048576).toFixed(0)}MB`);
+    if(!bits.length) bits.push(it.isLink? "받을 때 확인됩니다" : "정보 없음");
+    sub.append(bits.join(" · "));
     if(it.dup){
       const no=HIST.length-HIST.findIndex(j=>j.id===it.dup.id);
       const b=document.createElement("button");
@@ -2697,7 +2794,7 @@ function attachVideoPath(p,name){
   $("vName").textContent=name||p;
   pv.onloadedmetadata=()=>{ drawMarks(); paintHead(); paintIO(); };
 }
-/* 지정된 저장 폴더 (없으면 문서\Refcut 를 기본으로 만들어 쓴다) */
+/* 지정된 저장 폴더 (없으면 문서\Reftown 를 기본으로 만들어 쓴다) */
 async function currentOutDir(){
   try{
     const r=await jobGet(OUTKEY);
@@ -4532,7 +4629,7 @@ async function copyNow(){
     return c.toDataURL("image/png");
   };
   try{
-    const man={name:"Refcut", short_name:"Refcut", start_url:".", scope:".",
+    const man={name:"Reftown", short_name:"Reftown", start_url:".", scope:".",
       display:"standalone", background_color:"#16181d", theme_color:"#16181d",
       icons:[{src:icon(192),sizes:"192x192",type:"image/png"},
              {src:icon(512),sizes:"512x512",type:"image/png"}]};
@@ -4643,7 +4740,7 @@ if(!IS_EL) on$("updBtn","onclick",async()=>{
        새 버전을 자동으로 받으려면 최신 <b>index.html</b> 이 올라가 있는 주소가 필요합니다.
        <ol>
          <li>새 파일을 웹에 한 번 올립니다 (예: Netlify Drop)</li>
-         <li>설치 폴더 <b>%LOCALAPPDATA%\Refcut</b> 의
+         <li>설치 폴더 <b>%LOCALAPPDATA%\Reftown</b> 의
              <b>update_url.txt</b> 에 그 주소를 붙여넣습니다</li>
          <li>다음부터는 앱을 켤 때마다 자동으로 최신 버전이 됩니다</li>
        </ol>
@@ -4707,7 +4804,7 @@ on$("installBtn","onclick",async()=>{
     ? `<b>이미 설치된 상태로 실행 중이라면</b> 바탕화면 아이콘으로 언제든 열 수 있습니다.<br><br>
        아직 설치 전이라면, 받으신 압축을 풀고 <b>설치.bat</b> 을 한 번만 더블클릭하세요.
        <ol>
-         <li>바탕화면과 시작 메뉴에 <b>Refcut</b> 아이콘이 생깁니다</li>
+         <li>바탕화면과 시작 메뉴에 <b>Reftown</b> 아이콘이 생깁니다</li>
          <li>주소창 없는 <b>독립 창</b>으로 열립니다</li>
          <li>인터넷이 없어도 그대로 동작합니다</li>
        </ol>
@@ -4776,9 +4873,10 @@ async function askOutDirOnce(){
        </svg>
        <div class="wtext">
          <b>모든 것이 폴더 하나에 들어갑니다.</b><br>
-         이미지도 기록도 같은 곳이라, 그 폴더만 복사하면 백업입니다.
+         이미지도 기록도 같은 곳이라,<br>
+         그 폴더만 복사하면 백업입니다.
        </div>
-       <div class="wpath">${(root||"문서\\Refcut").replace(/</g,"&lt;")}</div>
+       <div class="wpath">${(root||"문서\\Reftown").replace(/</g,"&lt;")}</div>
      </div>`,
     [{k:"ok", t:"이대로 쓸게요", d:"위 폴더를 그대로 씁니다. 나중에 바꿔도 됩니다."},
      {k:"pick", t:"다른 폴더로 정할래요", d:"저장할 위치를 직접 고릅니다."},

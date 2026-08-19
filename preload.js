@@ -44,6 +44,10 @@ contextBridge.exposeInMainWorld("CG", {
   /* 영상 정보 */
   probe: (filePath) => ipcRenderer.invoke("probe", filePath),
 
+  /* 대기열에 띄울 작은 그림 한 장 (파일이든 인터넷 주소든 상관없다) */
+  thumbAt: (src, time, referer) =>
+    ipcRenderer.invoke("thumbAt", { src, time: time || 0, referer: referer || null }),
+
   /* ★ 분석용 축소 프레임 스트림.
      onFrame(index, Uint8ClampedArray) 가 프레임마다 호출된다.
      데이터는 320x180 RGBA — 기존 measure() 가 쓰던 것과 같은 형식이라
