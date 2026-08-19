@@ -30,7 +30,7 @@
   ::-webkit-scrollbar-track{background:transparent}
 
   /* ---------------- 왼쪽: 추출 기록 ---------------- */
-  aside{width:clamp(232px, 21vw, 300px); flex-shrink:0; background:#12141a;
+  aside{width:clamp(252px, 22vw, 336px); flex-shrink:0; background:#12141a;
         border-right:1px solid var(--border); padding:16px 14px 16px;
         display:flex; flex-direction:column; gap:10px; height:100vh;
         overflow-y:auto; overflow-x:hidden}
@@ -257,10 +257,11 @@
   #dSub{font-size:12px; color:var(--muted); margin-top:6px; word-break:keep-all}
 
   #queueWrap{display:none; margin-top:14px}
-  .qHead{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px}
+  .qHead{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;
+         flex:0 0 auto}
   .qTitle{font-size:13.5px; font-weight:700}
   .qTitle span{color:var(--muted); font-weight:400; font-size:12px}
-  #queue{display:flex; flex-direction:column; gap:7px; max-height:170px; overflow-y:auto}
+  #queue{display:flex; flex-direction:column; gap:7px; overflow-y:auto; overflow-x:hidden}
   .qi{display:flex; align-items:center; gap:10px; background:var(--panel);
       border:1px solid var(--border); border-radius:10px; padding:8px 10px}
   .qi.doing{border-color:var(--accent)}
@@ -270,10 +271,10 @@
         display:flex; align-items:center; justify-content:center}
   .qi.doing .qnum{background:var(--accent); color:#1a1a1a}
   .qi.done .qnum{background:var(--ok); color:#0b2416}
-  .qthumb{width:70px; height:39px; object-fit:cover; border-radius:5px;
+  .qthumb{width:88px; height:50px; object-fit:cover; border-radius:5px;
           background:#000; flex-shrink:0; cursor:zoom-in}
   .qbody{flex:1; min-width:0}
-  .qname{font-size:12.5px; font-weight:600; white-space:nowrap; overflow:hidden;
+  .qname{font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden;
          text-overflow:ellipsis}
   .qsub{font-size:11px; color:var(--muted); margin-top:3px;
         display:flex; align-items:center; gap:6px; flex-wrap:wrap}
@@ -306,14 +307,46 @@
   aside #dIcon{font-size:24px}
   aside #dMain{font-size:12.5px}
   aside #dSub{font-size:10.5px}
-  /* 대기열은 최대 3개 정도 높이까지만 커지고 그 다음은 스스로 스크롤 */
-  aside #queueWrap{flex:0 1 auto; min-height:0; max-height:230px;
-    overflow-y:auto; overflow-x:hidden}
+  /* 대기열: 제목 줄은 붙박이, 목록만 자기 안에서 구른다 */
+  aside #queueWrap{flex:0 1 auto; min-height:0; overflow:hidden;
+    flex-direction:column}
+  aside #queue{flex:1 1 auto; min-height:0}
   .runRow{flex:0 0 auto; display:flex; flex-direction:column; gap:6px}
   #progWrap{flex:0 0 auto; margin-top:2px; display:none}
   /* 기록만 남는 공간을 모두 가져간다 */
   #hist{flex:1 1 auto; min-height:120px; overflow-y:auto;
     display:flex; flex-direction:column; gap:8px}
+
+  /* ---------- 대기열에 영상이 들어와 있을 때의 자리 배분 ----------
+     예전에는 대기열이 230px 에 갇혀 있어서, 두세 개만 넣어도
+     손바닥만 한 창으로 들여다보는 꼴이었다 (두 줄이 겨우 보였다).
+
+     자리를 새로 나눈다.
+       · 넣는 칸(드롭존·주소 입력)은 이미 할 일을 마친 칸이다 → 군살만 뺀다.
+         기능은 하나도 없애지 않는다. 주소창도 화질 고르기도 그 자리에 있다.
+       · 기록은 화면의 1/4 까지만 쓰고 나머지는 자기 안에서 구른다.
+       · 남는 자리는 전부 대기열이 가져간다 (flex-basis 0 + grow).
+     ★ basis 를 auto 로 두면 '줄어들기 경쟁'이 되어 모두가 최소 크기에 눌린다.
+       0 으로 두어야 남는 자리를 대기열이 실제로 받아간다. */
+  aside.qOn{gap:8px}
+  aside.qOn #queueWrap{flex:1 1 0; min-height:200px}
+  aside.qOn #hist{flex:0 0 auto; min-height:110px; max-height:18vh}
+  /* 맨 아래 두 버튼도 한 줄로 — 세로로 쌓아둘 만큼 급한 버튼이 아니다 */
+  aside.qOn .sideFoot{flex-direction:row; flex-wrap:wrap; gap:6px}
+  aside.qOn .sideFoot .usageRow{flex:1 0 100%}
+  aside.qOn .sideFoot button{flex:1 1 0; min-width:0}
+  aside.qOn #drop{padding:8px 12px}
+  aside.qOn #dIcon{display:none}
+  aside.qOn #dMain{font-size:12px}
+  aside.qOn #dSub{display:none}
+  aside.qOn #orLine.on{display:none}          /* '또는' 구분선 — 자리만 차지한다 */
+  aside.qOn #linkRow{padding:7px 8px; gap:6px}
+  aside.qOn .linkTag{font-size:11px}
+  aside.qOn #linkIn{padding:7px 10px; font-size:12px}
+  aside.qOn #linkHint.on{display:none}
+  /* 추출 전 안내는 대기열이 비어 있을 때(=처음 켰을 때) 읽는 글이다.
+     대기열을 채운 다음에는 그 자리를 대기열에 내준다. */
+  aside.qOn .preNote{display:none}
   .sideFoot{flex:0 0 auto; padding-top:8px; border-top:1px solid var(--border);
     display:flex; flex-direction:column; gap:6px}
   .sideHead,.usageRow,#outDirLine,.preNote{flex:0 0 auto}
@@ -967,13 +1000,14 @@
             <div class="paneTitle">캡쳐된 컷 <b id="cutCount"></b></div>
             <span class="seg" id="modeSw">
               <button data-m="smart" class="on"
-                title="컷마다 자막·포커스가 다 갖춰진 가장 또렷한 순간을 골라 뽑습니다.&#10;레퍼런스 수집용으로 권장합니다.">분석 프레임</button>
+                title="컷마다 한 장 — 그 컷에서 가장 또렷한 순간을 골라 뽑습니다.&#10;레퍼런스 수집용으로 권장합니다.">분석 프레임</button>
               <button data-m="start"
-                title="각 컷이 시작되는 첫 프레임으로 다시 배치합니다.&#10;컷이 어디서 나뉘는지 확인할 때 좋습니다.">스타트 프레임</button>
+                title="컷마다 한 장 — 그 컷이 시작되는 첫 프레임입니다.&#10;컷이 어디서 나뉘는지 확인할 때 좋습니다.">스타트 프레임</button>
             </span>
           </div>
-          <div id="startNote">컷 전환이 잦거나 모션 블러·포커스 이동·디졸브가 많은 영상일수록
-            컷 시작점을 정확히 잡지 못합니다. 참고용으로 봐주세요.</div>
+          <div id="startNote">컷이 나뉘는 자리마다 그 컷의 <b>첫 프레임</b>을 한 장씩 뽑습니다.
+            분석 프레임과 컷 번호가 서로 같습니다.
+            디졸브처럼 서서히 넘어가는 전환은 시작점이 한두 장 밀릴 수 있습니다.</div>
           <div class="selBar" id="selBar">
             <b id="gSelCount"></b>
             <button class="mini" id="gFav">♥ 즐겨찾기</button>
@@ -1105,11 +1139,11 @@ const BLANK_STD   = 3;     // 이 아래면 '내용 없는 화면'(암전 등)
    1 로 두면 v32 와 완전히 동일하게 동작한다. */
 const SCAN_RATE = 1;
 
-// 한 컷 안에서 스타트/엔드 2장으로 나눌 조건 (셋 다 만족해야 함)
-const SPLIT_DUR   = 1.5;   // 컷이 이보다 길고
-const SPLIT_DIST  = 30;    // 화면이 이만큼 달라지고
-const SPLIT_SHARP = 3.5;   // 포커스가 이 배율 이상 바뀔 때
-const SPLIT_MIN   = 25;    // 스타트/엔드가 이보다 비슷하면 1장만
+/* ★ 컷 하나 = 프레임 하나. 예외 없음.
+   예전에는 한 컷 안에서 포커스나 움직임이 크게 바뀌면 스타트/엔드 두 장으로
+   쪼개 뽑았다. 의도는 좋았지만 '컷 수'와 '뽑힌 장 수'가 어긋나서
+   컷 번호를 세거나 샷리스트를 볼 때마다 헷갈린다는 이야기를 들었다.
+   이제 분석 프레임도 스타트 프레임도 컷마다 딱 한 장씩만 나온다. */
 
 /* ---------- 영상 ---------- */
 function loadVideo(file){
@@ -1236,7 +1270,22 @@ async function scanEl(item,tag){
   _elScanId=null;
   if(r && r.aborted) throw new Aborted();
   if(!r || !r.ok) throw new Error((r&&r.error)||"ffmpeg 가 영상을 읽지 못했습니다");
-  F._unit = 1/fps;
+
+  /* ★ 여기까지 F 에 적힌 시각은 (번호 ÷ 초당 장수) 로 지어낸 값이다.
+     ffmpeg 가 알려준 진짜 시각이 있으면 그것으로 갈아끼운다.
+     초당 장수가 일정하지 않은 영상(내려받은 영상에 흔하다)은 이 값이 없으면
+     뒤로 갈수록 몇 초씩 밀린다 — 컷을 눌렀을 때 다른 장면이 뜨고,
+     재생하는 동안 눈금이 실제 컷과 어긋나던 원인이 이것이다. */
+  if(r.times && r.times.length===F.length){
+    for(let i=0;i<F.length;i++) F[i].t=r.times[i];
+    S.realTimes=true;
+  }else S.realTimes=false;
+
+  /* 장과 장 사이 간격은 실제 값에서 뽑는다 (반올림하지 않는다) */
+  const gaps=[];
+  for(let i=1;i<F.length;i++){ const g=F[i].t-F[i-1].t; if(g>1e-6) gaps.push(g); }
+  gaps.sort((a,b)=>a-b);
+  F._unit = gaps.length ? gaps[gaps.length>>1] : 1/fps;
   F._filled = 0;                 // 되짚어 채울 필요가 없다 — 애초에 빠지지 않는다
   return F;
 }
@@ -1249,10 +1298,16 @@ function loadImg(src){
   return new Promise((ok,no)=>{ const im=new Image();
     im.onload=()=>ok(im); im.onerror=()=>no(new Error("이미지를 열지 못했습니다")); im.src=src; });
 }
+/* ffmpeg 에게 "이 시각의 장" 을 달라고 할 때 쓰는 값.
+   ffmpeg 는 '적어준 시각 이후의 첫 장' 을 준다. 그래서 딱 그 장의 시각을 적으면,
+   소수점이 아주 조금만 커도 다음 장이 나온다. 4분의 1장만큼 앞을 적어
+   반드시 그 장이 나오게 한다 (앞 장까지 물러나지는 않는다). */
+const grabAt=(t,fps)=>Math.max(0, t-0.25/((fps&&isFinite(fps)&&fps>1)?fps:24));
+
 async function captureEl(item,picks,base,outDir,tag){
   const dir=`${outDir}/${base}_CUTS/분석 프레임`;
   prog(66,`${tag||""}원본 프레임 저장 중...`,"");
-  const r=await window.CG.grabPNGs(item.path, picks.map(p=>p.t), dir, base);
+  const r=await window.CG.grabPNGs(item.path, picks.map(p=>grabAt(p.t,item.fps)), dir, base);
   if(!r||!r.ok) throw new Error("프레임을 저장하지 못했습니다");
 
   const shots=[], thumbDir=`${outDir}/${base}_CUTS/_목록미리보기(작은그림)`;
@@ -1366,15 +1421,105 @@ async function scan(v,tag){
   return F;
 }
 
-/* ---------- 2단계: 컷 나누기 ---------- */
-function findCuts(F){
-  const cuts=[0];
-  for(let i=1;i<F.length;i++){
-    const hard = F[i].blank!==F[i-1].blank;      // 내용 <-> 암전 전환
-    if((dist(F[i].sig,F[i-1].sig)>=CUT_TH || hard) &&
-       (F[i].t-F[cuts[cuts.length-1]].t)>=MIN_CUT_GAP) cuts.push(i);
+/* ---------- 2단계: 컷 나누기 ----------
+   ★ "화면이 CUT_TH 만큼 달라지면 컷" 하나만 보던 것이 문제였다.
+     그 규칙은 가만한 화면에서는 잘 맞지만, 다음 두 가지를 컷으로 착각한다.
+
+       ① 빠르게 움직이는 화면 (휘프팬·핸드헬드·빠른 줌, 포커스 이동)
+          장과 장 사이가 원래 많이 다르다. 그래서 몇 장마다 계속 '컷'이 선다.
+          → 한 컷인데 프레임이 서너 장씩 나오던 바로 그 원인이다.
+       ② 한두 장 번쩍하는 플래시 · 조명 변화
+          그 순간만 확 달라지고 곧 돌아온다.
+
+     그래서 두 가지를 더 본다.
+       · 주변보다 튀는가 — 그 자리만 유난히 달라졌는가, 원래 계속 그랬는가.
+         (움직임이 심한 구간은 기준선 자체가 높으므로 웬만해선 컷이 안 된다)
+       · 바뀐 채로 이어지는가 — 컷은 바뀌면 그대로 간다. 번쩍은 되돌아온다.
+
+     두 검사 모두 '컷을 지우기만' 한다. 없던 컷을 만들지는 않는다. */
+const ADAPT_RATIO = 3.0;   // 주변 움직임보다 이 배 이상 튀어야 컷
+const ADAPT_WIN   = 6;     // '주변' 으로 볼 앞뒤 장 수
+const HOLD_LOOK   = 5;     // 바뀐 뒤 몇 장을 확인할지
+const HOLD_BACK   = 5;     // 바뀌기 전 몇 장과 견줄지
+const HOLD_MIN    = 0.6;   // 그 중 이만큼은 계속 달라야 진짜 컷
+
+const median=a=>{ if(!a.length) return 0; a.sort((x,y)=>x-y);
+  const h=a.length>>1; return a.length%2 ? a[h] : (a[h-1]+a[h])/2; };
+
+/** 이 자리 주변이 원래 얼마나 요란한가 (변화량의 기준선).
+    ★ 앞뒤를 한 덩어리로 보면 안 된다. 움직임이 심한 구간이 시작되는 바로 그 자리
+      (= 진짜 컷)에서는 뒤쪽이 이미 요란해서 기준선이 높아지고, 진짜 컷이 죽는다.
+      그래서 앞쪽·뒤쪽을 따로 재고 '조용한 쪽'을 기준으로 삼는다.
+      · 움직임 한가운데 → 양쪽 다 요란 → 기준선 높음 → 컷으로 안 본다
+      · 움직임이 시작되는 자리 → 앞쪽이 조용 → 기준선 낮음 → 컷으로 본다
+    한쪽에 다른 컷이 끼어 있어도 흔들리지 않게 가운데값(중앙값)을 쓴다. */
+function localBase(d,i,n){
+  const back=[], fore=[];
+  for(let k=i-ADAPT_WIN;k<=i-2;k++) if(k>=1) back.push(d[k]);
+  for(let k=i+2;k<=i+ADAPT_WIN;k++) if(k<n) fore.push(d[k]);
+  const a=back.length?median(back):Infinity;
+  const b=fore.length?median(fore):Infinity;
+  const m=Math.min(a,b);
+  return Math.max(0.5, isFinite(m)?m:0.5);
+}
+
+/** 여기서 바뀐 화면이 그대로 이어지는가.
+    ★ 한두 장 번쩍하는 플래시는 '들어갈 때'와 '나올 때' 두 번 튄다.
+      바로 앞 한 장만 보고 판단하면 그 앞 장이 이미 번쩍인 장이라 속는다.
+      그래서 '바뀌기 전 여러 장' 중 어느 것과도 닮지 않아야 진짜로 바뀐 것으로 본다.
+      돌아온 화면은 반드시 그 전 어딘가와 닮으므로 여기서 걸린다. */
+function holdsAfter(F,i){
+  const back=[];
+  for(let k=i-HOLD_BACK-1;k<=i-2;k++) if(k>=0) back.push(F[k]);
+  if(!back.length) back.push(F[Math.max(0,i-1)]);
+  let n=0, diff=0;
+  for(let k=i+1;k<=Math.min(F.length-1,i+HOLD_LOOK);k++){
+    n++;
+    let near=Infinity;
+    for(const b of back) near=Math.min(near,dist(F[k].sig,b.sig));
+    if(near>=CUT_TH) diff++;                 // 그 전 어느 장과도 닮지 않았다
   }
-  cuts.push(F.length);
+  return n===0 || diff>=Math.ceil(n*HOLD_MIN);
+}
+
+function findCuts(F){
+  const n=F.length;
+  const d=new Float32Array(n);
+  for(let i=1;i<n;i++) d[i]=dist(F[i].sig,F[i-1].sig);
+
+  /* ---- 후보 모으기 ---- */
+  const cand=[];
+  for(let i=1;i<n;i++){
+    const hard = F[i].blank!==F[i-1].blank;      // 내용 <-> 암전(또는 흰 화면) 전환
+    if(!hard){
+      if(d[i]<CUT_TH) continue;                        // ① 예전 기준 (그대로 남겨둔다)
+      if(d[i]<ADAPT_RATIO*localBase(d,i,n)) continue;  // ② 주변도 원래 요란하다
+    }
+    /* ③ 바뀐 채로 이어지는가.
+       ★ 암전·흰 화면 전환에도 이 검사를 한다. 한두 장 번쩍하는 플래시는
+         화면이 새하얘지면서 '내용 없는 화면'으로 잡히는데, 예전에는 그것만으로
+         무조건 컷이 되어 한 컷 안에 컷이 하나 더 생겼다. */
+    if(!holdsAfter(F,i)) continue;
+    cand.push(i);
+  }
+
+  /* ---- 가까이 붙은 후보는 한 덩어리로 보고, 가장 크게 변한 자리만 남긴다 ----
+     ★ 예전에는 '먼저 나온 것'을 골랐다. 그래서 움직임이 심한 컷이 끝나고
+       다음 컷으로 넘어갈 때, 진짜 경계보다 한 장 앞에서 컷이 서곤 했다.
+       (스타트 프레임이 앞 컷의 마지막 장이 되던 원인 중 하나다)
+       한 덩어리 안에서는 가장 크게 변한 자리가 진짜 경계다. */
+  const cuts=[0];
+  let k=0;
+  while(k<cand.length){
+    let j=k, best=k;
+    while(j+1<cand.length && F[cand[j+1]].t-F[cand[k]].t < MIN_CUT_GAP){
+      j++; if(d[cand[j]]>d[cand[best]]) best=j;
+    }
+    const at=cand[best];
+    if(F[at].t-F[cuts[cuts.length-1]].t >= MIN_CUT_GAP) cuts.push(at);
+    k=j+1;
+  }
+  cuts.push(n);
   return cuts;
 }
 
@@ -1389,42 +1534,35 @@ function bestIn(F,lo,hi){
   return b;
 }
 
+/** 이 컷이 시작되는 프레임 = 컷이 나뉜 그 자리, 그대로.
+    ★ 예전에는 '전환에 섞인 장' 을 피하겠다고 여기서 한두 장 밀었다.
+      그런데 새 컷 자체가 움직이는 화면이면(팬·줌·포커스 이동) 장마다 크게 달라서
+      밀어야 할 이유가 없는데도 늘 두 장씩 밀렸다 — 스타트 프레임이 컷 시작이
+      아니게 되던 가장 큰 원인이다.
+      경계를 고르는 일은 findCuts 가 '가장 크게 변한 자리'로 이미 끝냈다.
+      여기서는 손대지 않는다. 암전으로 시작할 때만 그림이 나오는 첫 장을 찾는다. */
+function cutStartIndex(F,a,b){
+  let k=a;
+  while(k<b && F[k].blank) k++;
+  return k;
+}
+
+/* 컷 하나에 프레임 하나.
+   같은 자리에서 그 컷이 시작되는 시각(sT)도 함께 정해 둔다.
+   분석 프레임과 스타트 프레임이 '같은 컷 목록'에서 나오므로
+   둘은 언제나 장 수가 같고 CUT 번호도 서로 맞는다.
+   (예전에는 스타트 프레임만 따로 컷 경계를 다시 찾아서 어긋났다) */
 function choose(F,cuts,dur){
-  const raw=[];
+  const out=[];
   for(let c=0;c<cuts.length-1;c++){
     const a=cuts[c], b=cuts[c+1]-1;
     if(b<a) continue;
     const inT=F[a].t, outT=(c+1<cuts.length-1)? F[cuts[c+1]].t : dur;
-
-    // 이 컷 안에서 화면과 포커스가 얼마나 변했는지
-    let D=0, R=1;
-    for(let i=a+1;i<=b;i++){
-      D=Math.max(D,dist(F[i].sig,F[a].sig));
-      const r=Math.max(F[i].sharp,1e-6)/Math.max(F[a].sharp,1e-6);
-      R=Math.max(R,r,1/r);
-    }
-    const split = (outT-inT)>=SPLIT_DUR && D>=SPLIT_DIST && R>=SPLIT_SHARP;
-
-    if(!split){
-      // 기본: 컷당 한 장
-      raw.push({f:bestIn(F,a+Math.floor((b-a)*.35),a+Math.floor((b-a)*.80)),
-                inT,outT,keep:false});
-    }else{
-      // 포커스가 크게 넘어간 컷: 스타트 한 장 + 엔드 한 장
-      const f1=bestIn(F,a+Math.floor((b-a)*.15),a+Math.floor((b-a)*.40));
-      const f2=bestIn(F,a+Math.floor((b-a)*.68),a+Math.floor((b-a)*.90));
-      raw.push({f:f1,inT,outT,keep:false});
-      if(dist(F[f2].sig,F[f1].sig)>=SPLIT_MIN)
-        raw.push({f:f2,inT,outT,keep:true});
-    }
-  }
-
-  // 컷마다 최소 한 장은 반드시 남긴다. (완전한 검은 화면만 제외)
-  const out=[];
-  for(const p of raw){
-    if(F[p.f].blank) continue;
-    p.idx=out.length+1; p.t=F[p.f].t;
-    out.push(p);
+    // 컷 가운데쯤에서 가장 또렷한 한 장 (분석 프레임)
+    const f=bestIn(F,a+Math.floor((b-a)*.35),a+Math.floor((b-a)*.80));
+    if(F[f].blank) continue;          // 통째로 검은 컷만 건너뛴다
+    const s=cutStartIndex(F,a,b);     // 그 컷의 첫 장 (스타트 프레임)
+    out.push({f, t:F[f].t, sT:F[s].t, inT, outT, idx:out.length+1});
   }
   return out;
 }
@@ -2189,18 +2327,25 @@ function showLinkNotice(u){
   const kind=siteKind(u);
   if(kind!=="sniff" && kind!=="maybe"){ box.classList.remove("on"); return; }
   $("sniffDone").style.display="none";      // 아직 창이 열리기 전이라 그만둘 것이 없다
+  /* ★ '무엇을 하는지' 만 적혀 있으면 사용자는 왜 이런 번거로운 일을 시키는지
+     알 수 없다. 이유부터 적고, 그 다음에 할 일과 그 뒤에 벌어질 일을 적는다. */
   if(kind==="sniff"){
     $("sniffTitle").textContent="이 사이트는 재생 창이 열립니다";
     $("sniffTip").innerHTML=
-      "<b>추가</b> 를 누르면 작은 <b>브라우저 창</b>이 하나 열립니다."
-      +"<br>그 창에서 <b>재생 버튼</b>을 눌러주세요."
-      +" 영상 주소를 찾으면 그 창은 <b>스스로 닫힙니다</b>."
-      +"<br><span style='color:#5d6472'>로그인이 필요하면 그 창에서 하시면 됩니다.</span>";
+      "이 사이트는 프로그램이 영상을 바로 가져가지 못하게 막아 둡니다."
+      +"<br>그래서 <b>진짜 브라우저 창</b>을 열어 사람이 보는 것과 똑같이 재생하고,"
+      +" 그때 오가는 통신에서 <b>영상 주소만</b> 받아옵니다."
+      +"<br><b>재생 버튼만 눌러주시면 됩니다.</b> 주소를 찾는 즉시 창이 스스로 닫히고,"
+      +" <b>추출이 곧바로 시작됩니다</b> — 따로 누르실 것은 없습니다."
+      +"<br><span style='color:#5d6472'>로그인이 필요하면 그 창에서 하시면 됩니다."
+      +" 한 번 해두면 다음부터는 기억합니다.</span>";
   }else{
     $("sniffTitle").textContent="재생 창이 열릴 수 있습니다";
     $("sniffTip").innerHTML=
-      "이 사이트는 바로 가져오지 못하면 <b>브라우저 창</b>을 열어 다시 시도합니다."
-      +"<br>창이 뜨면 <b>재생 버튼</b>만 눌러주세요. 곧 스스로 닫힙니다.";
+      "이 사이트는 바로 가져오지 못하면 <b>브라우저 창</b>을 엽니다."
+      +" 영상이 <b>실제로 재생될 때만</b> 주소가 드러나는 사이트이기 때문입니다."
+      +"<br>창이 뜨면 <b>재생 버튼</b>만 눌러주세요."
+      +" 주소를 찾으면 창이 닫히고 <b>추출이 곧바로 시작됩니다</b>.";
   }
   box.classList.add("on");
 }
@@ -2213,10 +2358,11 @@ function openSniff(page){
   return new Promise(resolve=>{
     _sniffBest=null; _sniffResolve=resolve; _sniffPageTitle="";
     $("sniffDone").style.display="";        // 이제는 그만둘 수 있다
-    $("sniffTitle").textContent="재생 창이 열렸습니다";
+    $("sniffTitle").textContent="열린 창에서 재생 버튼을 눌러주세요";
     $("sniffTip").innerHTML=
-      "이 사이트는 <b>재생을 시작해야</b> 영상 주소를 알려줍니다."
-      +"<br>열린 창에서 <b>재생 버튼</b>만 눌러주세요. 곧 자동으로 닫힙니다."
+      "이 사이트는 영상이 <b>실제로 재생될 때만</b> 주소가 드러납니다."
+      +" 그래서 창을 열었습니다 — 재생되는 것을 옆에서 보고 주소를 받아옵니다."
+      +"<br>주소를 찾으면 <b>창은 스스로 닫히고, 추출이 곧바로 시작됩니다</b>."
       +"<br><span style='color:#5d6472'>로그인이 필요하면 그 창에서 하시면 됩니다.</span>";
     $("sniffBox").classList.add("on");
     window.CG.sniffOpen(page, m=>{
@@ -2361,7 +2507,20 @@ async function addLink(url, referer, pageTitle){
   if(r.thumb) placeholder.thumb=r.thumb;
   renderQueue();
   if(!placeholder.thumb) ensureThumb(placeholder);
-  toast(`대기열에 추가했습니다 — ${r.title}`);
+
+  /* ★ 주소로 넣은 것은 곧바로 추출까지 간다.
+     파일은 여러 개를 모아 놓고 한 번에 돌리는 일이 많지만, 주소는 하나씩
+     붙여넣는 것이라 '붙여넣기 → 확인 → 추출 시작' 세 번을 누르게 하는 것이
+     번거롭기만 하다. 특히 재생 창까지 열리는 사이트는 창이 닫힌 뒤에도
+     한 번 더 눌러야 해서 끝난 줄 알고 기다리게 된다.
+     이미 추출이 돌고 있으면 손대지 않는다 — 추출 고리가 대기열을 계속
+     다시 확인하므로, 지금 것이 끝나면 알아서 이어서 처리한다. */
+  if(S.running){
+    toast(`대기열에 넣었습니다 — 지금 것이 끝나면 이어서 추출합니다`);
+  }else{
+    toast(`추출을 시작합니다 — ${placeholder.name.replace(/\.mp4$/,"")}`);
+    startRun();
+  }
 }
 if(IS_EL){
   /* ★ on$ 는 이 아래에서 정의되므로 여기서 쓰면 스크립트가 통째로 멈춘다.
@@ -2449,7 +2608,10 @@ drop.addEventListener("drop",e=>{
 /* ======================= 대기열 ======================= */
 function renderQueue(){
   const q=S.queue;
-  $("queueWrap").style.display=q.length?"block":"none";
+  /* 대기열이 비어 있으면 '넣는 칸'이 주인공, 차 있으면 '대기열'이 주인공.
+     aside 에 표를 붙여두면 자리 배분은 CSS 가 알아서 한다. */
+  $("queueWrap").style.display=q.length?"flex":"none";
+  document.querySelector("aside").classList.toggle("qOn", q.length>0);
   const waiting=q.filter(x=>x.status==="wait").length;
   $("qCount").textContent=q.length?`(${waiting}개 대기 / 총 ${q.length}개)`:"";
   const box=$("queue"); box.innerHTML="";
@@ -2553,7 +2715,8 @@ function markDupInHist(){
 $("qClear").onclick=()=>{ if(S.running) return; S.queue=[]; renderQueue(); resetResult(); };
 
 /* ======================= 추출 ======================= */
-runBtn.onclick=async()=>{
+runBtn.onclick=()=>startRun();
+async function startRun(){
   if(S.running) return;
   const todo=S.queue.filter(x=>x.status==="wait" && !x.checking);
   if(!todo.length) return;
@@ -2599,7 +2762,7 @@ runBtn.onclick=async()=>{
   if(stopped){ statusEl.style.color="var(--muted)"; prog(0,"추출을 취소했습니다","");
     toast("추출을 취소했습니다 — 남은 영상은 대기열에 그대로 있습니다"); }
   else prog(100,"모두 완료","");
-};
+}
 /* 취소는 표만 세운다. 실제 중단은 각 단계 안쪽에서 스스로 빠져나온다.
    (중간에 강제로 끊으면 저장소에 반쪽짜리 기록이 남는다) */
 let _ytJob=null;
@@ -2610,63 +2773,10 @@ $("cancel").onclick=()=>{
   $("cancel").disabled=true; $("cancel").textContent="멈추는 중...";
   prog(null,"취소하는 중...","");
 };
-/* 컷 경계를 확인해 진짜 컷만 고른 뒤, 각 컷의 첫 프레임을 캡쳐한다.
-   추출에 쓰던 숨은 영상을 그대로 쓰므로 화면이 흔들리지 않는다. */
-const frameIndexAt=(F,t)=>{
-  let lo=0, hi=F.length-1;
-  while(lo<hi){ const m=(lo+hi)>>1; if(F[m].t < t-1e-6) lo=m+1; else hi=m; }
-  return lo;
-};
-/* 부드러운 전환(디졸브·마스크·휘프팬)은 프레임 사이 차이가 CUT_TH 를 넘지 않는다.
-   그때는 걸어온 구간에서 '가장 크게 변한 지점'을 전환으로 본다. */
-const SOFT_RATIO = 0.55;   // CUT_TH 의 이 비율만 넘으면 부드러운 전환으로 인정
-
-/** 이 캡쳐가 속한 컷이 '실제로' 시작된 프레임을 찾는다.
-    컷 감지에는 최소 간격 규칙이 있어 빠른 컷 여러 개가 하나로 묶일 수 있다.
-    그래서 캡쳐 지점에서 거꾸로 걸어가 가장 최근의 전환을 직접 찾는다.
-    (분석 프레임 쪽 로직은 전혀 건드리지 않는다)
-
-    prev 는 바로 앞 캡쳐. 같은 컷을 둘로 쪼갠 두 번째 장이면
-    앞장과 똑같은 시작을 가리켜 스타트 프레임이 중복되므로 따로 처리한다. */
-function realCutStart(F,pick,prev){
-  const i=frameIndexAt(F, pick.t);
-  const floor=frameIndexAt(F, pick.inT??0);
-
-  /* ① 같은 컷을 쪼갠 두 번째 장(포커스 이동 등)
-       — 컷 시작이 아니라 '변화가 시작된 지점'을 찾아야 의미가 있다.
-         앞장과 이 장 사이에서 가장 크게 변한 곳을 쓴다. */
-  if(prev && prev.inT!=null && pick.inT!=null && prev.inT===pick.inT){
-    const lo=frameIndexAt(F, prev.t);
-    let best=-1, bd=-1;
-    for(let k=lo+1;k<=i;k++){
-      const d=dist(F[k-1].sig, F[k].sig);
-      if(d>bd){ bd=d; best=k; }
-    }
-    if(best>0) return best;
-  }
-
-  /* ② 뚜렷한 전환을 거꾸로 찾으면서, 부드러운 전환 후보도 함께 기억해 둔다 */
-  let j=i, softI=-1, softD=-1;
-  while(j>floor){
-    const d=dist(F[j-1].sig, F[j].sig);
-    if(d>=CUT_TH) break;                 // 여기가 진짜 컷 시작
-    if(d>softD){ softD=d; softI=j; }
-    j--;
-  }
-  if(j>floor) return j;
-
-  /* ③ 뚜렷한 전환이 없었다면 부드러운 전환으로 본다 */
-  if(softI>0 && softD>=CUT_TH*SOFT_RATIO) return softI;
-
-  /* ④ 그래도 못 찾으면 감지된 컷 시작을 쓰되, 경계를 한 번 다듬는다 */
-  if(floor>1){
-    const lo=Math.max(1,floor-3), hi=Math.min(F.length-1,floor+1);
-    let best=floor, bd=-1;
-    for(let k=lo;k<=hi;k++){ const d=dist(F[k-1].sig,F[k].sig); if(d>bd){ bd=d; best=k; } }
-    return best;
-  }
-  return floor;
-}
+/* 스타트 프레임의 시각(sT)은 컷을 나눌 때(choose) 이미 정해진다.
+   예전에는 여기서 캡쳐 지점부터 거꾸로 걸어가며 컷 시작을 '다시' 찾았는데,
+   그 계산이 분석 프레임과 따로 놀아서 컷이 나뉜 자리와 어긋나곤 했다.
+   이제는 컷 경계 하나에서 두 프레임이 함께 나온다. */
 
 /* ---------- Electron 판 추출 ----------
    브라우저 판과 순서는 같다. 다른 것은 두 가지뿐이다.
@@ -2716,13 +2826,16 @@ async function runOneEl(item,tag,t0){
       +"왼쪽 드롭존을 눌러 파일을 직접 골라주세요.");
   const F=await scanEl(item,tag);
   if(F.length<2) throw new Error("영상에서 프레임을 읽지 못했습니다.");
+  /* 초당 장수도 진짜 시각에서 다시 잡는다.
+     영상 정보에 적힌 값은 반올림되어 있거나(23.98) 실제와 다를 수 있는데,
+     이 값으로 한 장씩 앞뒤로 움직이므로 정확할수록 좋다. */
+  if(F._unit>0 && isFinite(F._unit)) item.fps=1/F._unit;
   prog(63,tag+"컷 나누는 중...","");
   const cutIdx=findCuts(F);
   const picks=choose(F,cutIdx,item.duration);
   const base=safeName(item.name.replace(/\.[^.]+$/,""));
   const shots=await captureEl(item,picks,base,outDir,tag);
-  shots.forEach(s=>s.base=base);
-  picks.forEach((p,n)=>{ if(shots[n]) shots[n].sT = F[realCutStart(F,p,picks[n-1])].t; });
+  shots.forEach(s=>s.base=base);      // sT 는 picks 에 이미 들어 있어 그대로 따라온다
 
   /* 폴더를 열었을 때 무엇이 무엇인지 바로 알 수 있게 설명을 남긴다 */
   try{
@@ -2823,8 +2936,6 @@ async function runOne(item,tag){
   const sheet=await makeSheet(shots);
   // 빠진 프레임을 모두 채운 뒤이므로 실제 값을 그대로 쓴다 (반올림하지 않음)
   const fps = F._unit ? (1/F._unit) : (F.length/Math.max(v.duration,0.01));
-  picks.forEach((p,n)=>{ if(shots[n]) shots[n].sT = F[realCutStart(F,p,picks[n-1])].t; });
-
 
   const saved=await exportToDisk(base,shots,sheet,"분석 프레임");
   if(saved) toast(`${shots.length}장을 폴더에 저장했습니다`);
@@ -2885,7 +2996,9 @@ function refreshShots(){
   const shots=curShots();
   drawGrid();
   $("cutCount").textContent=`${shots.length}장`;
-  MARKS=shots.map(s=>s.t);
+  /* 자석(Shift+드래그)도 컷이 나뉘는 자리에 붙는다.
+     눈금과 같은 자리여야 '가까운 눈금이 밝아지는' 표시도 맞는다. */
+  MARKS=shots.map(cutStartOf);
   S.curShot=-1; S.sel.clear(); S.anchor=null;
   drawMarks(); markCurrentShot(); hideTip();
 }
@@ -3050,11 +3163,23 @@ grid.addEventListener("wheel",()=>{
   _gridUserScroll=true; clearTimeout(_gsT);
   _gsT=setTimeout(()=>_gridUserScroll=false,2000);
 },{passive:true});
+/* 그 컷이 시작되는 시각.
+   ★ 분석 프레임의 시각(t)은 '컷 한가운데'다. 컷의 시작이 아니다.
+     그런데 재생바 눈금도, '지금 이 컷' 표시도 그 값을 쓰고 있었다.
+     그래서 재생하면 화면은 이미 다음 컷인데 목록은 아직 앞 컷을 가리키고,
+     반 컷쯤 늦게 따라가는 것처럼 보였다.
+     여기서만 고치면 눈금·표시·미리보기가 한꺼번에 제자리를 찾는다. */
+function cutStartOf(s){
+  if(!s) return 0;
+  if(s.sT!=null) return s.sT;
+  if(s.inT!=null) return s.inT;
+  return s.t||0;
+}
 function markCurrentShot(){
   if(!S.out) return;
   const shots=curShots();
   let cur=-1;
-  for(let i=0;i<shots.length;i++) if(pv.currentTime>=shots[i].t-0.12) cur=i;
+  for(let i=0;i<shots.length;i++) if(pv.currentTime>=cutStartOf(shots[i])-0.02) cur=i;
   if(cur===S.curShot) return;
   S.curShot=cur;
   [...grid.querySelectorAll("figure")].forEach(el=>
@@ -3153,10 +3278,15 @@ async function fileFromHandle(h,ask){
     return await h.getFile();
   }catch(e){ return null; }
 }
-/* 컷을 누르면 그 지점으로 이동하고 '정지 상태'로 대기 */
+/* 컷을 누르면 그 지점으로 이동하고 '정지 상태'로 대기.
+   ★ 컷의 시각은 그 장이 시작되는 바로 그 순간이다. 그 값을 그대로 넣으면
+     소수점 반올림에 따라 '한 장 앞'(= 앞 컷의 마지막 장)이 뜨는 일이 있다.
+     4분의 1장만큼 안쪽을 짚어 그 장의 한가운데를 가리키게 한다.
+     — 눌렀는데 다른 장면이 뜨던 것이 이것 때문이다. */
 function seekTo_(t,idx){
   if(!hasVideo()){ toast("먼저 원본 영상을 불러와 주세요"); return; }
-  pv.pause(); pv.currentTime=t; paintHead();
+  const fd=1/((S.fps&&isFinite(S.fps)&&S.fps>1)?S.fps:24);
+  pv.pause(); pv.currentTime=Math.max(0,Math.min(t+0.25*fd,(pv.duration||0)-1e-3)); paintHead();
   if(idx!=null){                       // 클릭한 컷을 그대로 현재 위치로 표시
     S.curShot=idx;
     [...grid.querySelectorAll("figure")].forEach(el=>
@@ -3165,8 +3295,21 @@ function seekTo_(t,idx){
 }
 $("pPlay").onclick=()=>{ if(!hasVideo()) return; pv.paused?pv.play():pv.pause(); };
 pv.onclick=()=>{ S.focusArea="video"; pv.paused?pv.play():pv.pause(); };
-pv.onplay=()=>$("pPlay").textContent="❚❚";
-pv.onpause=()=>$("pPlay").textContent="▶";
+/* ★ timeupdate 는 1초에 네 번쯤만 온다. 그것으로 '지금 이 컷' 을 따라가면
+   컷이 바뀌고도 한참 뒤에야 목록이 움직여서, 재생과 따로 노는 것처럼 보인다.
+   재생 중에는 프레임마다 불리는 콜백으로 따라간다. */
+let _follow=0;
+function followFrames(){
+  if(!pv.requestVideoFrameCallback || _follow) return;
+  const tick=()=>{
+    if(pv.paused || !hasVideo()){ _follow=0; return; }
+    paintHead(); markCurrentShot();
+    _follow=pv.requestVideoFrameCallback(tick);
+  };
+  _follow=pv.requestVideoFrameCallback(tick);
+}
+pv.onplay=()=>{ $("pPlay").textContent="❚❚"; followFrames(); };
+pv.onpause=()=>{ $("pPlay").textContent="▶"; _follow=0; };
 pv.ontimeupdate=()=>{ paintHead(); markCurrentShot(); };
 pv.onseeked=()=>{ paintHead(); markCurrentShot(); };
 $("pVol").oninput=e=>{ pv.volume=+e.target.value; pv.muted=false; paintVol(); };
@@ -3214,11 +3357,13 @@ function drawMarks(){
   paintMarkBtn();
   if(MARKVIEW!=="on") return;
   const d=pv.duration||1;
+  /* 눈금은 '컷이 나뉘는 자리'에 찍는다 — 화면이 실제로 바뀌는 그 지점이라
+     재생하면서 보면 눈금과 화면이 딱 맞아떨어진다. */
   curShots().forEach(s=>{
     const m=document.createElement("div");
     m.className="mk";
-    m.style.left=(s.t/d*100)+"%";
-    m.title=`CUT${s.idx} · ${tcs(s.t)}`;
+    m.style.left=(cutStartOf(s)/d*100)+"%";
+    m.title=`CUT${s.idx} 시작 · ${tcs(cutStartOf(s))}`;
     box.appendChild(m);
   });
 }
@@ -3290,15 +3435,15 @@ function showTipAt(clientX){
   const cx=Math.min(Math.max(clientX,r.left),r.right);
   const t=((cx-r.left)/W)*dur;
 
-  // 커서 위치에서 가장 가까운 캡쳐 (거리 제한 없이 항상 표시)
+  // 커서 위치에서 가장 가까운 컷 (눈금과 같은 기준 = 컷이 시작되는 자리)
   let best=0, bd=Infinity;
-  shots.forEach((s,i)=>{ const d=Math.abs(s.t-t); if(d<bd){ bd=d; best=i; } });
+  shots.forEach((s,i)=>{ const d=Math.abs(cutStartOf(s)-t); if(d<bd){ bd=d; best=i; } });
 
   const s=shots[best], tip=$("markTip");
   if(tip._i!==best){
     tip._i=best;
     tip.querySelector("img").src=s.url;
-    tip.querySelector("span").textContent=`CUT${s.idx} · ${tcs(s.t)}`;
+    tip.querySelector("span").textContent=`CUT${s.idx} · ${tcs(cutStartOf(s))}`;
   }
   const half=79;
   tip.style.left=Math.max(half,Math.min(cx-r.left,W-half))+"px";   // 커서를 따라감
@@ -3315,11 +3460,14 @@ function paintModeSw(){
     sk.className = S.mode==="start" ? "kindTag start" : "kindTag"; }
   const n=$("startNote"); if(n) n.classList.toggle("on",S.mode==="start");
 }
+/* startVer 는 '어떤 규칙으로 만든 스타트 프레임인가'를 적어두는 번호다.
+   3 = 컷 경계에서 곧바로 뽑은 것(지금 규칙). 2 이하로 적혀 있는 옛 기록은
+   낡은 규칙으로 만든 것이므로 다시 만든다 — 그래야 컷과 어긋나지 않는다. */
 $("modeSw").onclick=async e=>{
   const b=e.target.closest("button"); if(!b) return;
   const m=b.dataset.m;
   if(m===S.mode) return;
-  if(m==="start" && !(S.out&&S.out.startShots&&S.out.startVer===2)){
+  if(m==="start" && !(S.out&&S.out.startShots&&S.out.startVer===3)){
     const ok=await buildStartShots();
     if(!ok) return;
   }
@@ -3362,7 +3510,7 @@ function buildKeybar(){
   const defs=[
     ["◀▌","한 프레임 뒤","D",()=>{pv.pause();pv.currentTime=Math.max(0,pv.currentTime-1/S.fps);paintHead();}],
     ["▌▶","한 프레임 앞","F",()=>{pv.pause();pv.currentTime=Math.min(pv.duration,pv.currentTime+1/S.fps);paintHead();}],
-    ["🧲","캡쳐 지점에 자석","Shift+드래그",null],
+    ["🧲","컷 시작에 자석","Shift+드래그",null],
     ["📋","현재 화면 복사","Ctrl+C",copyFrame],
     ["ℹ","영상 정보","Tab",toggleInfo],
   ];
@@ -3433,7 +3581,10 @@ async function buildStartShotsEl(){
   prog(8,"스타트 프레임 만드는 중...","");
   try{
     const dir=`${outDir}/${S.out.base}_CUTS/스타트 프레임`;
-    const times=shots.map(s=> s.sT!=null ? s.sT : s.t);
+    /* 기록에 적는 시각은 컷이 시작되는 그 시각 그대로,
+       ffmpeg 에게 적어주는 시각만 4분의 1장 앞으로 민다 (grabAt 설명 참고) */
+    const at=shots.map(s=> s.sT!=null ? s.sT : s.t);
+    const times=at.map(t=>grabAt(t,S.fps));
     const r=await window.CG.grabPNGs(src,times,dir,S.out.base+"_START");
     if(!r||!r.ok) throw new Error("프레임을 저장하지 못했습니다");
     const thumbDir=`${outDir}/${S.out.base}_CUTS/_목록미리보기(작은그림)`;
@@ -3449,15 +3600,15 @@ async function buildStartShotsEl(){
         thumb=`${thumbDir}/START_CUT${i+1}.jpg`;
         await window.CG.writeFile(thumb,new Uint8Array(await b.arrayBuffer()));
       }catch(e){}
-      out.push({idx:shots[i].idx, t:times[i], inT:shots[i].inT, outT:shots[i].outT,
+      out.push({idx:shots[i].idx, t:at[i], inT:shots[i].inT, outT:shots[i].outT,
         sT:shots[i].sT, base:S.out.base, file:full, thumb, thumbOnly:true,
         url: thumb? fileURL(thumb):fileURL(full), fav:false});
       prog(8+(i+1)/shots.length*88,`스타트 프레임 만드는 중...  ${i+1} / ${shots.length}`,"");
     }
     if(S.jobId!==myJob){ toast("다른 기록으로 옮겨서 취소했습니다"); return false; }
-    S.out.startShots=out; S.out.startVer=2;
+    S.out.startShots=out; S.out.startVer=3;
     const j=await jobGet(S.jobId);
-    if(j){ j.startVer=2;
+    if(j){ j.startVer=3;
       j.startShots=out.map(x=>({idx:x.idx,t:x.t,inT:x.inT,outT:x.outT,sT:x.sT,
         base:x.base,file:x.file,thumb:x.thumb,fav:false}));
       await jobPut(j); }
@@ -3498,7 +3649,8 @@ async function buildStartShots(){
     const ctx=can.getContext("2d");
     for(let i=0;i<shots.length;i++){
       const s=shots[i];
-      const t=Math.max(0,(s.sT ?? s.inT ?? s.t)+0.2/S.fps);   // 추출 때 계산해 둔 시작 시각
+      /* 컷이 시작되는 시각에서 반 장 뒤 — 한 장 앞(앞 컷의 끝)이 잡히지 않게 */
+      const t=Math.max(0,(s.sT ?? s.inT ?? s.t)+0.5/S.fps);
       await seekAndWait(v,t);
       ctx.drawImage(v,0,0,can.width,can.height);
       const blob=await toOutBlob(can);
@@ -3522,11 +3674,11 @@ async function buildStartShots(){
     toast("다른 기록으로 옮겨서 취소했습니다");
     return false;
   }
-  S.out.startShots=out; S.out.startVer=2;
+  S.out.startShots=out; S.out.startVer=3;
   if(S.jobId){
     try{
       const j=await jobGet(S.jobId);
-      if(j){ j.startVer=2;
+      if(j){ j.startVer=3;
         j.startShots=out.map(x=>({idx:x.idx,t:x.t,inT:x.inT,outT:x.outT,
           blob:x.blob,base:x.base,fav:false})); await jobPut(j); }
     }catch(e){}
@@ -3800,7 +3952,7 @@ $("lbGo").onclick=async()=>{
   if(targetJob) await loadJob(targetJob);
   /* 화면이 다 그려진 다음에 옮겨야 목록에서도 제자리를 찾는다 */
   setTimeout(()=>{
-    if(mode==="start" && S.out && S.out.startShots && S.out.startVer===2 && S.mode!=="start"){
+    if(mode==="start" && S.out && S.out.startShots && S.out.startVer===3 && S.mode!=="start"){
       S.mode="start"; paintModeSw(); refreshShots();
     }
     goToCut(cutIdx, t);
@@ -4002,7 +4154,7 @@ async function loadJob(id){
     startSheetPath:j.startSheetPath||null,
     shots:j.shots.map(mk),
     startVer: j.startVer||0,
-    startShots: (j.startShots && j.startVer===2) ? j.startShots.map(mk) : null};
+    startShots: (j.startShots && j.startVer===3) ? j.startShots.map(mk) : null};
   resTitle.textContent=`✓ ${j.name} — ${j.shots.length}장 · ${fmtDate(j.createdAt)} 추출`;
   progWrap.style.display="none";
   if(IS_EL){

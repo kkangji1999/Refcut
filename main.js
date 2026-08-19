@@ -256,13 +256,27 @@ ipcMain.handle("thumbAt", async (_e, { src, time, referer }) => {
    ========================================================================= */
 const AW = 320, AH = 180, FRAME_BYTES = AW * AH * 4;
 
+/* ★ 프레임이 '몇 초 지점의 것인가' 는 계산하면 안 된다.
+   예전에는 화면 쪽에서 (프레임 번호 ÷ 초당 장수) 로 시각을 지어냈다.
+   초당 장수가 일정한 영상은 그래도 맞지만, 내려받은 영상은 초당 장수가
+   들쭉날쭉한 경우가 흔하다 (같은 24fps 라고 적혀 있어도 실제 간격이 다르다).
+   그러면 뒤로 갈수록 시각이 밀려서,
+     · 컷을 눌렀는데 다른 장면이 뜨고
+     · 재생하는 동안 눈금과 실제 컷이 어긋난다.
+   그래서 ffmpeg 에게 각 프레임의 진짜 시각(pts_time)을 직접 물어본다.
+   showinfo 는 프레임 한 장마다 한 줄씩, 내보내는 순서 그대로 찍어준다. */
 ipcMain.handle("scanFrames", async (e, { filePath, jobId }) => {
   return new Promise((resolve) => {
     const args = [
-      "-v", "error",
+      "-v", "info", "-hide_banner",   // showinfo 의 글은 info 수준이라 error 로는 안 보인다
       "-i", filePath,
       "-map", "0:v:0",
-      "-vf", `scale=${AW}:${AH}:flags=fast_bilinear`,
+      "-vf", `scale=${AW}:${AH}:flags=fast_bilinear,showinfo`,
+      /* ★ 이것이 없으면 ffmpeg 가 '초당 장수를 고르게 맞추려고' 프레임을 복사해
+         끼워 넣는다. 그러면 showinfo 가 찍어준 시각의 개수와 실제로 받는 장수가
+         어긋나서, 진짜 시각을 쓰지 못하고 예전처럼 계산한 값으로 돌아가 버린다.
+         복사하지 말고 디코드된 그대로 달라고 한다 (덤으로 조금 더 빠르다). */
+      "-vsync", "0",
       "-pix_fmt", "rgba",
       "-f", "rawvideo",
       "-",
@@ -270,6 +284,8 @@ ipcMain.handle("scanFrames", async (e, { filePath, jobId }) => {
     const ff = spawn(ffmpegPath(), args, { windowsHide: true });
     const chunks = [];
     let buffered = 0, sent = 0, killed = false;
+    const times = [];        // 프레임마다의 진짜 시각(초)
+    let tail = "";           // 줄이 중간에서 잘려 오는 것을 이어붙이는 자리
 
     CANCEL.set(jobId, () => { killed = true; try { ff.kill("SIGKILL"); } catch (x) {} });
 
@@ -287,8 +303,20 @@ ipcMain.handle("scanFrames", async (e, { filePath, jobId }) => {
       }
     });
 
+    /* stderr 에는 showinfo 의 줄과 진짜 오류가 섞여 온다.
+       시각은 뽑아서 모으고, 오류로 보여줄 글은 앞부분만 조금 남긴다
+       (info 수준이라 그냥 다 쌓으면 긴 영상에서 메모리를 크게 먹는다). */
     let errTxt = "";
-    ff.stderr.on("data", (d) => { errTxt += d.toString(); });
+    ff.stderr.on("data", (d) => {
+      const s = tail + d.toString();
+      const lines = s.split("\n");
+      tail = lines.pop();                    // 마지막 조각은 다음 번에 이어붙인다
+      for (const ln of lines) {
+        const m = ln.match(/pts_time:\s*([\d.]+)/);
+        if (m) { times.push(parseFloat(m[1])); continue; }
+        if (errTxt.length < 4000) errTxt += ln + "\n";
+      }
+    });
     ff.on("error", (err) => {
       CANCEL.delete(jobId);
       resolve({ ok: false, error: "ffmpeg 를 실행하지 못했습니다: " + err.message });
@@ -297,7 +325,8 @@ ipcMain.handle("scanFrames", async (e, { filePath, jobId }) => {
       CANCEL.delete(jobId);
       if (killed) return resolve({ ok: false, aborted: true });
       if (code !== 0) return resolve({ ok: false, error: errTxt.slice(0, 400) || ("ffmpeg 종료 코드 " + code) });
-      resolve({ ok: true, count: sent });
+      /* 장수와 시각의 수가 맞을 때만 쓴다. 어긋나면 화면 쪽이 예전 방식으로 돌아간다. */
+      resolve({ ok: true, count: sent, times: times.length === sent ? times : null });
     });
   });
 });
@@ -818,7 +847,7 @@ ipcMain.handle("sniffOpen", async (e, pageUrl) => {
 
   sniffWin = new BrowserWindow({
     width: 1100, height: 780,
-    title: "재생 버튼을 눌러주세요 — 주소를 찾으면 자동으로 닫힙니다",
+    title: "재생 버튼을 눌러주세요 — 주소를 찾으면 닫히고 추출이 시작됩니다",
     autoHideMenuBar: true, backgroundColor: "#101216",
     webPreferences: { session: part, nodeIntegration: false, contextIsolation: true },
   });
