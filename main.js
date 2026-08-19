@@ -518,6 +518,51 @@ async function ensureYtdlp(send) {
   return exe;
 }
 
+/* =========================================================================
+   자바스크립트 실행기 (quickjs) — 유튜브 때문에 필요하다
+   -------------------------------------------------------------------------
+   유튜브는 진짜 영상 주소를 자바스크립트로 뒤섞어 내려준다.
+   yt-dlp 는 그 뒤섞임을 풀 자바스크립트 실행기가 있어야 원래 주소를 얻는다.
+   실행기가 없으면 목록까지는 멀쩡히 보이는데, 막상 받을 때 403(접근 거부)으로
+   중간에 끊긴다 — "유튜브 주소만 추출에 실패한다" 던 것이 바로 이것이다.
+   (만든 사람 컴퓨터에는 개발용 node 가 깔려 있어 이 구멍이 잘 보이지 않았다)
+   그래서 2 MB 짜리 작은 실행기 하나를 처음 한 번만 받아 yt-dlp 옆에 둔다.
+   ========================================================================= */
+const isYoutube = (u) => /youtube[.]com|youtu[.]be/i.test(String(u || ""));
+function qjsAsset() {
+  const a = process.arch;
+  if (process.platform === "win32")
+    return a === "ia32" ? "qjs-windows-x86.exe" : "qjs-windows-x86_64.exe";
+  if (process.platform === "darwin")
+    return a === "arm64" ? "qjs-darwin-arm64" : "qjs-darwin-x86_64";
+  return a === "arm64" ? "qjs-linux-aarch64" : "qjs-linux-x86_64";
+}
+const QJSEXE = () => path.join(YTDIR(), process.platform === "win32" ? "qjs.exe" : "qjs");
+let qjsPending = null;
+/* 없으면 받아온다. 실패해도 던지지 않는다 — 다른 사이트는 이것 없이도 된다 */
+function ensureQuickjs(send) {
+  const exe = QJSEXE();
+  if (fs.existsSync(exe)) return Promise.resolve(exe);
+  if (qjsPending) return qjsPending;
+  qjsPending = (async () => {
+    if (send) send({ stage: "setup", text: "유튜브용 도구를 준비하는 중... (처음 한 번만)" });
+    const res = await net.fetch(
+      "https://github.com/quickjs-ng/quickjs/releases/latest/download/" + qjsAsset());
+    if (!res.ok) throw new Error("실행기 내려받기 실패 (" + res.status + ")");
+    const tmp = exe + ".part";                 // 받다 말면 반쪽짜리가 남지 않게
+    fs.writeFileSync(tmp, Buffer.from(await res.arrayBuffer()));
+    try { fs.chmodSync(tmp, 0o755); } catch (e) {}
+    fs.renameSync(tmp, exe);
+    return exe;
+  })().catch(() => { qjsPending = null; return ""; });
+  return qjsPending;
+}
+/* yt-dlp 에게 "자바스크립트는 이걸로 돌려라" 고 알려주는 옵션 */
+function jsArgs() {
+  const p = QJSEXE();
+  return fs.existsSync(p) ? ["--js-runtimes", "quickjs:" + p] : [];
+}
+
 /* ---------- 사이트별 재시도 조합 ----------
    한 번에 안 되는 사이트가 있다. 특히 비메오는 기본 방식이
    OAuth 토큰을 받아오다 401 로 막히는 일이 잦다.
@@ -542,6 +587,17 @@ function retryPlans(url, useCookies, referer) {
   /* 로그인 정보를 쓰기로 했으면 그것부터 시도한다.
      (회원만 볼 수 있는 사이트는 이게 아니면 아예 안 된다) */
   if (useCookies) return [...cookiePlans(), []];
+  /* ★ 유튜브는 순서가 전부다.
+     기본 통로는 목록만 잘 읽어주고, 막상 받으려 하면 403 으로 끊긴다.
+     '페이지에 심는 플레이어'(web_embedded) 통로는 그대로 열려 있어
+     4K 까지 원래 화질로 받아진다. 그것을 맨 앞에 두고,
+     그 통로가 막힌 영상(심기 금지)만 차례로 뒤로 물린다.
+     맨 뒤의 android 는 360p 뿐이지만 '그래도 하나는 받아진다'는 안전망이다.
+     ※ 이 통로들은 자바스크립트 실행기가 있어야 열린다 (ensureQuickjs) */
+  if (isYoutube(url)) {
+    const c = (v) => ["--extractor-args", "youtube:player_client=" + v];
+    return [c("web_embedded"), c("web_safari"), [], c("android"), ...cookiePlans()];
+  }
   const plans = [[]];                                   // ① 기본
   if (/vimeo\.com/i.test(url)) {
     plans.push(["--extractor-args", "vimeo:client=web"]);      // ② 웹 방식
@@ -618,6 +674,7 @@ ipcMain.handle("ytInfo", async (_e, url, useCookies, referer) => {
   let exe, last = "";
   try { exe = await ensureYtdlp(null); }
   catch (e) { return { ok: false, error: String(e.message || e) }; }
+  if (isYoutube(url)) await ensureQuickjs(null);   // 유튜브일 때만, 처음 한 번만
 
   const errs = [];
   const deadline = Date.now() + 45000;      // 로그인 시도까지 합쳐 60초를 넘기지 않는다
@@ -631,7 +688,7 @@ ipcMain.handle("ytInfo", async (_e, url, useCookies, referer) => {
     try {
       const out = await runYt(exe, ["--dump-single-json", "--no-warnings",
         "--no-playlist", "--socket-timeout", "10", "--retries", "1",
-        ...ffmpegLocArgs(), ...extra, url], 18000);
+        ...ffmpegLocArgs(), ...jsArgs(), ...extra, url], 25000);
       const j = JSON.parse(out);
       /* 이 영상이 실제로 제공하는 화질만 추린다 */
       const heights = [...new Set((j.formats || [])
@@ -655,7 +712,7 @@ ipcMain.handle("ytInfo", async (_e, url, useCookies, referer) => {
       try {
         const out = await runYt(exe, ["--dump-single-json", "--no-warnings",
           "--no-playlist", "--socket-timeout", "10", "--retries", "1",
-          ...ffmpegLocArgs(), "--cookies-from-browser", br, url], 7000);
+          ...ffmpegLocArgs(), ...jsArgs(), "--cookies-from-browser", br, url], 9000);
         const j = JSON.parse(out);
         const heights = [...new Set((j.formats || [])
           .filter((f) => f.vcodec && f.vcodec !== "none" && f.height)
@@ -712,6 +769,7 @@ ipcMain.handle("ytDownload", async (e, { url, dest, jobId, height, plan, useCook
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     const send = (o) => e.sender.send("ytProgress", { jobId, ...o });
     const exe = await ensureYtdlp(send);
+    if (isYoutube(url)) await ensureQuickjs(send);
     let killed = false;
     CANCEL.set("yt" + jobId, () => { killed = true; });
 
@@ -735,6 +793,7 @@ ipcMain.handle("ytDownload", async (e, { url, dest, jobId, height, plan, useCook
         "--no-warnings", "--no-playlist", "--no-part", "--newline",
         "-f", fmtSel || fmt, "--merge-output-format", "mp4",
         ...ffmpegLocArgs(),              // ffmpeg 위치를 알려준다 (없으면 합치기가 실패한다)
+        ...jsArgs(),                     // 유튜브 주소를 푸는 자바스크립트 실행기
         ...extra, "-o", dest, url,
       ];
       const p2 = spawn(exe, args, { windowsHide: true });
@@ -807,7 +866,10 @@ ipcMain.handle("ytDownload", async (e, { url, dest, jobId, height, plan, useCook
    그때 오가는 통신에서 영상 주소만 주워담는다.
    자바스크립트로 감춰두든 봇을 걸러내든, 실제로 재생되는 것은 반드시 지나가므로
    이 방법은 대부분의 사이트에서 통한다.
-   ★ 로그인이 필요하면 그 창에서 그냥 로그인하시면 되고, 그 상태는 다음에도 남는다.
+   ★ 로그인은 없어도 된다 — 확인해 보니 로그인 없이도 대부분 잡힌다.
+     (주소를 찾는 즉시 창이 닫히므로 로그인할 틈도 없다)
+     다만 TVCF 는 기업 계정이 아니면 플레이어가 720p 까지만 내주므로,
+     여기서 잡히는 주소도 720p 가 한계다 — 화면 쪽에서 미리 알려준다.
    ========================================================================= */
 /* ---------- 주소에서 화질 읽기 ----------
    스트림 주소에는 대개 화질이 적혀 있다 (720p · 1280x720 · /1080/ 처럼).
@@ -1049,7 +1111,9 @@ ipcMain.handle("sniffClose", () => {
 /* 진단 — 어디서 막히는지 직접 확인한다 */
 ipcMain.handle("ytDiag", async () => {
   const out = { exePath: YTEXE(), exists: false, size: 0, version: "", test: "", error: "",
-                ffmpeg: ffmpegPath(), ffmpegOk: false, ffprobeOk: false };
+                ffmpeg: ffmpegPath(), ffmpegOk: false, ffprobeOk: false, jsOk: false };
+  try { await ensureQuickjs(null); } catch (e) {}
+  out.jsOk = fs.existsSync(QJSEXE());
   try {
     const fp = ffmpegPath();
     out.ffmpegOk = await new Promise((r) => {
@@ -1073,8 +1137,9 @@ ipcMain.handle("ytDiag", async () => {
     catch (e) { out.error = "실행 실패: " + (e.message || e); return out; }
     try {
       await runYt(YTEXE(), ["--dump-single-json", "--no-warnings", "--simulate",
-        "--socket-timeout", "8", "--retries", "1",
-        "https://www.youtube.com/watch?v=aqz-KE-bpKQ"], 20000);
+        "--socket-timeout", "8", "--retries", "1", ...jsArgs(),
+        "--extractor-args", "youtube:player_client=web_embedded",
+        "https://www.youtube.com/watch?v=aqz-KE-bpKQ"], 25000);
       out.test = "성공";
     } catch (e) { out.test = "실패: " + String(e.message || e).slice(0, 200); }
   } catch (e) { out.error = String(e.message || e); }
@@ -1192,6 +1257,18 @@ ipcMain.handle("writeFile", (_e, { path: p, data }) => {
 
 /* 그림을 윈도우 클립보드에 직접 넣는다.
    화면 쪽(navigator.clipboard)이 막히거나 실패해도 여기로 돌아오면 복사가 된다. */
+/* ★ 저장해 둔 PNG 를 '파일 그대로' 클립보드에 넣는다.
+   화면 쪽에서 그림을 다시 그려 옮기던 길은 창이 잠깐 초점을 잃거나
+   브라우저 보안 규칙에 걸리면 조용히 실패했다 (복사가 됐다 안 됐다 하던 원인).
+   경로만 넘기면 이 길은 그런 사정과 무관하게 언제나 된다. */
+ipcMain.handle("copyImageFile", (_e, p) => {
+  try {
+    const img = nativeImage.createFromPath(String(p || ""));
+    if (img.isEmpty()) return { ok: false, error: "빈 그림" };
+    clipboard.writeImage(img);
+    return { ok: true };
+  } catch (e) { return { ok: false, error: String(e) }; }
+});
 ipcMain.handle("copyImage", (_e, data) => {
   try {
     const img = nativeImage.createFromBuffer(Buffer.from(data));

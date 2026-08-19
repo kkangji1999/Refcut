@@ -2381,6 +2381,10 @@ const EASY_SITES=[/(^|\.)youtube\.com$/i,/(^|\.)youtu\.be$/i,/(^|\.)vimeo\.com$/
   /(^|\.)instagram\.com$/i,/(^|\.)facebook\.com$/i,/(^|\.)tiktok\.com$/i,
   /(^|\.)twitter\.com$/i,/(^|\.)x\.com$/i,/(^|\.)naver\.com$/i,/(^|\.)tv\.naver\.com$/i];
 function hostOf(u){ try{ return new URL(String(u||"").trim()).hostname; }catch(e){ return ""; } }
+const isTVCF=u=>/(^|[.])tvcf[.]co[.]kr$/i.test(hostOf(u));
+/* TVCF 는 기업(광고주) 계정으로 로그인해야 원본 화질을 준다.
+   그냥 보는 사람에게는 720p 까지만 열려 있다 — 미리 알려줘야 덜 당황한다. */
+const TVCF_CAP="TVCF 는 기업 계정이 아니면 720p 까지만 받아집니다";
 function siteKind(u){
   const h=hostOf(u); if(!h) return "";
   if(SNIFF_SITES.some(r=>r.test(h))) return "sniff";
@@ -2406,9 +2410,9 @@ function showLinkNotice(u){
   if(kind==="sniff"){
     $("sniffTitle").textContent="재생 창이 열립니다";
     $("sniffTip").innerHTML=
-      "<b>재생 버튼만 눌러주세요.</b>"
+      "<b>재생 버튼만 눌러주세요.</b> 로그인은 필요 없습니다."
       +"<br><span style='color:#5d6472'>찾는 즉시 창이 닫히고 추출이 시작됩니다"
-      +"<br>화질은 가장 높게 · 로그인은 그 창에서</span>";
+      +(isTVCF(u)?"<br>"+TVCF_CAP:"")+"</span>";
   }else{
     $("sniffTitle").textContent="재생 창이 열릴 수 있습니다";
     $("sniffTip").innerHTML=
@@ -2428,9 +2432,9 @@ function openSniff(page){
     $("sniffDone").style.display="";        // 이제는 그만둘 수 있다
     $("sniffTitle").textContent="열린 창에서 재생 버튼을 눌러주세요";
     $("sniffTip").innerHTML=
-      "열린 창에서 <b>재생 버튼</b>을 눌러주세요."
+      "열린 창에서 <b>재생 버튼</b>을 눌러주세요. 로그인은 필요 없습니다."
       +"<br><span style='color:#5d6472'>찾는 즉시 창이 닫히고 추출이 시작됩니다"
-      +"<br>화질은 가장 높게</span>";
+      +(isTVCF(page)?"<br>"+TVCF_CAP:"")+"</span>";
     $("sniffBox").classList.add("on");
     window.CG.sniffOpen(page, m=>{
       if(m && m.pageTitle) _sniffPageTitle=m.pageTitle;
@@ -2513,6 +2517,7 @@ async function addLink(url, referer, pageTitle, fallbackUrl){
            <b style="color:#8a94a8">상태 확인</b><br>
            도구 설치 · ${d.exists?`예 (${(d.size/1048576).toFixed(1)} MB)`:"<b>아니오</b>"}<br>
            버전 · ${d.version||"확인 실패"}<br>
+           유튜브용 실행기 · ${d.jsOk?"정상":"<b>없음</b>"}<br>
            ffmpeg · ${d.ffmpegOk?"정상":"<b>없음</b>"}${d.ffprobeOk?"":" (ffprobe 없음 — ffmpeg 가 대신 읽습니다)"}<br>
            연결 시험 · ${d.test||"-"}${d.error?`<br>오류 · ${String(d.error).slice(0,120)}`:""}
          </div>`;
@@ -3144,7 +3149,7 @@ function drawGrid(){
       return b; };
     tools.append(
       mk("👁","크게 보기",()=>openShotsHere(i,shots)),
-      mk("📋","복사",async()=>{ const ok=await copyBlob(await fullBlob(s));
+      mk("📋","복사",async()=>{ const ok=await copyShot(s);
         if(ok){ fig.classList.add("copied"); setTimeout(()=>fig.classList.remove("copied"),900); } }),
       mk("⬇","저장",async()=>{ download(await fullBlob(s),fname(s)); markDownloaded([i]); toast("저장했습니다"); })
     );
@@ -3216,7 +3221,7 @@ $("gDl").onclick=async e=>{
 $("gCopy").onclick=async()=>{
   const list=selShots(); if(!list.length) return;
   if(list.length>1) toast("한 장만 복사됩니다 (첫 번째 선택)");
-  await copyBlob(await fullBlob(list[0]));
+  await copyShot(list[0]);
 };
 $("gFav").onclick=async()=>{
   const list=[...S.sel].sort((a,b)=>a-b);
@@ -4038,7 +4043,7 @@ $("lbClose").onclick=closeLB;
 $("lbSave").onclick=async()=>{ const c=lbCurrent();
   const b=c.blob||await fullBlob(LB.list[LB.idx]||{});
   if(b){ download(b,c.name); toast("저장했습니다"); } };
-$("lbCopy").onclick=async()=>copyBlob(lbCurrent().blob||await fullBlob(LB.list[LB.idx]||{}));
+$("lbCopy").onclick=async()=>copyShot(LB.list[LB.idx]||{}, lbCurrent().blob);
 /* '해당 구간 보기' — 즐겨찾기에서 열었을 때는 그 프레임이 다른 프로젝트의 것일 수 있다.
    예전에는 지금 열려 있는 영상에서만 이동하려 해서 아무 일도 일어나지 않았다.
    필요하면 그 프로젝트를 먼저 열고, 이동한 뒤, 캡쳐 격자도 같은 컷으로 맞춘다. */
@@ -4084,18 +4089,61 @@ function closeLB(){
    앱(Electron)에서는 브라우저 클립보드가 막히는 경우가 있어,
    실패하면 곧바로 앱 자체 복사로 다시 시도한다. */
 async function putPNG(png){
+  /* ★ 앱에서는 앱 자체 복사를 먼저 쓴다.
+     브라우저 클립보드는 창이 잠깐 초점을 잃으면 조용히 거절한다
+     (복사가 됐다 안 됐다 하던 이유 중 하나가 이것이었다). */
+  if(IS_EL && window.CG && window.CG.copyImage){
+    try{
+      const r=await window.CG.copyImage(new Uint8Array(await png.arrayBuffer()));
+      if(r && r.ok) return true;
+    }catch(e){}
+  }
   try{
     await navigator.clipboard.write([new ClipboardItem({"image/png":png})]);
     return true;
   }catch(e){}
-  try{
-    if(IS_EL && window.CG && window.CG.copyImage){
-      const r=await window.CG.copyImage(new Uint8Array(await png.arrayBuffer()));
-      if(r && r.ok) return true;
-    }
-  }catch(e){}
   return false;
 }
+/* 컷 한 장 복사.
+   앱에서는 이미 저장해 둔 PNG 파일이 있으므로 그 경로만 넘긴다 —
+   화면에서 그림을 다시 그려 옮기는 과정을 통째로 건너뛰는, 가장 확실한 길이다. */
+async function copyShot(s, blob){
+  if(IS_EL && s && s.file && window.CG && window.CG.copyImageFile){
+    try{
+      const r=await window.CG.copyImageFile(s.file);
+      if(r && r.ok){ clearTextSel(); toast("복사했습니다 · Ctrl+V 로 붙여넣기"); return true; }
+    }catch(e){}
+  }
+  return copyBlob(blob || await fullBlob(s||{}));
+}
+/* ---------- 글자 선택과 그림 복사 ----------
+   예전에는 화면 어딘가에 글자가 선택되어 있기만 하면 그림 복사가 통째로
+   멈췄다. 캡쳐 격자 위를 살짝 끌기만 해도 설명 글자가 선택되므로,
+   "어떤 컴퓨터는 복사가 안 되다가 갑자기 된다" 는 일이 여기서 생겼다.
+   이제는 입력칸 안의 선택이거나, 바로 그 자리에서 고른 글자일 때만 양보한다. */
+function selText(){
+  const sel=window.getSelection();
+  return (sel && !sel.isCollapsed && String(sel).trim()) ? sel : null;
+}
+function selInField(sel){
+  const n=sel.anchorNode, el=n && (n.nodeType===1?n:n.parentElement);
+  return !!(el && el.closest && el.closest("input,textarea,[contenteditable='true']"));
+}
+/* 오른쪽 클릭 — 누른 그 자리의 글자 선택만 글자 복사로 넘긴다 */
+function textSelAt(target){
+  const sel=selText(); if(!sel) return false;
+  if(selInField(sel)) return true;
+  try{ return !!(target && sel.containsNode && sel.containsNode(target,true)); }catch(e){ return false; }
+}
+/* Ctrl+C — 그림 자리(격자·크게 보기·영상·보관함) 밖에서 고른 글자면 글자 복사 */
+function textSelForKey(){
+  const sel=selText(); if(!sel) return false;
+  if(selInField(sel)) return true;
+  const n=sel.anchorNode, el=n && (n.nodeType===1?n:n.parentElement);
+  if(!el || !el.closest) return false;
+  return !el.closest("#grid,#lb,#vPane,#arcGrid");
+}
+function clearTextSel(){ try{ const s=window.getSelection(); if(s) s.removeAllRanges(); }catch(e){} }
 async function copyBlob(blob){
   try{
     if(!blob) throw new Error("no blob");
@@ -4786,7 +4834,7 @@ document.addEventListener("keydown",e=>{
     if(e.key==="ArrowRight"){ e.preventDefault(); lbMove(1); }
     else if(e.key==="ArrowLeft"){ e.preventDefault(); lbMove(-1); }
     else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="c"){ e.preventDefault();
-      (async()=>copyBlob(lbCurrent().blob||await fullBlob(LB.list[LB.idx]||{})))(); }
+      (async()=>copyShot(LB.list[LB.idx]||{}, lbCurrent().blob))(); }
     else if((e.ctrlKey||e.metaKey)&&(e.key==="+"||e.key==="=")){ e.preventDefault(); zoomBy(1.3); }
     else if((e.ctrlKey||e.metaKey)&&e.key==="-"){ e.preventDefault(); zoomBy(1/1.3); }
     return;
@@ -4797,9 +4845,8 @@ document.addEventListener("keydown",e=>{
   if((e.ctrlKey||e.metaKey) && !e.shiftKey && !e.altKey
      && String(e.key||"").toLowerCase()==="c"
      && !$("dlg").classList.contains("on") && !$("fmodal").classList.contains("on")){
-    /* 제목처럼 글자를 끌어서 선택해 뒀거나 입력칸 안이라면 글자 복사에 맡긴다 */
-    const sel=window.getSelection();
-    if(sel && !sel.isCollapsed && String(sel).trim()) return;
+    /* 입력칸 안이거나, 그림 자리 밖에서 고른 글자라면 글자 복사에 맡긴다 */
+    if(textSelForKey()) return;
     const ae=document.activeElement;
     if(ae && (ae.tagName==="INPUT" || ae.tagName==="TEXTAREA" || ae.isContentEditable)) return;
     e.preventDefault();
@@ -4844,10 +4891,10 @@ async function copyNow(){
   const list=selShots();
   if(list.length){
     if(list.length>1) toast("한 장만 복사됩니다 (첫 번째 선택)");
-    return copyBlob(await fullBlob(list[0]));
+    return copyShot(list[0]);
   }
   const shots=curShots();
-  if(S.curShot>=0 && shots[S.curShot]) return copyBlob(await fullBlob(shots[S.curShot]));
+  if(S.curShot>=0 && shots[S.curShot]) return copyShot(shots[S.curShot]);
   if(hasVideo() && pv.videoWidth) return copyFrame();
   if(shots.length) return toast("복사할 컷을 먼저 클릭해서 골라주세요");
   toast("복사할 컷이 없습니다");
@@ -4864,14 +4911,12 @@ document.addEventListener("contextmenu", async e=>{
   const t=e.target;
   if(!t || !t.closest) return;
   if(t.tagName==="INPUT" || t.tagName==="TEXTAREA" || t.isContentEditable) return;
-  const sel=window.getSelection();
-  if(sel && !sel.isCollapsed && String(sel).trim()) return;
+  if(textSelAt(t)) return;
 
   /* ① 크게 보기 — 지금 보고 있는 그 장 */
   if($("lb") && $("lb").classList.contains("on")){
     e.preventDefault();
-    const c=lbCurrent();
-    copyBlob(c.blob||await fullBlob(LB.list[LB.idx]||{}));
+    copyShot(LB.list[LB.idx]||{}, lbCurrent().blob);
     return;
   }
   /* ② 즐겨찾기 보관함의 카드 */
@@ -4884,7 +4929,7 @@ document.addEventListener("contextmenu", async e=>{
     const src = x.kind==="video" ? (x.job.shots||[]).find(y=>y) : x;
     if(!src) return toast("복사할 그림이 없습니다");
     if(x.kind==="video") toast("영상은 대표 컷 한 장으로 복사합니다");
-    if(await copyBlob(await fullBlob(src))) flashCopied(ac);
+    if(await copyShot(src)) flashCopied(ac);
     return;
   }
   /* ③ 캡쳐 격자의 컷 */
@@ -4893,7 +4938,7 @@ document.addEventListener("contextmenu", async e=>{
     e.preventDefault();
     const sh=curShots()[+fig.dataset.i];
     if(!sh) return;
-    if(await copyBlob(await fullBlob(sh))) flashCopied(fig);
+    if(await copyShot(sh)) flashCopied(fig);
     return;
   }
   /* ④ 영상 화면 — 지금 보이는 그 장을 뜬다 */
