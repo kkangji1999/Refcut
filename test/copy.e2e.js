@@ -14,6 +14,8 @@ const fs = require("fs");
 const ROOT = path.join(__dirname, "..");
 const OUT = path.join(__dirname, "_생성물");
 const PNG = path.join(OUT, "복사시험.png");
+/* 시험은 진짜 앱데이터·기록을 건드리지 않는다 (test/_격리.js 설명 참고) */
+const 시험방 = require("./_격리")(app, "copy");
 require(path.join(ROOT, "main.js"));
 
 const waitWindow = () => new Promise((res) => {

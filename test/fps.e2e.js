@@ -18,6 +18,8 @@ const path = require("path");
 const fs = require("fs");
 const { spawn } = require("child_process");
 
+/* 시험은 진짜 앱데이터·기록을 건드리지 않는다 (test/_격리.js 설명 참고) */
+const 시험방 = require("./_격리")(app, "fps");
 require(path.join(__dirname, "..", "main.js"));
 
 const OUT = path.join(__dirname, "_생성물");

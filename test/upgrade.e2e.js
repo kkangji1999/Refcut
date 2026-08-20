@@ -15,6 +15,8 @@ const { app, BrowserWindow } = require("electron");
 const path = require("path");
 const http = require("http");
 /* ★ 진짜 main.js 를 그대로 불러온다 — streamUpgrade 손잡이가 여기서 등록된다 */
+/* 시험은 진짜 앱데이터·기록을 건드리지 않는다 (test/_격리.js 설명 참고) */
+const 시험방 = require("./_격리")(app, "upgrade");
 require(path.join(__dirname, "..", "main.js"));
 
 const MASTER = [

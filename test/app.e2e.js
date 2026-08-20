@@ -18,11 +18,14 @@ const fs = require("fs");
 const ROOT = path.join(__dirname, "..");
 const OUT = path.join(__dirname, "_생성물");
 const VIDEO = path.join(OUT, "clip.mp4");
-const SAVE = path.join(OUT, "앱추출결과");
 
 /* ★ 진짜 main.js 를 그대로 불러온다.
    창만 따로 만들면 ipcMain 손잡이(probe·scanFrames·grabPNGs...)가 하나도
    등록되지 않아 아무것도 못 한다. */
+/* 시험은 진짜 앱데이터·기록을 건드리지 않는다 (test/_격리.js 설명 참고) */
+const 시험방 = require("./_격리")(app, "app");
+/* ★ 결과는 시험방 안에만 쌓는다 — 밖의 폴더를 비우면 남의 작업물이 날아간다 */
+const SAVE = path.join(시험방.저장, "앱추출결과");
 require(path.join(ROOT, "main.js"));
 
 const waitWindow = () => new Promise(res => {

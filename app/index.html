@@ -407,6 +407,11 @@
     font-size:12px; line-height:1.9; padding:12px 15px; border-radius:8px;
     display:none; white-space:pre; font-variant-numeric:tabular-nums}
   #pinfoBox.on{display:block}
+  /* 재생 칸이 왜 비어 있는지 한 줄로 알려주는 자리 */
+  #pvNote{position:absolute; left:0; right:0; bottom:0; display:none;
+    background:rgba(0,0,0,.82); color:#c9d0de; font-size:12.5px;
+    padding:9px 13px; text-align:center; line-height:1.5}
+  #pvNote.on{display:block}
 
   .ctl{display:flex; align-items:center; gap:10px; margin-top:10px; flex-shrink:0}
   .pbtn{background:var(--panel2); border:1px solid var(--border); color:var(--fg);
@@ -855,7 +860,8 @@
     <div id="drop">
       <div id="dIcon">🎬</div>
       <div id="dMain">영상 파일을 끌어다 놓으세요</div>
-      <div id="dSub">눌러서 고르기 · 여러 개 한 번에</div>
+      <div id="dSub">눌러서 고르기 · 여러 개 한 번에
+        <br><span style="opacity:.72">mp4 · mov · avi · mkv · wmv · mpg · mts 등 대부분의 형식</span></div>
     </div>
 
     <!-- 영상을 넣는 두 번째 길. 파일과 같은 무게로 보이게 카드로 세운다.
@@ -885,8 +891,9 @@
     </div>
     <div id="linkHint">유튜브 · 비메오 · 인스타 · TVCF — 받아서 바로 분석합니다</div>
 
-    <input type="file" id="file" accept="video/*" multiple hidden>
-    <input type="file" id="reattach" accept="video/*" hidden>
+    <!-- ★ video/* 만 적으면 윈도우가 아는 형식만 고를 수 있다 (mts·mxf 등이 빠진다) -->
+    <input type="file" id="file" accept="video/*,.mp4,.mov,.m4v,.mkv,.avi,.webm,.wmv,.asf,.flv,.f4v,.mpg,.mpeg,.mpe,.m2v,.ts,.m2ts,.mts,.m2t,.mxf,.3gp,.3g2,.ogv,.vob,.dv,.divx,.qt,.rm,.rmvb,.y4m" multiple hidden>
+    <input type="file" id="reattach" accept="video/*,.mp4,.mov,.m4v,.mkv,.avi,.webm,.wmv,.asf,.flv,.f4v,.mpg,.mpeg,.mpe,.m2v,.ts,.m2ts,.mts,.m2t,.mxf,.3gp,.3g2,.ogv,.vob,.dv,.divx,.qt,.rm,.rmvb,.y4m" hidden>
 
     <div id="queueWrap">
       <div class="qHead">
@@ -963,6 +970,7 @@
               <button class="mini" id="attachBtn">📂 원본 영상 불러오기</button>
             </div>
             <div id="pinfoBox"></div>
+            <div id="pvNote"></div>
           </div>
           <div class="ctl">
             <button class="pbtn" id="pPlay">▶</button>
@@ -1314,11 +1322,16 @@ async function captureEl(item,picks,base,outDir,tag){
   prog(66,`${tag||""}원본 프레임 저장 중...`,"");
   const r=await window.CG.grabPNGs(item.path, picks.map(p=>grabAt(p.t,item.fps)), dir, base);
   if(!r||!r.ok) throw new Error("프레임을 저장하지 못했습니다");
+  /* 끝내 못 뽑은 자리가 있으면 그 컷만 건너뛴다.
+     없는 파일을 목록에 넣으면 샷리스트를 만들다 멈춘다. */
+  const 빠짐=new Set(r.missing||[]);
+  if(빠짐.size) toast(`${빠짐.size}개 컷은 프레임을 뽑지 못해 건너뜁니다`);
 
   const shots=[], thumbDir=`${outDir}/${base}_CUTS/_목록미리보기(작은그림)`;
   const can=document.createElement("canvas"), ctx=can.getContext("2d");
   for(let i=0;i<picks.length;i++){
     if(ABORT) throw new Aborted();
+    if(빠짐.has(i)) continue;
     const full=r.files[i];
     const url=fileURL(full);
     let thumb=null;
@@ -1605,10 +1618,16 @@ async function makeSheet(shots){
   ctx.fillStyle="#181818"; ctx.fillRect(0,0,can.width,can.height);
   ctx.font="15px sans-serif"; ctx.textBaseline="top";
   for(let i=0;i<shots.length;i++){
-    const im=await new Promise(r=>{const o=new Image();o.onload=()=>r(o);o.src=shots[i].url;});
+    /* ★ 예전에는 그림이 안 열릴 때를 대비하지 않아서, 프레임 한 장이 없으면
+       여기서 영영 멈춰 있었다 (추출이 끝나지도, 오류가 뜨지도 않았다).
+       못 연 자리는 빈 칸으로 두고 그냥 넘어간다. */
+    const im=await new Promise(r=>{const o=new Image();
+      o.onload=()=>r(o); o.onerror=()=>r(null);
+      setTimeout(()=>r(null),15000); o.src=shots[i].url;});
     const c=i%cols, r=Math.floor(i/cols);
     const x=pad+c*(tw+pad), y=pad+r*(th+lh+pad);
-    ctx.drawImage(im,x,y,tw,th);
+    if(im) ctx.drawImage(im,x,y,tw,th);
+    else{ ctx.fillStyle="#2a2a2a"; ctx.fillRect(x,y,tw,th); }
     ctx.fillStyle="#ebebeb";
     ctx.fillText(`CUT${shots[i].idx}  ${tcs(shots[i].t)}`, x+3, y+th+5);
   }
@@ -2285,6 +2304,23 @@ function videoMeta(file){
      아무 일도 일어나지 않던 원인이 이것이다. */
 const isRealFile=f=>{ try{ return f instanceof Blob; }catch(e){ return false; } };
 
+/* ---------- 어떤 파일을 받아줄 것인가 ----------
+   ★ 예전에는 여섯 가지 확장자(mp4·mov·mkv·avi·m4v·webm)만 통과시키고
+     나머지는 아무 말 없이 버렸다. 그래서 mts·wmv·mpg 같은 것을 끌어다 놓으면
+     대기열에 아무것도 안 뜨고, 왜 안 들어갔는지도 알 수 없었다.
+     — 파일 고르기 창에서는 아예 보이지도 않았다.
+   이제 확장자로 자르지 않는다.
+     ① 영상이 아닌 것이 뻔한 파일(사진·문서·소리)만 여기서 돌려보내고
+     ② 나머지는 ffmpeg 에게 직접 물어본다 — 열리면 받고, 못 열면 이유를 말해준다.
+   ffmpeg 가 읽을 수 있는 그릇은 전부 들어온다. */
+const VIDEO_EXT=["mp4","mov","m4v","mkv","avi","webm","wmv","asf","flv","f4v",
+  "mpg","mpeg","mpe","m2v","ts","m2ts","mts","m2t","mxf","3gp","3g2","ogv",
+  "vob","dv","divx","qt","rm","rmvb","y4m"];
+const NOT_VIDEO=/[.](jpe?g|png|gif|bmp|webp|tiff?|heic|heif|svg|ico|psd|ai|eps|pdf|docx?|xlsx?|pptx?|hwpx?|txt|rtf|md|csv|json|xml|html?|css|js|zip|rar|7z|tar|gz|exe|dll|msi|iso|dmg|mp3|wav|flac|aac|m4a|oga|opus|wma|aiff?|mid|ttf|otf|lnk|url|ini|log)$/i;
+const 확장자=n=>(String(n).match(/[.]([a-z0-9]+)$/i)||["",""])[1].toLowerCase();
+const escHtml=t=>String(t).replace(/[&<>"]/g,
+  c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
 /* 대기열에 띄울 작은 그림을 뒤늦게라도 채워 넣는다.
    기다리게 하지 않고, 준비되는 대로 그 자리에 끼워 넣는다. */
 async function ensureThumb(item){
@@ -2303,9 +2339,15 @@ async function addFiles(items){
   if(!items.length) return;
   /* 추출 중에 새 영상을 넣는 경우, 보고 있던 결과 화면을 지우면 안 된다 */
   if(!S.running) resetResult();
+  const 못넣음=[];                 // 넣지 못한 것은 반드시 이유와 함께 알려준다
   for(const it of items){
     const f=it.file; if(!f) continue;
-    if(!(f.type||"").startsWith("video") && !/\.(mp4|mov|mkv|avi|m4v|webm)$/i.test(f.name)) continue;
+    const nm=f.name||"";
+    const 영상같음=(f.type||"").startsWith("video") || VIDEO_EXT.includes(확장자(nm));
+    /* 사진·문서·소리처럼 영상이 아닌 것이 뻔한 파일은 여기서 돌려보낸다 */
+    if(!영상같음 && NOT_VIDEO.test(nm)){
+      못넣음.push([nm,"영상 파일이 아닙니다"]); continue;
+    }
     /* Electron 에서는 파일의 실제 경로를 쓸 수 있다.
        ffmpeg 가 그 경로를 그대로 읽으므로 훨씬 빠르고 정확하다. */
     /* 파일의 실제 위치. 최신 Electron 은 file.path 를 막아두어서
@@ -2315,26 +2357,49 @@ async function addFiles(items){
     if(!p && f && f.path) p=f.path;
     let m=null, size=f.size||0;
     if(IS_EL && p){
-      try{
-        const q=await window.CG.probe(p);
-        if(q && q.ok){
-          m={duration:q.duration, w:q.width, h:q.height, fps:q.fps, thumb:null};
-          if(!size) size=q.size||0;
-        }
-      }catch(e){}
+      /* ★ 받아줄지 말지는 확장자가 아니라 ffmpeg 가 정한다.
+         열리면 무슨 그릇이든 들어오고, 못 열면 그 자리에서 이유를 알려준다.
+         (예전에는 여기서 조용히 사라져서 "왜 안 되지" 만 남았다) */
+      let q=null;
+      try{ q=await window.CG.probe(p); }catch(e){}
+      if(!q || !q.ok){
+        못넣음.push([nm, "영상으로 열지 못했습니다"
+          +((q&&q.error)?" — "+escHtml(String(q.error).slice(0,160)):"")]);
+        continue;
+      }
+      if(q.hasVideo===false){
+        못넣음.push([nm,"화면이 없는 파일입니다 — 소리만 들어 있는 것 같습니다"]);
+        continue;
+      }
+      m={duration:q.duration, w:q.width, h:q.height, fps:q.fps, thumb:null};
+      if(!size) size=q.size||0;
     }
     /* 프로그램 쪽이 못 읽었을 때만 화면 쪽 <video> 로 다시 시도한다.
        가짜 파일이면 이 길은 애초에 쓸 수 없으므로 건너뛴다. */
     if(!m && isRealFile(f)){ try{ m=await videoMeta(f); }catch(e){} }
+    /* 브라우저판에는 ffmpeg 가 없다 — 크롬이 못 여는 형식은 여기서 걸린다.
+       (앱에서는 파일 위치를 모르는 경우이므로, 추출할 때 위치부터 안내한다) */
+    if(!IS_EL && (!m || (!m.duration && !m.w))){
+      못넣음.push([nm,"이 브라우저가 열지 못하는 형식입니다"
+        +"<br>앱(Reftown)에서는 이 형식도 열립니다"]);
+      continue;
+    }
     if(!m) m={duration:0,w:0,h:0,fps:24,thumb:null};
     const item={file:isRealFile(f)?f:null, path:p, handle:it.handle||null,
-      name:f.name, size, type:f.type||"",
+      name:nm, size, type:f.type||"",
       duration:m.duration, w:m.w, h:m.h, fps:m.fps||24, thumb:m.thumb,
       dup:findDup(size,m.duration), status:"wait"};
     S.queue.push(item);
     renderQueue();
     ensureThumb(item);            // 그림은 기다리지 않고 준비되는 대로 채운다
   }
+  if(못넣음.length) 못넣음알림(못넣음);
+}
+/* 넣지 못한 파일을 한 번에 모아 보여준다 — 조용히 사라지는 일이 없게 한다 */
+function 못넣음알림(list){
+  const body=list.map(([n,why])=>
+    `<b>${escHtml(n)}</b><br><span style="color:#8a93a6">${why}</span>`).join("<br><br>");
+  appAlert(body, list.length>1 ? `넣지 못한 파일 ${list.length}개` : "넣지 못했습니다");
 }
 function resetResult(){
   res.classList.remove("on"); document.querySelector("main").classList.remove("compact");
@@ -2354,7 +2419,7 @@ drop.onclick=async()=>{
   if(window.showOpenFilePicker){
     try{
       const hs=await window.showOpenFilePicker({multiple:true,types:[{description:"영상 파일",
-        accept:{"video/*":[".mp4",".mov",".mkv",".avi",".m4v",".webm"]}}]});
+        accept:{"video/*":VIDEO_EXT.map(x=>"."+x)}}]});
       const items=[]; for(const h of hs) items.push({file:await h.getFile(), handle:h});
       addFiles(items); return;
     }catch(e){ if(e.name==="AbortError") return; }
@@ -2378,6 +2443,7 @@ let _sniffTimer=null, _sniffBest=null, _sniffResolve=null, _sniffPageTitle="";
    주소를 '붙여넣는 순간'에 미리 알려줘야, 창이 열리고 닫히는 것을 알아본다. */
 const SNIFF_SITES=[/(^|\.)tvcf\.co\.kr$/i];
 const EASY_SITES=[/(^|\.)youtube\.com$/i,/(^|\.)youtu\.be$/i,/(^|\.)vimeo\.com$/i,
+  /(^|\.)pinterest\.[a-z.]+$/i,/(^|\.)pin\.it$/i,
   /(^|\.)instagram\.com$/i,/(^|\.)facebook\.com$/i,/(^|\.)tiktok\.com$/i,
   /(^|\.)twitter\.com$/i,/(^|\.)x\.com$/i,/(^|\.)naver\.com$/i,/(^|\.)tv\.naver\.com$/i];
 function hostOf(u){ try{ return new URL(String(u||"").trim()).hostname; }catch(e){ return ""; } }
@@ -2411,13 +2477,13 @@ function showLinkNotice(u){
     $("sniffTitle").textContent="재생 창이 열립니다";
     $("sniffTip").innerHTML=
       "<b>재생 버튼만 눌러주세요.</b> 로그인은 필요 없습니다."
-      +"<br><span style='color:#5d6472'>찾는 즉시 창이 닫히고 추출이 시작됩니다"
+      +"<br><span style='color:#5d6472'>찾는 즉시 창이 닫히고 대기열에 들어갑니다"
       +(isTVCF(u)?"<br>"+TVCF_CAP:"")+"</span>";
   }else{
     $("sniffTitle").textContent="재생 창이 열릴 수 있습니다";
     $("sniffTip").innerHTML=
       "막히면 재생 창이 열립니다. <b>재생 버튼만 눌러주세요.</b>"
-      +"<br><span style='color:#5d6472'>찾는 즉시 창이 닫히고 추출이 시작됩니다</span>";
+      +"<br><span style='color:#5d6472'>찾는 즉시 창이 닫히고 대기열에 들어갑니다</span>";
   }
   box.classList.add("on");
 }
@@ -2433,7 +2499,7 @@ function openSniff(page){
     $("sniffTitle").textContent="열린 창에서 재생 버튼을 눌러주세요";
     $("sniffTip").innerHTML=
       "열린 창에서 <b>재생 버튼</b>을 눌러주세요. 로그인은 필요 없습니다."
-      +"<br><span style='color:#5d6472'>찾는 즉시 창이 닫히고 추출이 시작됩니다"
+      +"<br><span style='color:#5d6472'>찾는 즉시 창이 닫히고 대기열에 들어갑니다"
       +(isTVCF(page)?"<br>"+TVCF_CAP:"")+"</span>";
     $("sniffBox").classList.add("on");
     window.CG.sniffOpen(page, m=>{
@@ -2525,6 +2591,16 @@ async function addLink(url, referer, pageTitle, fallbackUrl){
     return appAlert(String(hardErr.message||hardErr).replace(/\n/g,"<br>")+extra,"영상 주소");
   }
 
+  /* ★ 핀터레스트에는 영상이 핀에 직접 있는 것과, 유튜브·비메오로 이어지기만
+     하는 것이 섞여 있다. 뒤엣것은 프로그램 쪽이 이어지는 주소를 찾아 알려준다.
+     그 주소로 조용히 갈아타면 사용자는 붙여넣기 한 번으로 끝난다. */
+  if((!r||!r.ok) && r && r.altUrl && r.altUrl!==url){
+    S.queue=S.queue.filter(x=>x!==placeholder); renderQueue();
+    toast(r.altKind==="link" ? "핀에 연결된 원본 영상으로 가져옵니다"
+                             : "핀에서 영상 주소를 찾았습니다");
+    return addLink(r.altUrl, r.altReferer||referer||null, pageTitle||"", null);
+  }
+
   /* ★ 일반 방식이 막혔다면, 사용자를 붙잡고 설명하는 대신 곧바로 우회한다.
      브라우저를 열어 재생하게 하고, 잡힌 주소로 조용히 이어서 진행한다.
      (이미 우회로 들어온 주소면 다시 시도하지 않는다) */
@@ -2613,18 +2689,18 @@ async function addLink(url, referer, pageTitle, fallbackUrl){
   renderQueue();
   if(!placeholder.thumb) ensureThumb(placeholder);
 
-  /* ★ 주소로 넣은 것은 곧바로 추출까지 간다.
-     파일은 여러 개를 모아 놓고 한 번에 돌리는 일이 많지만, 주소는 하나씩
-     붙여넣는 것이라 '붙여넣기 → 확인 → 추출 시작' 세 번을 누르게 하는 것이
-     번거롭기만 하다. 특히 재생 창까지 열리는 사이트는 창이 닫힌 뒤에도
-     한 번 더 눌러야 해서 끝난 줄 알고 기다리게 된다.
-     이미 추출이 돌고 있으면 손대지 않는다 — 추출 고리가 대기열을 계속
-     다시 확인하므로, 지금 것이 끝나면 알아서 이어서 처리한다. */
+  /* ★ 예전에는 주소를 넣으면 곧바로 추출까지 달렸다.
+     그런데 이 프로그램은 '받기' 도 함께 하는 도구여서, 추출은 필요 없고
+     영상 파일만 받고 싶은 때가 많다 — 그때마다 추출이 멋대로 시작돼 버렸다.
+     (TVCF 처럼 재생 창이 열리는 사이트는 창이 닫히자마자 추출로 넘어가서
+      끼어들 틈조차 없었다)
+     그래서 이제는 대기열까지만 간다. 그 다음은 사용자가 고른다.
+       · [추출 시작]  — 받아서 컷까지 뽑는다 (예전과 같다)
+       · [⬇ 영상다운] — 영상 파일만 받는다 */
   if(S.running){
-    toast(`대기열에 넣었습니다 — 지금 것이 끝나면 이어서 추출합니다`);
+    toast("대기열에 넣었습니다 — 지금 것이 끝나면 이어서 추출합니다");
   }else{
-    toast(`추출을 시작합니다 — ${placeholder.name.replace(/\.mp4$/,"")}`);
-    startRun();
+    toast("대기열에 넣었습니다 — [추출 시작] 또는 [⬇ 영상다운] 을 눌러주세요");
   }
 }
 if(IS_EL){
@@ -2785,6 +2861,15 @@ function renderQueue(){
     if(it.status==="done")  sub.append(" · 완료");
     body.appendChild(sub);
     row.append(num,th,body);
+    /* 주소로 넣은 것은 '받기만' 도 고를 수 있게 한다 */
+    if(it.status==="wait" && it.isLink && !it.checking){
+      const dl=document.createElement("button");
+      dl.className="mini"; dl.textContent="⬇ 영상다운";
+      dl.title="추출하지 않고 영상 파일만 받습니다 (저장 폴더 안의 [받은 영상])";
+      dl.disabled = S.running || _dlBusy;
+      dl.onclick=e=>{ e.stopPropagation(); 영상만받기(it); };
+      row.appendChild(dl);
+    }
     if(it.status==="wait"){
       const del=document.createElement("button");
       del.className="mini"; del.textContent="✕"; del.title="대기열에서 빼기";
@@ -2868,11 +2953,78 @@ async function startRun(){
     toast("추출을 취소했습니다 — 남은 영상은 대기열에 그대로 있습니다"); }
   else prog(100,"모두 완료","");
 }
+/* ======================= 영상만 받기 =======================
+   ★ 이 프로그램은 '컷 뽑는 도구' 이면서 '영상 받는 도구' 이기도 하다.
+     추출은 필요 없고 영상 파일만 갖고 싶을 때가 많은데, 예전에는 주소를
+     넣으면 무조건 추출까지 달려서 그럴 방법이 없었다.
+   받아 놓은 파일은 대기열에 그대로 남겨 둔다 — 마음이 바뀌어 [추출 시작] 을
+   눌러도 다시 받지 않고 그 파일에서 바로 뽑는다. */
+let _dlBusy=false;
+async function 영상만받기(item){
+  if(S.running) return toast("추출이 도는 중입니다 — 끝난 뒤에 받아주세요");
+  if(_dlBusy)   return toast("이미 하나를 받고 있습니다");
+  if(!item.url) return;
+  const outDir=await currentOutDir();
+  if(!outDir) return toast("저장 폴더를 먼저 지정해 주세요");
+  const base=safeName(item.name.replace(/[.][^.]+$/,"")).slice(0,80)
+    || ("영상_"+new Date().toTimeString().slice(0,8).replace(/:/g,""));
+  let dest=`${outDir}/받은 영상/${base}.mp4`;
+  try{ dest=await window.CG.freePath(dest); }catch(e){}
+
+  _dlBusy=true; ABORT=false; item.status="doing"; renderQueue();
+  $("cancel").classList.add("on"); $("cancel").disabled=false;
+  $("cancel").textContent="받기 취소";
+  progWrap.style.display="block"; resetProg();
+  prog(1,"영상 받는 중...","");
+  const jid="d"+Date.now(); _ytJob=jid;
+  let r=null;
+  try{
+    r=await window.CG.ytDownload(item.url, dest, jid,
+      {height:item.height||0, plan:item.plan, referer:item.referer||null}, m=>{
+        if(ABORT) return;
+        if(m.text){ prog(null, m.text, ""); return; }
+        if(typeof m.percent==="number")
+          prog(m.percent, `영상 받는 중...  ${m.percent.toFixed(0)}%`, "");
+      });
+  }catch(e){ r={ok:false, error:String(e&&e.message||e)}; }
+  _ytJob=null; _dlBusy=false; ABORT=false;
+  $("cancel").classList.remove("on");
+
+  if(r && r.aborted){
+    item.status="wait"; renderQueue();
+    statusEl.style.color="var(--muted)"; prog(0,"받기를 취소했습니다","");
+    return toast("받기를 취소했습니다");
+  }
+  if(!r || !r.ok){
+    item.status="wait"; renderQueue();
+    statusEl.style.color="var(--err)";
+    prog(0,"오류: "+((r&&r.error)||"받지 못했습니다"),"");
+    return appAlert(String((r&&r.error)||"받지 못했습니다")
+                    .split(String.fromCharCode(10)).join("<br>"),
+                    "영상 받기");
+  }
+  /* 받은 뒤에는 '주소' 가 아니라 '파일' 이 된다 — 추출로 이어가도 다시 받지 않는다 */
+  item.path=r.path; item.size=r.size||0;
+  item.isLink=false; item.url=null; item.checking=false;
+  /* 경로에서 파일 이름만 떼어낸다 (윈도우는 역슬래시, 그 밖은 슬래시) */
+  item.name=String(r.path).split(String.fromCharCode(92)).pop()
+                          .split("/").pop()||item.name;
+  item.status="wait"; item.받아둠=true;
+  try{ const q=await window.CG.probe(r.path);
+    if(q&&q.ok){ item.duration=q.duration; item.w=q.width; item.h=q.height; item.fps=q.fps; }
+  }catch(e){}
+  item.dup=findDup(item.size,item.duration);
+  renderQueue();
+  statusEl.style.color="var(--muted)";
+  prog(100,"영상을 받았습니다 — 저장 폴더 안의 [받은 영상] 에 있습니다","");
+  toast("받았습니다 — 그대로 두고 [추출 시작] 을 누르면 추출까지 이어집니다");
+}
+
 /* 취소는 표만 세운다. 실제 중단은 각 단계 안쪽에서 스스로 빠져나온다.
    (중간에 강제로 끊으면 저장소에 반쪽짜리 기록이 남는다) */
 let _ytJob=null;
 $("cancel").onclick=()=>{
-  if(!S.running || ABORT) return;
+  if((!S.running && !_dlBusy) || ABORT) return;
   ABORT=true;
   if(_ytJob){ try{ window.CG.ytCancel(_ytJob); }catch(e){} }
   $("cancel").disabled=true; $("cancel").textContent="멈추는 중...";
@@ -2960,6 +3112,10 @@ async function runOneEl(item,tag,t0){
       `  프로그램 목록에 띄우려고 작게 줄인 사본입니다.\r\n`+
       `  결과물이 아니니 쓰지 마세요. 지워도 되지만\r\n`+
       `  지우면 프로그램 목록의 그림이 안 보입니다.\r\n\r\n`+
+      `[..._미리보기.mp4]  (있을 때만)\r\n`+
+      `  ProRes·AVI·WMV 처럼 화면에서 바로 재생되지 않는 형식일 때만\r\n`+
+      `  재생용으로 만든 작은 사본입니다. 결과물이 아닙니다.\r\n`+
+      `  지워도 되지만, 지우면 그 영상을 다시 열 때 또 만듭니다.\r\n\r\n`+
       `[..._샷리스트_분석프레임.png]\r\n`+
       `  분석 프레임을 한 장에 모아 놓은 것입니다.\r\n`+
       `  스타트 프레임으로 만들면 _샷리스트_스타트프레임.png 로 따로 저장됩니다.\r\n`;
@@ -3008,11 +3164,77 @@ function showResultEl(item){
   buildKeybar();
 }
 function attachVideoPath(p,name){
-  if(_pvUrl){ URL.revokeObjectURL(_pvUrl); _pvUrl=null; }
-  pv.src=fileURL(p); _pvUrl="file";
+  if(_pvUrl && _pvUrl!=="file"){ URL.revokeObjectURL(_pvUrl); }
+  _pvUrl="file";
   $("noVid").style.display="none"; pv.style.display="block";
   $("vName").textContent=name||p;
-  pv.onloadedmetadata=()=>{ drawMarks(); paintHead(); paintIO(); };
+  /* ★ 추출은 ffmpeg 가 하므로 ProRes·DNxHD·AVI·WMV·MPEG-TS 도 잘 된다.
+     그런데 이 재생 칸은 크롬이 돌린다 — 크롬은 저 형식들을 그리지 못한다.
+     이제는 그때만 작은 mp4 사본을 하나 만들어 끼워 넣는다 (원본은 그대로 둔다).
+
+     못 그린다는 것을 알아채는 길이 두 가지다.
+       ① 오류가 난다 — 소리가 없는 ProRes mov 가 이렇다
+       ② ★ 오류도 없이 그냥 까맣다 — 소리가 들어 있는 ProRes mov 가 이렇다.
+          크롬이 소리는 읽을 수 있어서 '열렸다' 고 답해 버린다. 길이도 맞고
+          되감기도 되는데 화면만 안 나온다. 이때는 화면 크기가 0 으로 온다.
+          ①만 보고 있었더니, 편집실에서 나오는 mov(ProRes + PCM 소리)가
+          그대로 까만 화면이었다. 크기가 0 인지도 함께 본다. */
+  pv.onloadedmetadata=()=>{
+    if(!pv.videoWidth){ 미리보기만들기(p); return; }
+    재생메모(null); drawMarks(); paintHead(); paintIO();
+  };
+  pv.onerror=()=>미리보기만들기(p);
+  pv.src=fileURL(p);
+}
+/* 재생 칸 위에 한 줄 안내를 띄운다 (없애려면 null) */
+function 재생메모(txt){
+  const box=$("pvNote"); if(!box) return;
+  if(!txt){ box.classList.remove("on"); box.textContent=""; return; }
+  box.textContent=txt; box.classList.add("on");
+}
+let _prevJob=null, _prevTried=null;
+async function 미리보기만들기(src){
+  pv.onerror=null;
+  if(!IS_EL){ 재생메모("이 브라우저가 재생하지 못하는 형식입니다 — 캡쳐는 정상입니다"); return; }
+  const o=S.out||{};
+  if(!o.outDir || !o.base){
+    재생메모("이 형식은 여기서 재생되지 않습니다 — 캡쳐는 정상입니다"); return; }
+  if(_prevJob) return;
+  /* 사본까지 까맣게 나오면 또 만들러 들어와 끝없이 맴돈다 — 한 번만 시도한다 */
+  if(_prevTried===src){
+    재생메모("이 영상은 여기서 재생되지 않습니다 — 캡쳐와 저장은 정상입니다"); return; }
+  _prevTried=src;
+  /* 재생이 안 되는 까닭이 '형식' 인지 '파일이 사라진 것' 인지부터 가린다.
+     원본을 옮기거나 지운 기록을 열었을 때 엉뚱한 안내를 하지 않기 위해서다. */
+  let q=null; try{ q=await window.CG.probe(src); }catch(e){}
+  if(!q || !q.ok){
+    재생메모("원본 영상을 열지 못했습니다 — 옮기거나 지우지 않았는지 확인해 주세요");
+    return;
+  }
+  const dest=`${o.outDir}/${o.base}_CUTS/${o.base}_미리보기.mp4`;
+  const jid="p"+Date.now();
+  _prevJob=jid;
+  /* 이미 만들어 둔 사본이면 곧바로 돌아온다 — 그때는 안내가 깜빡이지 않게 한다 */
+  const 늦게알림=setTimeout(()=>재생메모(
+    "이 형식은 그대로 재생되지 않아 미리보기를 만드는 중입니다..."), 400);
+  let r=null;
+  try{
+    r=await window.CG.makePreview(src, dest, jid, m=>{
+      if(typeof m.percent==="number"){
+        clearTimeout(늦게알림);
+        재생메모(`미리보기를 만드는 중입니다  ${m.percent.toFixed(0)}%`);
+      }
+    });
+  }catch(e){}
+  clearTimeout(늦게알림);
+  _prevJob=null;
+  if(!r || !r.ok){
+    if(r && r.aborted){ 재생메모(null); return; }
+    재생메모("이 형식은 여기서 재생되지 않습니다 — 캡쳐와 저장은 정상입니다"); return;
+  }
+  재생메모(null);
+  pv.onerror=()=>재생메모("미리보기를 재생하지 못했습니다 — 캡쳐와 저장은 정상입니다");
+  pv.src=fileURL(r.path);
 }
 /* 지정된 저장 폴더 (없으면 문서\Reftown 를 기본으로 만들어 쓴다) */
 async function currentOutDir(){
@@ -3321,14 +3543,23 @@ let _pvUrl=null;
 function attachVideo(file){
   if(_pvUrl) URL.revokeObjectURL(_pvUrl);
   _pvUrl=URL.createObjectURL(file);
-  pv.src=_pvUrl; S.playFile=file;
+  S.playFile=file;
   $("noVid").style.display="none"; pv.style.display="block";
   $("vName").textContent=file.name;
-  pv.onloadedmetadata=()=>{ drawMarks(); paintHead(); paintIO(); };
+  const 못그림="이 형식은 여기서 재생되지 않습니다 — 캡쳐는 정상입니다";
+  pv.onloadedmetadata=()=>{
+    if(!pv.videoWidth){ 재생메모(못그림); return; }   // 소리만 읽히는 영상 (위 설명 참고)
+    재생메모(null); drawMarks(); paintHead(); paintIO();
+  };
+  pv.onerror=()=>재생메모(못그림);
+  pv.src=_pvUrl;
 }
 function detachVideo(){
+  pv.onerror=null; pv.onloadedmetadata=null; 재생메모(null); _prevTried=null;
+  if(_prevJob){ try{ window.CG.cancelPreview(_prevJob); }catch(e){} _prevJob=null; }
   pv.pause(); pv.removeAttribute("src"); pv.load();
-  if(_pvUrl){ URL.revokeObjectURL(_pvUrl); _pvUrl=null; }
+  if(_pvUrl && _pvUrl!=="file"){ URL.revokeObjectURL(_pvUrl); }
+  _pvUrl=null;
   pv.style.display="none"; $("noVid").style.display="flex";
   $("vName").textContent=""; $("marks").innerHTML="";
   hideTip();
@@ -3694,10 +3925,13 @@ async function buildStartShotsEl(){
     const times=at.map(t=>grabAt(t,S.fps));
     const r=await window.CG.grabPNGs(src,times,dir,S.out.base+"_START");
     if(!r||!r.ok) throw new Error("프레임을 저장하지 못했습니다");
+    const 빠짐=new Set(r.missing||[]);        // 못 뽑은 자리는 건너뛴다
+    if(빠짐.size) toast(`${빠짐.size}개 컷은 프레임을 뽑지 못해 건너뜁니다`);
     const thumbDir=`${outDir}/${S.out.base}_CUTS/_목록미리보기(작은그림)`;
     const can=document.createElement("canvas"), ctx=can.getContext("2d");
     const out=[];
     for(let i=0;i<shots.length;i++){
+      if(빠짐.has(i)) continue;
       const full=r.files[i]; let thumb=null;
       try{
         const im=await loadImg(fileURL(full));

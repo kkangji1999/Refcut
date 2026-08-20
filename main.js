@@ -141,25 +141,42 @@ function snapFps(v) {
   }
   return v;
 }
+/* ffmpeg 가 남긴 글에서 '왜 못 읽었는지' 한 줄을 골라낸다.
+   그냥 "읽지 못했습니다" 만 띄우면 사용자가 다음에 무엇을 할지 알 수 없다. */
+function readErr(txt, err) {
+  const t = String(txt || "");
+  if (/ENOENT|not recognized|찾을 수 없습니다/i.test(String((err && err.message) || "")))
+    return "ffmpeg 를 찾지 못했습니다";
+  const m = t.match(/^.*(Invalid data found|No such file|Permission denied|moov atom not found|Unknown format|Decoder .* not found|does not contain any stream)[^\n]*/mi);
+  if (m) return m[0].trim().slice(0, 160);
+  const last = t.trim().split("\n").filter(Boolean).pop();
+  return (last || "영상 정보를 읽지 못했습니다").slice(0, 160);
+}
+
 /* ffprobe 가 없을 때의 대체 경로.
    ffmpeg 는 출력 파일을 안 주면 오류로 끝나지만, 그 전에 영상 정보를
    먼저 찍어준다. 그 글을 읽어 길이·크기·초당 장수를 뽑아낸다. */
 function probeViaFfmpeg(filePath) {
   return new Promise((resolve) => {
     execFile(ffmpegPath(), ["-hide_banner", "-i", filePath],
-      { maxBuffer: 1 << 22, windowsHide: true }, (err, stdout, stderr) => {
+      { maxBuffer: 1 << 22, windowsHide: true, timeout: 30000 }, (err, stdout, stderr) => {
         const txt = String(stderr || "") + String(stdout || "");
         const dm = txt.match(/Duration:\s*(\d+):(\d\d):(\d\d(?:\.\d+)?)/);
+        /* ★ MPEG-TS 계열은 첫 장의 시각이 0 이 아니라 1.4초쯤에서 시작한다.
+           이 값을 알아야 프레임을 어떻게 뽑을지 정할 수 있다 (grabPNGs 참고). */
+        const sm = txt.match(/Duration:[^\n]*?start:\s*(-?[\d.]+)/);
         const vm = txt.match(/Stream #\d+:\d+[^\n]*?:\s*Video:\s*([^\s,(]+)([^\n]*)/);
         const rest = vm ? vm[2] : "";
         const rm = rest.match(/[,\s](\d{2,5})x(\d{2,5})/);
         const fm = rest.match(/,\s*([\d.]+)\s*fps/);
         if (!dm && !vm)
-          return resolve({ ok: false, error: "영상 정보를 읽지 못했습니다" });
+          return resolve({ ok: false, error: readErr(txt, err) });
         let size = 0;
         try { size = fs.statSync(filePath).size; } catch (e) {}
         resolve({
           ok: true,
+          hasVideo: !!vm,               /* 화면이 들어 있는가 (소리뿐인 파일 가려내기) */
+          start: sm ? parseFloat(sm[1]) : 0,
           width: rm ? parseInt(rm[1], 10) : 0,
           height: rm ? parseInt(rm[2], 10) : 0,
           codec: vm ? vm[1] : "",
@@ -177,9 +194,10 @@ ipcMain.handle("probe", async (_e, filePath) => {
       "-v", "error",
       "-select_streams", "v:0",
       "-show_entries", "stream=width,height,r_frame_rate,nb_frames,codec_name",
+      "-show_entries", "stream_disposition=attached_pic",
       "-show_entries", "format=duration,size",
       "-of", "json", filePath,
-    ], { maxBuffer: 1 << 22 }, (err, stdout) => {
+    ], { maxBuffer: 1 << 22, timeout: 30000 }, (err, stdout) => {
       if (err) return resolve({ ok: false, error: String(err.message || err) });
       try {
         const j = JSON.parse(stdout);
@@ -187,6 +205,9 @@ ipcMain.handle("probe", async (_e, filePath) => {
         const [n, d] = String(s.r_frame_rate || "24/1").split("/").map(Number);
         resolve({
           ok: true,
+          /* 앨범 표지 한 장(attached_pic)은 '영상'이 아니다 — 소리 파일이다 */
+          hasVideo: !!(s.width && s.height &&
+                       !((s.disposition || {}).attached_pic)),
           width: s.width, height: s.height,
           codec: s.codec_name,
           fps: snapFps(d ? n / d : 24),
@@ -196,8 +217,14 @@ ipcMain.handle("probe", async (_e, filePath) => {
       } catch (e) { resolve({ ok: false, error: String(e) }); }
     });
   });
-  if (byProbe.ok) return byProbe;
-  return probeViaFfmpeg(filePath);   // ffprobe 가 없거나 실패하면 ffmpeg 가 읽는다
+  if (byProbe.ok && byProbe.hasVideo) return byProbe;
+  /* ffprobe 가 없거나 실패하면 ffmpeg 가 읽는다.
+     ★ ffprobe 가 '화면이 없다' 고 했을 때도 한 번 더 물어본다 —
+       MXF·MPEG-TS 처럼 스트림을 늦게 찾는 그릇은 ffprobe 가 놓치는 일이 있다.
+       ffmpeg 도 못 찾으면 그때야 소리뿐인 파일로 본다. */
+  const byFf = await probeViaFfmpeg(filePath);
+  if (byFf.ok && byFf.hasVideo) return byFf;
+  return byProbe.ok ? byProbe : byFf;
 });
 
 /* =========================================================================
@@ -331,27 +358,124 @@ ipcMain.handle("scanFrames", async (e, { filePath, jobId }) => {
   });
 });
 
-/* 지정한 시각들의 원본 해상도 프레임을 PNG 로 저장한다.
-   -ss 를 입력 앞에 두면 키프레임 단위로 빠르게 건너뛴 뒤 정확히 맞춘다. */
+/* 한 장이 제대로 나왔는지 (빈 파일이 아닌지) 본다 */
+function madeOk(f) {
+  try { return fs.existsSync(f) && fs.statSync(f).size > 0; } catch (e) { return false; }
+}
+
+/* 빠른 길: 시각마다 -ss 를 입력 앞에 두어 키프레임 단위로 건너뛴 뒤 정확히 맞춘다.
+   긴 영상에서 가장 빠르다 — mp4·mov·mkv·avi 는 이 길로 간다. */
+function grabBySeek(filePath, times, out) {
+  return (async () => {
+    for (let i = 0; i < times.length; i++) {
+      await new Promise((res) => {
+        const ff = spawn(ffmpegPath(), [
+          "-v", "error",
+          "-ss", String(times[i]),
+          "-i", filePath,
+          "-frames:v", "1",
+          "-y", out[i],
+        ], { windowsHide: true });
+        ff.on("close", () => res());
+        ff.on("error", () => res());
+      });
+    }
+  })();
+}
+
+/* 한 번에 훑는 길.
+   ★ MPEG-TS 계열(.ts·.m2ts·.mts)은 첫 장의 시각이 0 이 아니라 1.4초쯤에서
+     시작한다. 그런 그릇에서 -ss 를 입력 앞에 두면 ffmpeg 가 엉뚱한 자리로
+     건너뛴다 — 다른 장면이 나오거나, 뒤쪽 시각은 아예 한 장도 안 나온다.
+     (한 장도 안 나오면 예전에는 샷리스트를 만들다 영영 멈춰 있었다)
+   그래서 그런 그릇은 처음부터 한 번 훑으면서 원하는 시각의 장만 골라낸다.
+   훑기는 한 번뿐이므로 컷이 많을수록 오히려 이쪽이 빠르다. */
+function grabByScan(filePath, times, out, fps) {
+  return new Promise((resolve) => {
+    const w = 0.9 / (fps > 1 && isFinite(fps) ? fps : 24);   // 한 장 만큼의 창
+    const tmp = path.join(os.tmpdir(),
+      "reftown_cut_" + Date.now() + Math.random().toString(36).slice(2, 7));
+    fs.mkdirSync(tmp, { recursive: true });
+    /* 필터 안에서는 쉼표가 칸막이라, 글자로 쓰려면 앞에 역슬래시를 붙여야 한다.
+       역슬래시는 글 속에서 한 겹씩 벗겨지기 쉬워 문자표(92)로 직접 만든다. */
+    const 쉼표 = String.fromCharCode(92) + ",";
+    const expr = times.map((t) =>
+      "between(t" + 쉼표 + (+t).toFixed(6) + 쉼표 + (+t + w).toFixed(6) + ")"
+    ).join("+");
+    const ff = spawn(ffmpegPath(), [
+      "-v", "error", "-i", filePath,
+      "-map", "0:v:0",
+      "-vf", "select=" + expr,
+      "-vsync", "0", "-y", path.join(tmp, "%d.png"),
+    ], { windowsHide: true });
+    const done = () => {
+      /* ★ 뽑힌 개수가 요청한 개수와 같을 때만 자리를 맞춘다.
+         하나라도 더 뽑혔으면 그 뒤가 통째로 한 칸씩 밀려 엉뚱한 장이 된다 —
+         그럴 때는 아무것도 옮기지 않고, 부르는 쪽이 느리지만 확실한 길로 간다. */
+      let 개수 = 0;
+      try { 개수 = fs.readdirSync(tmp).length; } catch (e) {}
+      if (개수 === times.length) {
+        for (let i = 0; i < times.length; i++) {
+          const from = path.join(tmp, (i + 1) + ".png");
+          try { if (madeOk(from)) { fs.rmSync(out[i], { force: true }); fs.renameSync(from, out[i]); } }
+          catch (e) {}
+        }
+      }
+      try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) {}
+      resolve();
+    };
+    ff.on("close", done);
+    ff.on("error", done);
+  });
+}
+
+/* 느리지만 언제나 맞는 길: -ss 를 입력 뒤에 두면 처음부터 풀어가며 정확히 맞춘다.
+   앞의 두 길이 모두 실패한 자리에만 쓴다 (한 장마다 처음부터 풀므로 느리다). */
+function grabByDecode(filePath, times, out) {
+  return (async () => {
+    for (let i = 0; i < times.length; i++) {
+      await new Promise((res) => {
+        const ff = spawn(ffmpegPath(), [
+          "-v", "error", "-i", filePath,
+          "-ss", String(times[i]), "-frames:v", "1", "-y", out[i],
+        ], { windowsHide: true });
+        ff.on("close", () => res());
+        ff.on("error", () => res());
+      });
+    }
+  })();
+}
+
+/* 지정한 시각들의 원본 해상도 프레임을 PNG 로 저장한다. */
 ipcMain.handle("grabPNGs", async (_e, { filePath, times, outDir, prefix }) => {
   fs.mkdirSync(outDir, { recursive: true });
-  const out = [];
-  for (let i = 0; i < times.length; i++) {
-    const dest = path.join(outDir, `${prefix}_CUT${i + 1}.png`);
-    await new Promise((res) => {
-      const ff = spawn(ffmpegPath(), [
-        "-v", "error",
-        "-ss", String(times[i]),
-        "-i", filePath,
-        "-frames:v", "1",
-        "-y", dest,
-      ], { windowsHide: true });
-      ff.on("close", () => res());
-      ff.on("error", () => res());
-    });
-    out.push(dest);
+  const out = times.map((_, i) => path.join(outDir, `${prefix}_CUT${i + 1}.png`));
+  for (const f of out) { try { fs.rmSync(f, { force: true }); } catch (e) {} }
+
+  const info = await probeViaFfmpeg(filePath);
+  const fps = (info && info.fps) || 24;
+  const 늦게시작 = !!(info && Math.abs(info.start || 0) > 0.001);
+
+  if (늦게시작) await grabByScan(filePath, times, out, fps);
+  else await grabBySeek(filePath, times, out);
+
+  /* 빠진 자리가 있으면 다음 길로 넘어간다.
+     ★ 늦게 시작하는 그릇에서 앞쪽 -ss 로 되돌아가면 '다른 장' 이 나온다.
+       없는 것보다 나쁘므로, 그쪽은 느리지만 확실한 길로만 다시 시도한다. */
+  const 빠진자리 = () => out.map((f, i) => (madeOk(f) ? -1 : i)).filter((i) => i >= 0);
+  let missing = 빠진자리();
+  if (missing.length && !늦게시작) {
+    await grabByScan(filePath, missing.map((i) => times[i]),
+                     missing.map((i) => out[i]), fps);
+    missing = 빠진자리();
   }
-  return { ok: true, files: out };
+  if (missing.length) {
+    await grabByDecode(filePath, missing.map((i) => times[i]),
+                       missing.map((i) => out[i]));
+    missing = 빠진자리();
+  }
+  /* 끝내 못 뽑은 자리는 숨기지 않고 알려준다 — 화면 쪽이 그 컷을 건너뛴다 */
+  return { ok: missing.length < out.length, files: out, missing };
 });
 
 /* 취소 */
@@ -363,13 +487,120 @@ ipcMain.handle("cancelScan", (_e, jobId) => {
 });
 
 /* =========================================================================
+   미리보기용 사본 만들기
+   -------------------------------------------------------------------------
+   ★ 추출은 ffmpeg 가 하므로 ProRes·DNxHD·AVI·WMV·MPEG-TS 도 문제없이 된다.
+     그런데 결과 화면의 재생기는 크롬이 돌린다. 크롬은 저런 형식을 열지 못해서,
+     추출은 멀쩡히 끝났는데 재생 칸만 까맣게 죽어 있었다 — 안내도 없었다.
+   그래서 크롬이 못 여는 영상일 때만, 결과 폴더에 작은 mp4 사본을 하나 만든다.
+   한 번 만들어두면 다음부터는 그대로 다시 쓴다 (원본은 건드리지 않는다).
+   ========================================================================= */
+const PREVIEW = new Map();
+ipcMain.handle("makePreview", async (e, { src, dest, jobId }) => {
+  const info = await probeViaFfmpeg(src);
+  const iw = (info && info.width) || 0;
+  const 길이 = (info && info.duration) || 0;
+  /* ★ 화질을 어디까지 지킬 것인가.
+     처음에는 1280 · crf28 로 만들었다. 그런데 4K 마스터를 올려놓고 보면
+     "원본 화질이 아닌 느낌" 이 그대로 드러난다 — 이 칸으로 레퍼런스를
+     들여다보는 사람에게는 그것이 곧 화질이다.
+     재어 보니 4K 를 그대로 만들어도 걸리는 시간이 같았다. 오래 걸리는 쪽은
+     인코딩이 아니라 '원본을 읽어 오는 것' 이기 때문이다 (1.3GB 를 네트워크
+     드라이브에서 읽는 데 12초, 4K 로 만들든 720p 로 만들든 12초).
+     그래서 줄이지 않는다 — 원본 해상도 그대로 만든다.
+     아주 긴 영상만 파일이 지나치게 커지지 않게 1920 으로 낮춘다. */
+  const 긴영상 = 길이 > 600;                      // 10분이 넘으면
+  const W = (긴영상 && iw > 1920) ? (1920 & ~1) : 0;   // 0 = 줄이지 않는다
+  const 목표폭 = W || iw;
+  /* 이미 만들어 둔 사본이 있어도, 그때보다 지금 기준이 높아졌으면 다시 만든다.
+     ★ 예전에는 '파일이 있으면 무조건 다시 쓴다' 였다. 그래서 화질 기준을
+       올려도 옛날에 만든 흐린 사본이 계속 나왔다 — 고친 것이 안 고쳐진 것처럼
+       보이던 원인이다. */
+  try {
+    if (fs.existsSync(dest) && fs.statSync(dest).size > 4096) {
+      const 옛것 = await probeViaFfmpeg(dest);
+      if (옛것 && 옛것.ok && 옛것.width && (!목표폭 || 옛것.width >= 목표폭 - 2))
+        return { ok: true, path: dest, reused: true };
+    }
+  } catch (x) {}
+  return new Promise((resolve) => {
+    try { fs.mkdirSync(path.dirname(dest), { recursive: true }); } catch (x) {}
+    const tmp = dest + ".만드는중";
+    const ff = spawn(ffmpegPath(), [
+      "-v", "info", "-hide_banner", "-y",
+      "-i", src,
+      "-map", "0:v:0", "-map", "0:a:0?",       // 소리는 있으면 넣는다
+      /* W 가 0 이면 줄이지 않는다 (원본 해상도 그대로) */
+      ...(W ? ["-vf", "scale=" + W + ":-2"] : []),
+      "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+      /* 되감기를 자주 하는 칸이라 열쇠장(키프레임)을 촘촘히 둔다 */
+      "-g", "48",
+      "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+      "-c:a", "aac", "-b:a", "128k",
+      "-f", "mp4", tmp,
+    ], { windowsHide: true });
+
+    let dur = 0, err = "", killed = false;
+    PREVIEW.set(jobId, () => { killed = true; try { ff.kill("SIGKILL"); } catch (x) {} });
+    ff.stderr.on("data", (d) => {
+      const t = d.toString();
+      if (!dur) {
+        const m = t.match(/Duration:\s*(\d+):(\d\d):(\d\d(?:\.\d+)?)/);
+        if (m) dur = (+m[1]) * 3600 + (+m[2]) * 60 + parseFloat(m[3]);
+      }
+      const ts = t.match(/time=(\d+):(\d\d):(\d\d(?:\.\d+)?)/g);
+      if (ts && dur > 0) {
+        const l = ts[ts.length - 1].match(/time=(\d+):(\d\d):(\d\d(?:\.\d+)?)/);
+        const at = (+l[1]) * 3600 + (+l[2]) * 60 + parseFloat(l[3]);
+        e.sender.send("prevProgress",
+          { jobId, percent: Math.max(0, Math.min(100, at / dur * 100)) });
+      }
+      if (err.length < 4000) err += t;
+    });
+    ff.on("error", (x) => {
+      PREVIEW.delete(jobId);
+      resolve({ ok: false, error: "ffmpeg 를 실행하지 못했습니다: " + x.message });
+    });
+    ff.on("close", (code) => {
+      PREVIEW.delete(jobId);
+      if (killed || code !== 0) {
+        try { fs.unlinkSync(tmp); } catch (x) {}
+        return resolve(killed ? { ok: false, aborted: true }
+                              : { ok: false, error: readErr(err, null) });
+      }
+      /* 다 만든 뒤에야 제 이름을 붙인다 — 중간에 끊긴 반쪽짜리를 다음에 쓰면 안 된다 */
+      try { fs.rmSync(dest, { force: true }); fs.renameSync(tmp, dest); }
+      catch (x) { return resolve({ ok: false, error: String(x.message || x) }); }
+      resolve({ ok: true, path: dest });
+    });
+  });
+});
+ipcMain.handle("cancelPreview", (_e, jobId) => {
+  const fn = PREVIEW.get(jobId);
+  if (fn) fn();
+  return { ok: true };
+});
+
+/* =========================================================================
    파일 · 폴더
    ========================================================================= */
+/* 파일 고르기 창에 늘어놓을 영상 그릇들.
+   ★ 예전에는 여섯 가지뿐이어서 mov 외의 것들은 창에 보이지도 않았다. */
+const VIDEO_EXT = ["mp4", "mov", "m4v", "mkv", "avi", "webm", "wmv", "asf",
+  "flv", "f4v", "mpg", "mpeg", "mpe", "m2v", "ts", "m2ts", "mts", "m2t",
+  "mxf", "3gp", "3g2", "ogv", "vob", "dv", "divx", "qt", "rm", "rmvb", "y4m"];
+
 ipcMain.handle("pickVideos", async () => {
   const r = await dialog.showOpenDialog(win, {
     title: "영상 고르기",
     properties: ["openFile", "multiSelections"],
-    filters: [{ name: "영상", extensions: ["mp4", "mov", "mkv", "avi", "m4v", "webm"] }],
+    filters: [
+      { name: "영상", extensions: VIDEO_EXT },
+      /* ★ 목록에 없는 그릇도 ffmpeg 는 대개 읽는다.
+         고르지도 못하게 막아두면 확인할 길이 없으므로 모든 파일도 열어둔다.
+         영상이 아니면 넣는 순간 이유를 알려준다. */
+      { name: "모든 파일", extensions: ["*"] },
+    ],
   });
   return r.canceled ? [] : r.filePaths;
 });
@@ -669,8 +900,77 @@ function pickThumb(j) {
   return String(list[0].url);
 }
 
+/* =========================================================================
+   짧은 주소 펴기 · 핀터레스트
+   -------------------------------------------------------------------------
+   ★ 핀터레스트는 두 가지가 걸림돌이다.
+     ① 공유 버튼이 주는 주소가 pin.it/XXXX 라는 짧은 주소다.
+        yt-dlp 는 이것을 모른다 — 따라가서 진짜 핀 주소로 바꿔줘야 한다.
+     ② 핀에 올라온 영상이 핀터레스트에 직접 있는 것도 있고,
+        유튜브·비메오로 이어지기만 하는 것도 있다. 뒤엣것은 yt-dlp 의
+        핀터레스트 추출기가 "영상이 없다" 며 물러난다.
+        그럴 때는 핀 페이지를 읽어 이어지는 영상 주소를 찾아 그쪽으로 간다.
+   ========================================================================= */
+function 호스트(u) { try { return new URL(String(u)).hostname.replace(/^www\./, ""); }
+                    catch (e) { return ""; } }
+const 핀터레스트인가 = (u) => /(^|\.)pinterest\.[a-z.]+$/i.test(호스트(u))
+                          || /^pin\.it$/i.test(호스트(u));
+
+/* 짧은 주소를 따라가 진짜 주소로 바꾼다. 못 펴면 원래 것을 그대로 돌려준다. */
+async function 주소펴기(url) {
+  /* ★ 지금 잘 되는 사이트는 건드리지 않는다 — pin.it 하나만 편다 */
+  if (!/^pin[.]it$/i.test(호스트(url))) return url;
+  try {
+    const r = await net.fetch(url, { redirect: "follow",
+      headers: { "User-Agent": UA } });
+    if (r && r.url && r.url !== url) return r.url;
+  } catch (e) {}
+  return url;
+}
+
+/* 핀 페이지를 읽어 '이어지는 영상 주소' 나 '핀터레스트가 직접 가진 영상' 을 찾는다 */
+async function 핀에서영상찾기(pageUrl) {
+  let html = "";
+  try {
+    const r = await net.fetch(pageUrl, { headers: {
+      "User-Agent": UA, "Accept-Language": "ko,en;q=0.8" } });
+    if (!r.ok) return null;
+    html = await r.text();
+  } catch (e) { return null; }
+  /* 페이지 안의 JSON 은 슬래시를 역슬래시와 함께 적어 둔다 — 먼저 펴 놓는다.
+     (역슬래시는 글 속에서 겹쳐 쓰기 쉬워 문자표(92)로 직접 만든다) */
+  const 역슬래시 = String.fromCharCode(92);
+  const t = html.split(역슬래시 + "/").join("/");
+  /* ① 유튜브·비메오로 이어지는 핀이면 그 주소로 넘긴다 (그쪽이 화질도 좋다) */
+  const ext = t.match(
+    /https?:[/][/](?:www[.])?(?:youtube[.]com[/]watch[?]v=[\w-]{6,}|youtu[.]be[/][\w-]{6,}|vimeo[.]com[/]\d{6,})/i);
+  if (ext) return { kind: "link", url: ext[0] };
+  /* ② 핀터레스트가 직접 가진 영상 — 전체 목록(m3u8)이 있으면 화질을 고를 수 있다 */
+  const m3u8 = t.match(/https?:[/][/][^"'<>\s]+?[.]m3u8/i);
+  if (m3u8) return { kind: "stream", url: m3u8[0], referer: pageUrl };
+  const mp4 = t.match(/https?:[/][/]v\d*[.]pinimg[.]com[/]videos[/][^"'<>\s]+?[.]mp4/i);
+  if (mp4) return { kind: "stream", url: mp4[0], referer: pageUrl };
+  return null;
+}
+
+/* 받을 파일 이름이 이미 있으면 번호를 붙여 비어 있는 자리를 찾아준다.
+   ('영상만 받기' 로 같은 영상을 두 번 받을 때 먼저 것을 덮지 않는다) */
+ipcMain.handle("freePath", (_e, dest) => {
+  try {
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    if (!fs.existsSync(dest)) return dest;
+    const ext = path.extname(dest), base = dest.slice(0, dest.length - ext.length);
+    for (let n = 2; n < 1000; n++) {
+      const p2 = `${base}_${n}${ext}`;
+      if (!fs.existsSync(p2)) return p2;
+    }
+  } catch (e) {}
+  return dest;
+});
+
 /* 링크 정보만 먼저 읽어온다 (제목·길이) — 대기열에 보여주기 위해 */
 ipcMain.handle("ytInfo", async (_e, url, useCookies, referer) => {
+  url = await 주소펴기(url);          // pin.it/XXXX → 진짜 핀 주소
   let exe, last = "";
   try { exe = await ensureYtdlp(null); }
   catch (e) { return { ok: false, error: String(e.message || e) }; }
@@ -724,6 +1024,16 @@ ipcMain.handle("ytInfo", async (_e, url, useCookies, referer) => {
       } catch (e) { errs.push(String(e.message || e)); }
     }
   }
+  /* ★ 핀터레스트는 '핀에 영상이 직접 있는 것' 과 '유튜브·비메오로 이어지기만
+     하는 것' 이 섞여 있다. 뒤엣것은 yt-dlp 가 영상이 없다며 물러난다.
+     그럴 때만 핀 페이지를 읽어 이어지는 영상 주소를 찾아 알려준다.
+     (화면 쪽이 그 주소로 다시 넣는다 — 다른 사이트의 흐름은 그대로다) */
+  if (핀터레스트인가(url)) {
+    const 대안 = await 핀에서영상찾기(url);
+    if (대안) return { ok: false, altUrl: 대안.url, altKind: 대안.kind,
+                       altReferer: 대안.referer || null,
+                       error: friendlyYtError(pickError(errs)) };
+  }
   return { ok: false, error: friendlyYtError(pickError(errs)) };
 });
 
@@ -766,6 +1076,7 @@ function friendlyYtError(msg) {
 /* 실제 내려받기. 진행률을 렌더러로 흘려보낸다. */
 ipcMain.handle("ytDownload", async (e, { url, dest, jobId, height, plan, useCookies, referer }) => {
   try {
+    url = await 주소펴기(url);        // 정보를 읽을 때와 같은 주소로 받는다
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     const send = (o) => e.sender.send("ytProgress", { jobId, ...o });
     const exe = await ensureYtdlp(send);

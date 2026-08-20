@@ -63,6 +63,16 @@ contextBridge.exposeInMainWorld("CG", {
   },
   cancelScan: (jobId) => ipcRenderer.invoke("cancelScan", jobId),
 
+  /* 크롬이 못 여는 형식일 때만 쓰는 미리보기용 mp4 사본
+     onProgress({percent}) 가 만드는 동안 계속 불린다 */
+  makePreview: (src, dest, jobId, onProgress) => {
+    const h = (_e, m) => { if (m.jobId === jobId) onProgress && onProgress(m); };
+    ipcRenderer.on("prevProgress", h);
+    return ipcRenderer.invoke("makePreview", { src, dest, jobId })
+      .finally(() => ipcRenderer.removeListener("prevProgress", h));
+  },
+  cancelPreview: (jobId) => ipcRenderer.invoke("cancelPreview", jobId),
+
   /* 원본 해상도 PNG 저장 */
   grabPNGs: (filePath, times, outDir, prefix) =>
     ipcRenderer.invoke("grabPNGs", { filePath, times, outDir, prefix }),
@@ -100,6 +110,8 @@ contextBridge.exposeInMainWorld("CG", {
       .finally(() => ipcRenderer.removeListener("ytProgress", h));
   },
   ytCancel: (jobId) => ipcRenderer.invoke("ytCancel", jobId),
+  /* 같은 이름이 이미 있으면 번호를 붙여 비어 있는 자리를 알려준다 */
+  freePath: (dest) => ipcRenderer.invoke("freePath", dest),
   ytDiag: () => ipcRenderer.invoke("ytDiag"),
 
   /* 브라우저에서 열어 영상 주소 잡기 */
