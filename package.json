@@ -21,7 +21,8 @@
     "bin:force": "node scripts/fetch-bin.js --force",
     "dist": "npm run bin && electron-builder --win --x64",
     "dist:dir": "npm run bin && electron-builder --dir",
-    "release": "npm run bin && electron-builder --win --x64 --publish always"
+    "release": "npm run bin && electron-builder --win --x64 --publish always && node scripts/release-notes.js",
+    "release:notes": "node scripts/release-notes.js"
   },
   "devDependencies": {
     "electron": "^31.0.0",
