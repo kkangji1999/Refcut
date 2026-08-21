@@ -934,16 +934,93 @@ const YTEXE = () => path.join(YTDIR(),
 const YT_RELEASE = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/" +
   (process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp");
 
+/* =========================================================================
+   백신이 도구를 지웠는지 알아내기
+   -------------------------------------------------------------------------
+   yt-dlp 는 파이썬을 exe 로 묶은 프로그램이라 백신(V3·알약·디펜더)이
+   실제 위험이 아닌데도 의심해 조용히 격리·삭제하는 일이 잦다.
+   그때 사용자에게 보이는 것은 "링크로 받기가 안 된다" 뿐이고,
+   앱은 없어진 파일을 다시 받고 → 백신이 또 지우고 를 되풀이한다.
+
+   그래서 '파일이 사라졌다' 는 신호를 붙잡아 그 자리에서 이유를 말해준다.
+   오류 글에 이 표시를 달아두면 어디를 거쳐 올라오든 알아볼 수 있다.
+   ========================================================================= */
+const 백신표시 = "[백신차단]";
+const 백신오류인가 = (m) => String(m || "").includes(백신표시);
+const 백신오류 = (무엇) => new Error(백신표시 + " " + 무엇);
+
+const YT_최소 = 1000000;          // 이보다 작으면 온전한 yt-dlp 가 아니다 (17 MB 짜리다)
+
+function 파일크기(p) {
+  try { return fs.existsSync(p) ? fs.statSync(p).size : 0; } catch (e) { return 0; }
+}
+
+/* 도구가 제자리에 멀쩡히 있는가. 없거나 반쪽이면 백신이 손댄 것이다.
+   (격리는 파일을 지우거나 0 바이트로 만든다)
+   ★ 반쪽짜리는 여기서 치운다. 그대로 두면 다음에도 그것을 쓰려 들지만,
+     치워두면 백신 예외를 잡은 뒤 다시 누르기만 해도 저절로 되살아난다. */
+function 도구확인(exe, 최소, 이름) {
+  if (파일크기(exe) >= 최소) return exe;
+  try { fs.rmSync(exe, { force: true }); } catch (e) {}
+  throw 백신오류(이름 + "가 준비되자마자 사라졌습니다");
+}
+
+/* 실행 자체가 안 될 때 — 파일이 없어졌거나 잠겼으면 백신 짓이다.
+   (백신은 실행하려는 순간에 낚아채 지우거나, 0 바이트로 만들어 놓는다) */
+function 실행실패(exe, e) {
+  if (파일크기(exe) < YT_최소) {
+    try { fs.rmSync(exe, { force: true }); } catch (x) {}
+    return 백신오류("영상 받기 도구가 사라졌습니다");
+  }
+  const c = e && e.code;
+  if (c === "EACCES" || c === "EPERM")
+    return 백신오류("영상 받기 도구를 실행하지 못했습니다");
+  return e;
+}
+
+/* 설치 파일에 함께 넣어둔 원본을 개인 폴더로 옮겨 심는다.
+   ★ 왜 옮겨 심는가 — yt-dlp 는 스스로를 갈아끼우며 최신을 유지하는데(-U),
+     설치 폴더(Program Files)에는 쓸 권한이 없어 그 자리에서는 못 한다. */
+function 동봉본심기(name, dest) {
+  const src = bundledBin(name);
+  if (!src) return false;
+  try {
+    fs.copyFileSync(src, dest);
+    try { fs.chmodSync(dest, 0o755); } catch (e) {}
+    return fs.existsSync(dest);
+  } catch (e) { return false; }
+}
+
 async function ensureYtdlp(send) {
   const exe = YTEXE();
   if (!fs.existsSync(exe)) {
-    if (send) send({ stage: "setup", text: "영상 받기 도구를 준비하는 중... (처음 한 번만)" });
-    const res = await net.fetch(YT_RELEASE);
-    if (!res.ok) throw new Error("영상 받기 도구를 내려받지 못했습니다 (" + res.status + ")");
-    fs.writeFileSync(exe, Buffer.from(await res.arrayBuffer()));
-    try { fs.chmodSync(exe, 0o755); } catch (e) {}
-    writeSettings({ ...readSettings(), ytUpdated: Date.now() });
-    return exe;
+    /* ① 설치 파일에 들어 있으면 그것을 쓴다 — 인터넷도, 기다림도 없다.
+       백신이 '인터넷에서 exe 를 받아 실행한다' 고 오해할 일도 사라진다. */
+    if (동봉본심기("yt-dlp", exe)) {
+      도구확인(exe, YT_최소, "영상 받기 도구");
+      /* 동봉본은 설치 파일을 만들던 날의 것이다. 유튜브는 구조를 자주 바꾸므로
+         바로 아래 '하루 한 번 갱신' 으로 넘겨 최신으로 맞춘다. */
+      writeSettings({ ...readSettings(), ytUpdated: 0 });
+      if (send) send({ stage: "setup", text: "영상 받기 도구를 최신으로 맞추는 중... (처음 한 번만)" });
+    } else {
+      /* ② 동봉본이 없거나 백신이 설치 폴더에서 지웠다면 예전처럼 받아온다 */
+      if (send) send({ stage: "setup", text: "영상 받기 도구를 준비하는 중... (처음 한 번만)" });
+      let res;
+      try { res = await net.fetch(YT_RELEASE); }
+      catch (e) {
+        throw new Error("영상 받기 도구를 내려받지 못했습니다.\n"
+          + "인터넷 연결이나 백신·방화벽이 막고 있는지 확인해 주세요.");
+      }
+      if (!res.ok) throw new Error("영상 받기 도구를 내려받지 못했습니다 (" + res.status + ")");
+      const buf = Buffer.from(await res.arrayBuffer());
+      const tmp = exe + ".part";              // 받다 말면 반쪽짜리가 남지 않게
+      fs.writeFileSync(tmp, buf);
+      try { fs.chmodSync(tmp, 0o755); } catch (e) {}
+      try { fs.renameSync(tmp, exe); } catch (e) { throw 백신오류("영상 받기 도구를 저장하지 못했습니다"); }
+      도구확인(exe, YT_최소, "영상 받기 도구");
+      writeSettings({ ...readSettings(), ytUpdated: Date.now() });
+      return exe;
+    }
   }
   /* 하루 한 번 조용히 갱신 — 실패해도 그냥 넘어간다 */
   const st = readSettings();
@@ -958,7 +1035,10 @@ async function ensureYtdlp(send) {
       });
     } catch (e) {}
   }
-  return exe;
+  /* ★ 쓰기 직전에 늘 확인한다.
+     백신은 처음 받을 때가 아니라 한참 뒤에 검사하다 지우기도 한다.
+     한 번만 확인하고 넘어가면 그때부터는 이유 없는 실패가 된다. */
+  return 도구확인(exe, YT_최소, "영상 받기 도구");
 }
 
 /* =========================================================================
@@ -987,6 +1067,8 @@ function ensureQuickjs(send) {
   const exe = QJSEXE();
   if (fs.existsSync(exe)) return Promise.resolve(exe);
   if (qjsPending) return qjsPending;
+  /* 설치 파일에 들어 있으면 그대로 옮겨 심는다 — 이쪽도 백신이 잘 의심한다 */
+  if (동봉본심기("qjs", exe)) return Promise.resolve(exe);
   qjsPending = (async () => {
     if (send) send({ stage: "setup", text: "유튜브용 도구를 준비하는 중... (처음 한 번만)" });
     const res = await net.fetch(
@@ -1072,6 +1154,9 @@ function retryPlans(url, useCookies, referer) {
    마지막 오류(대개 "쿠키를 못 읽었다")는 진짜 원인이 아니므로,
    쿠키 관련이 아닌 첫 오류를 우선해서 보여준다. */
 function pickError(errs) {
+  /* ★ 백신이 도구를 지웠다면 나머지 오류는 모두 그 뒤끝일 뿐이다 */
+  const av = errs.find(백신오류인가);
+  if (av) return av;
   const real = errs.find((e) => !/cookie/i.test(e));
   return real || errs[0] || "";
 }
@@ -1097,7 +1182,7 @@ function runYt(exe, args, ms) {
     });
     p2.on("error", (e) => {
       if (done) return;
-      done = true; clearTimeout(timer); rej(e);
+      done = true; clearTimeout(timer); rej(실행실패(exe, e));
     });
   });
 }
@@ -1186,7 +1271,11 @@ ipcMain.handle("ytInfo", async (_e, url, useCookies, referer) => {
   url = await 주소펴기(url);          // pin.it/XXXX → 진짜 핀 주소
   let exe, last = "";
   try { exe = await ensureYtdlp(null); }
-  catch (e) { return { ok: false, error: String(e.message || e) }; }
+  catch (e) {
+    const 원문 = String(e.message || e);
+    return { ok: false, error: friendlyYtError(원문),
+             blocked: 백신오류인가(원문), toolDir: YTDIR() };
+  }
   if (isYoutube(url)) await ensureQuickjs(null);   // 유튜브일 때만, 처음 한 번만
 
   const errs = [];
@@ -1247,10 +1336,28 @@ ipcMain.handle("ytInfo", async (_e, url, useCookies, referer) => {
                        altReferer: 대안.referer || null,
                        error: friendlyYtError(pickError(errs)) };
   }
-  return { ok: false, error: friendlyYtError(pickError(errs)) };
+  /* ★ 백신이 도구를 지운 것이라면 화면 쪽이 '브라우저로 우회' 하지 않도록 알려준다.
+     우회는 도구가 멀쩡할 때나 뜻이 있고, 여기서는 사용자만 헤매게 만든다. */
+  const 최종 = pickError(errs);
+  return { ok: false, error: friendlyYtError(최종),
+           blocked: 백신오류인가(최종), toolDir: YTDIR() };
 });
 
+/* 백신이 도구를 지웠을 때 보여줄 안내.
+   ★ "받지 못했습니다" 로만 끝내면 사용자는 영영 이유를 모른다.
+     무엇이 지워졌고, 그것이 무엇이며, 어디를 예외로 잡으면 되는지까지 적는다. */
+function 백신안내() {
+  return "백신 프로그램이 '영상 받기 도구' 를 지웠습니다.\n\n"
+    + "이 도구(yt-dlp)는 영상 사이트에서 파일을 받아오는, 널리 쓰이는 공개 프로그램입니다.\n"
+    + "실제로 위험한 것은 아닌데 생김새 때문에 백신이 의심하는 일이 잦습니다.\n"
+    + "(V3 · 알약 · 윈도우 디펜더 모두 그럴 수 있습니다)\n\n"
+    + "백신 설정에서 아래 폴더를 '검사 제외'(예외) 로 추가한 뒤 다시 시도해 주세요.\n\n"
+    + YTDIR();
+}
+
 function friendlyYtError(msg) {
+  /* ★ 백신이 지운 것이라면 다른 어떤 설명보다 이것이 먼저다 */
+  if (백신오류인가(msg)) return 백신안내();
   const m = msg.toLowerCase();
   if (m.includes("private") || m.includes("members-only") || m.includes("login"))
     return "비공개이거나 로그인이 필요한 영상입니다.";
@@ -1345,7 +1452,7 @@ ipcMain.handle("ytDownload", async (e, { url, dest, jobId, height, plan, useCook
       });
       p2.stderr.on("data", (d) => { lastAt = Date.now(); err += d; });
       p2.on("close", (c) => (c === 0 ? finish(res) : finish(rej, new Error(err.slice(0, 400)))));
-      p2.on("error", (e) => finish(rej, e));
+      p2.on("error", (e) => finish(rej, 실행실패(exe, e)));
     });
 
     /* 정보를 읽을 때 성공했던 방식을 먼저 쓰고, 안 되면 나머지를 차례로 */
@@ -1379,7 +1486,9 @@ ipcMain.handle("ytDownload", async (e, { url, dest, jobId, height, plan, useCook
     return { ok: true, path: dest, size: fs.statSync(dest).size };
   } catch (err) {
     CANCEL.delete("yt" + jobId);
-    return { ok: false, error: friendlyYtError(String(err.message || err)) };
+    const 원문 = String(err.message || err);
+    return { ok: false, error: friendlyYtError(원문),
+             blocked: 백신오류인가(원문), toolDir: YTDIR() };
   }
 });
 /* =========================================================================
@@ -1634,7 +1743,9 @@ ipcMain.handle("sniffClose", () => {
 
 /* 진단 — 어디서 막히는지 직접 확인한다 */
 ipcMain.handle("ytDiag", async () => {
-  const out = { exePath: YTEXE(), exists: false, size: 0, version: "", test: "", error: "",
+  const out = { exePath: YTEXE(), toolDir: YTDIR(), exists: false, size: 0,
+                version: "", test: "", error: "", blocked: false,
+                bundled: !!bundledBin("yt-dlp"),   // 설치 파일 쪽 원본이 살아 있는가
                 ffmpeg: ffmpegPath(), ffmpegOk: false, ffprobeOk: false, jsOk: false };
   try { await ensureQuickjs(null); } catch (e) {}
   out.jsOk = fs.existsSync(QJSEXE());
@@ -1655,10 +1766,20 @@ ipcMain.handle("ytDiag", async () => {
     if (!out.exists) {
       try { await ensureYtdlp(null); out.exists = fs.existsSync(out.exePath);
             out.size = out.exists ? fs.statSync(out.exePath).size : 0; }
-      catch (e) { out.error = "내려받기 실패: " + (e.message || e); return out; }
+      catch (e) {
+        const 원문 = String(e.message || e);
+        out.blocked = 백신오류인가(원문);
+        out.error = out.blocked ? "백신이 도구를 지웠습니다" : "준비 실패: " + 원문;
+        return out;
+      }
     }
     try { out.version = (await runYt(YTEXE(), ["--version"], 10000)).trim(); }
-    catch (e) { out.error = "실행 실패: " + (e.message || e); return out; }
+    catch (e) {
+      const 원문 = String(e.message || e);
+      out.blocked = 백신오류인가(원문);
+      out.error = out.blocked ? "백신이 도구를 지웠습니다" : "실행 실패: " + 원문;
+      return out;
+    }
     try {
       await runYt(YTEXE(), ["--dump-single-json", "--no-warnings", "--simulate",
         "--socket-timeout", "8", "--retries", "1", ...jsArgs(),

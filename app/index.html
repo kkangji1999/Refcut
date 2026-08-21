@@ -1719,7 +1719,7 @@ function download(blob,name){
    같은 날 두 번째로 내보내면 26.8.1602 로 올린다.
    업데이트 확인은 마디마다 숫자로 비교하므로(verNum) 자리수가 달라도 안전하다. */
 /* 앱으로 켰으면 설치된 진짜 버전을 그대로 쓴다 (여기 숫자는 웹으로 열 때의 몫) */
-const APP_VERSION = (window.CG && window.CG.version) || "26.8.2510";
+const APP_VERSION = (window.CG && window.CG.version) || "26.8.2511";
 const APP_DATE    = "2026.08.21";
 /* 최신 index.html 이 올라가 있는 주소.
    여기에 넣어두면 [업데이트] 버튼이 새 버전을 확인합니다.
@@ -2577,6 +2577,34 @@ function pickHeight(list, want){
   const fit=list.filter(h=>h<=want);
   return fit.length ? fit[0] : list[list.length-1]; // 다 크면 가장 낮은 것
 }
+/* ===================================================================
+   백신이 '영상 받기 도구' 를 지웠을 때
+   -------------------------------------------------------------------
+   ★ 그냥 "받지 못했습니다" 로 끝내면 사용자는 영영 이유를 모른다.
+     백신은 조용히 지우기 때문에 화면에 아무 흔적도 남지 않는다.
+     그래서 이유를 적어주고, 예외로 잡아야 할 폴더를 바로 열어준다.
+   =================================================================== */
+async function 백신알림(msg, dir){
+  const 안내 = String(msg||"").split(String.fromCharCode(10)).join("<br>");
+  const 열기 = dir
+    ? `<div style="margin-top:16px">
+         <button id="avOpen" style="padding:7px 14px;border-radius:8px;cursor:pointer;
+           border:1px solid var(--border);background:#232733;color:#dfe4ee;font-size:12px">
+           그 폴더 열기</button>
+         <span style="margin-left:10px;font-size:11px;color:#6b7385">
+           백신의 [검사 제외] 목록에 이 폴더를 넣어주세요</span>
+       </div>` : "";
+  const 뒷길 = `<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);
+                            font-size:11px;color:#6b7385;line-height:1.8">
+      예외로 잡을 수 없는 컴퓨터라면, 받아둔 <b>yt-dlp.exe</b> 를 위 폴더에 직접 넣어도 됩니다.<br>
+      파일이 그 자리에 있으면 프로그램은 새로 받지 않고 그대로 씁니다.
+    </div>`;
+  const p = appAlert(안내 + 열기 + 뒷길, "백신이 막았습니다");
+  const b = document.getElementById("avOpen");
+  if(b) b.onclick = ()=>{ window.CG.revealFolder(dir); toast("폴더를 열었습니다"); };
+  return p;
+}
+
 async function addLink(url, referer, pageTitle, fallbackUrl){
   url=String(url||"").trim();
   if(!isVideoURL(url))
@@ -2625,7 +2653,10 @@ async function addLink(url, referer, pageTitle, fallbackUrl){
         `<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);
                      font-size:11px;color:#6b7385;line-height:1.8">
            <b style="color:#8a94a8">상태 확인</b><br>
-           도구 설치 · ${d.exists?`예 (${(d.size/1048576).toFixed(1)} MB)`:"<b>아니오</b>"}<br>
+           ${d.blocked?`<b style="color:#f87171">백신이 영상 받기 도구를 지웠습니다 —
+              ${d.toolDir||""} 를 검사 제외로 잡아주세요</b><br>`:""}
+           도구 설치 · ${d.exists?`예 (${(d.size/1048576).toFixed(1)} MB)`:"<b>아니오</b>"}
+             ${d.bundled?"":" (설치 파일 쪽 원본도 없음)"}<br>
            버전 · ${d.version||"확인 실패"}<br>
            유튜브용 실행기 · ${d.jsOk?"정상":"<b>없음</b>"}<br>
            ffmpeg · ${d.ffmpegOk?"정상":"<b>없음</b>"}${d.ffprobeOk?"":" (ffprobe 없음 — ffmpeg 가 대신 읽습니다)"}<br>
@@ -2633,6 +2664,14 @@ async function addLink(url, referer, pageTitle, fallbackUrl){
          </div>`;
     }catch(e){}
     return appAlert(String(hardErr.message||hardErr).replace(/\n/g,"<br>")+extra,"영상 주소");
+  }
+
+  /* ★ 백신이 도구를 지운 것이라면 브라우저 우회로 넘기면 안 된다.
+     도구가 없으니 우회해도 결국 못 받고, 사용자는 이유도 모른 채 헤매게 된다.
+     여기서 곧바로 이유를 말해준다. */
+  if(r && r.blocked){
+    S.queue=S.queue.filter(x=>x!==placeholder); renderQueue();
+    return 백신알림(r.error, r.toolDir);
   }
 
   /* ★ 핀터레스트에는 영상이 핀에 직접 있는 것과, 유튜브·비메오로 이어지기만
@@ -3042,6 +3081,10 @@ async function 영상만받기(item){
   if(!r || !r.ok){
     item.status="wait"; renderQueue();
     statusEl.style.color="var(--err)";
+    if(r && r.blocked){
+      prog(0,"백신이 영상 받기 도구를 지웠습니다","");
+      return 백신알림(r.error, r.toolDir);
+    }
     prog(0,"오류: "+((r&&r.error)||"받지 못했습니다"),"");
     return appAlert(String((r&&r.error)||"받지 못했습니다")
                     .split(String.fromCharCode(10)).join("<br>"),
