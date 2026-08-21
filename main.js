@@ -582,6 +582,218 @@ ipcMain.handle("cancelPreview", (_e, jobId) => {
 });
 
 /* =========================================================================
+   파일 자리 맞추기
+   -------------------------------------------------------------------------
+   컷을 손으로 정리하면(병합·분할·교체) 저장 폴더의 CUT 번호가 목록과 어긋난다.
+   그림을 다시 뽑아 쓰면 확실하지만, 컷이 많은 작업에서는 그때마다 몇 십 초가
+   걸린다 — 그림 내용은 그대로이고 '번호'만 밀린 것이 대부분이기 때문이다.
+   그래서 화면 쪽이 "무엇을 무엇으로" 만 정해서 보내고, 여기서는 이름만 바꾼다.
+   ★ 서로 자리를 맞바꾸는 경우가 있으므로 반드시 두 걸음으로 옮긴다.
+     한 번에 옮기면 아직 옮기지 않은 파일을 덮어써 버린다.
+   ========================================================================= */
+ipcMain.handle("arrangeFiles", (_e, { moves, remove, copy }) => {
+  const 옮김 = [], 없음 = [];
+  const 목록 = (moves || []).filter((m) => m && m.from && m.to && m.from !== m.to);
+  try {
+    for (const m of 목록) {
+      if (!fs.existsSync(m.from)) { 없음.push(m.from); continue; }
+      m.tmp = m.to + ".자리옮기는중";
+      try { fs.mkdirSync(path.dirname(m.to), { recursive: true }); } catch (x) {}
+      fs.renameSync(m.from, m.tmp);
+      옮김.push(m);
+    }
+    for (const m of 옮김) {
+      try { fs.rmSync(m.to, { force: true }); } catch (x) {}
+      fs.renameSync(m.tmp, m.to);
+    }
+  } catch (e) {
+    /* 도중에 멈췄으면 임시 이름으로 남은 것을 되돌려 놓는다 — 반쪽으로 두지 않는다 */
+    for (const m of 옮김) {
+      try { if (fs.existsSync(m.tmp)) fs.renameSync(m.tmp, m.from); } catch (x) {}
+    }
+    return { ok: false, error: String(e.message || e) };
+  }
+  /* 복사 — 즐겨찾기처럼 '원래 자리는 그대로 두고 사본을 따로 두는' 경우에 쓴다 */
+  let 베낌 = 0;
+  for (const c of (copy || [])) {
+    try {
+      if (!c || !c.from || !c.to || !fs.existsSync(c.from)) { 없음.push(c && c.from); continue; }
+      fs.mkdirSync(path.dirname(c.to), { recursive: true });
+      fs.copyFileSync(c.from, c.to);
+      베낌++;
+    } catch (x) {}
+  }
+  let 지움 = 0;
+  for (const p of (remove || [])) {
+    try { if (p && fs.existsSync(p) && fs.statSync(p).isFile()) { fs.rmSync(p, { force: true }); 지움++; } }
+    catch (x) {}
+  }
+  return { ok: true, moved: 옮김.length, copied: 베낌, removed: 지움, missing: 없음 };
+});
+
+/* =========================================================================
+   구간을 영상으로 잘라내기
+   -------------------------------------------------------------------------
+   프레임을 연속으로 뽑는 길은 이미 있지만, 소리가 없고 파일이 수백 장이 된다.
+   레퍼런스로 "이 구간" 을 통째로 남기고 싶을 때가 있어서 영상으로도 뽑는다.
+     · 그대로   — 다시 만들지 않고 잘라내기만 한다. 화질·소리 100% 원본.
+                  다만 잘리는 자리가 열쇠장(키프레임)까지 밀릴 수 있다.
+     · 정확히   — 딱 그 구간으로 다시 만든다. 해상도는 원본 그대로 두고
+                  화질을 아주 높게(crf 16) 잡아 눈으로는 차이가 없게 한다.
+   ========================================================================= */
+const CLIP = new Map();
+
+/* 원본이 '편집용 그릇' 인지 본다.
+   ProRes·DNxHD 처럼 편집실에서 쓰는 것, 10bit·4:2:2·4:4:4 처럼 색을 넉넉히 담은 것은
+   H.264(8bit 4:2:0)로 옮기면 색이 깎인다. 그런 원본만 ProRes 로 뽑는다.
+   그 밖의 보통 영상(대개 8bit 4:2:0 H.264)은 H.264 로 뽑는 것이 원본과 같은 자리다. */
+function 편집용원본(codec, pix) {
+  if (/prores|dnxhd|dnxhr|cfhd|v210|v410|ffv1|huffyuv|utvideo|rawvideo|qtrle/i.test(codec || "")) return true;
+  if (/p10|p12|p14|p16|422|444/i.test(pix || "")) return true;
+  return false;
+}
+function 영상속내용(file) {
+  return new Promise((resolve) => {
+    execFile(ffprobePath(), [
+      "-v", "error", "-select_streams", "v:0",
+      "-show_entries", "stream=codec_name,pix_fmt", "-of", "json", file,
+    ], { maxBuffer: 1 << 20, timeout: 20000 }, (err, stdout) => {
+      if (err) return resolve({});
+      try {
+        const s = (JSON.parse(stdout).streams || [])[0] || {};
+        resolve({ codec: s.codec_name, pix: s.pix_fmt });
+      } catch (e) { resolve({}); }
+    });
+  });
+}
+
+/* =========================================================================
+   구간을 영상으로 뽑기
+   -------------------------------------------------------------------------
+   ★ 왜 '다시 만들기' 인가.
+     자르기만 하고 다시 만들지 않으면(-c copy) 훨씬 빠르지만, 시작 자리가
+     반드시 열쇠장(키프레임)이어야 한다. 영상은 대부분의 장을 '앞 장과 무엇이
+     다른가' 로만 적어 두기 때문에, 열쇠장이 아닌 자리에서는 그림을 세울 수가 없다.
+     그래서 인점보다 앞선 열쇠장까지 되돌아가 시작한다 — 열쇠장 간격이 2초면
+     앞이 최대 2초 더 붙는다. 잡은 구간과 다른 영상이 나오는 셈이다.
+   그래서 여기서는 언제나 딱 그 구간으로 다시 만든다.
+   해상도·초당 장수는 손대지 않고(원본 그대로), 화질만 아주 높게 잡는다.
+   ========================================================================= */
+ipcMain.handle("clipRange", async (e, { src, destNoExt, start, dur, jobId }) => {
+  if (!(dur > 0)) return { ok: false, error: "구간이 너무 짧습니다" };
+  const 속 = await 영상속내용(src);
+  const 편집용 = 편집용원본(속.codec, 속.pix);
+
+  const 계획 = 편집용
+    ? [{ 이름: "prores", ext: ".mov",
+         args: ["-c:v", "prores_ks", "-profile:v", "3", "-vendor", "apl0",
+                "-pix_fmt", "yuv422p10le", "-c:a", "pcm_s16le"] },
+       /* ProRes 로 못 만들면 H.264 로라도 남긴다 — 빈손으로 끝내지 않는다 */
+       { 이름: "h264", ext: ".mp4",
+         args: ["-c:v", "libx264", "-preset", "fast", "-crf", "15",
+                "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "256k",
+                "-movflags", "+faststart"] }]
+    : [{ 이름: "h264", ext: ".mp4",
+         args: ["-c:v", "libx264", "-preset", "fast", "-crf", "15",
+                "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "256k",
+                "-movflags", "+faststart"] }];
+
+  let 마지막오류 = "만들지 못했습니다";
+  for (const p of 계획) {
+    const dest = 빈자리(destNoExt + p.ext);
+    const tmp = dest.slice(0, dest.length - p.ext.length) + ".만드는중" + p.ext;
+    const r = await new Promise((resolve) => {
+      const ff = spawn(ffmpegPath(), [
+        "-v", "info", "-hide_banner", "-y",
+        "-ss", String(start), "-i", src, "-t", String(dur),
+        "-map", "0:v:0", "-map", "0:a?",
+        ...p.args, tmp,
+      ], { windowsHide: true });
+      let err = "", killed = false;
+      CLIP.set(jobId, () => { killed = true; try { ff.kill("SIGKILL"); } catch (x) {} });
+      ff.stderr.on("data", (d) => {
+        const t = d.toString();
+        const ts = t.match(/time=(\d+):(\d\d):(\d\d(?:\.\d+)?)/g);
+        if (ts) {
+          const l = ts[ts.length - 1].match(/time=(\d+):(\d\d):(\d\d(?:\.\d+)?)/);
+          const at = (+l[1]) * 3600 + (+l[2]) * 60 + parseFloat(l[3]);
+          e.sender.send("clipProgress",
+            { jobId, percent: Math.max(0, Math.min(100, at / dur * 100)) });
+        }
+        if (err.length < 4000) err += t;
+      });
+      ff.on("error", (x) => {
+        CLIP.delete(jobId);
+        resolve({ ok: false, error: "ffmpeg 를 실행하지 못했습니다: " + x.message });
+      });
+      ff.on("close", (code) => {
+        CLIP.delete(jobId);
+        if (killed) { try { fs.rmSync(tmp, { force: true }); } catch (x) {}
+                      return resolve({ ok: false, aborted: true }); }
+        if (code !== 0) { try { fs.rmSync(tmp, { force: true }); } catch (x) {}
+                          return resolve({ ok: false, error: readErr(err, null) }); }
+        try { fs.rmSync(dest, { force: true }); fs.renameSync(tmp, dest); }
+        catch (x) { return resolve({ ok: false, error: String(x.message || x) }); }
+        let size = 0;
+        try { size = fs.statSync(dest).size; } catch (x) {}
+        resolve({ ok: true, path: dest, size, kind: p.이름,
+                  codec: 속.codec || "", pix: 속.pix || "" });
+      });
+    });
+    if (r.ok || r.aborted) return r;
+    마지막오류 = r.error || 마지막오류;
+  }
+  return { ok: false, error: 마지막오류 };
+});
+ipcMain.handle("clipCancel", (_e, jobId) => {
+  const fn = CLIP.get(jobId);
+  if (fn) fn();
+  return { ok: true };
+});
+
+/* =========================================================================
+   영상 속내용 자세히 읽기 (Tab 정보창용)
+   -------------------------------------------------------------------------
+   probe 는 추출에 꼭 필요한 것만 빠르게 읽는다. 여기서는 그 위에
+   코덱·프로파일·색 형식·소리까지 더 읽는다 — 정보창을 열 때만 부른다.
+   ========================================================================= */
+ipcMain.handle("probeFull", async (_e, filePath) => {
+  const 한줄 = (args) => new Promise((resolve) => {
+    execFile(ffprobePath(), args, { maxBuffer: 1 << 22, timeout: 30000 },
+      (err, stdout) => {
+        if (err) return resolve(null);
+        try { return resolve(JSON.parse(stdout)); } catch (e) { resolve(null); }
+      });
+  });
+  const v = await 한줄([
+    "-v", "error", "-select_streams", "v:0",
+    "-show_entries",
+    "stream=codec_name,codec_long_name,profile,level,pix_fmt,bits_per_raw_sample," +
+    "width,height,r_frame_rate,nb_frames,bit_rate,color_primaries,color_transfer,field_order",
+    "-show_entries", "format=format_name,format_long_name,duration,size,bit_rate",
+    "-of", "json", filePath,
+  ]);
+  const a = await 한줄([
+    "-v", "error", "-select_streams", "a:0",
+    "-show_entries", "stream=codec_name,channels,sample_rate,bit_rate,bits_per_raw_sample",
+    "-of", "json", filePath,
+  ]);
+  if (!v) {
+    /* ffprobe 가 없으면 ffmpeg 가 읽은 것이라도 돌려준다 */
+    const f = await probeViaFfmpeg(filePath);
+    return f && f.ok ? { ok: true, video: { codec_name: f.codec, width: f.width,
+      height: f.height }, format: { duration: f.duration, size: f.size }, audio: null } : { ok: false };
+  }
+  return {
+    ok: true,
+    video: (v.streams && v.streams[0]) || null,
+    format: v.format || null,
+    audio: (a && a.streams && a.streams[0]) || null,
+  };
+});
+
+
+/* =========================================================================
    파일 · 폴더
    ========================================================================= */
 /* 파일 고르기 창에 늘어놓을 영상 그릇들.
@@ -955,7 +1167,7 @@ async function 핀에서영상찾기(pageUrl) {
 
 /* 받을 파일 이름이 이미 있으면 번호를 붙여 비어 있는 자리를 찾아준다.
    ('영상만 받기' 로 같은 영상을 두 번 받을 때 먼저 것을 덮지 않는다) */
-ipcMain.handle("freePath", (_e, dest) => {
+function 빈자리(dest) {
   try {
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     if (!fs.existsSync(dest)) return dest;
@@ -966,7 +1178,8 @@ ipcMain.handle("freePath", (_e, dest) => {
     }
   } catch (e) {}
   return dest;
-});
+}
+ipcMain.handle("freePath", (_e, dest) => 빈자리(dest));
 
 /* 링크 정보만 먼저 읽어온다 (제목·길이) — 대기열에 보여주기 위해 */
 ipcMain.handle("ytInfo", async (_e, url, useCookies, referer) => {

@@ -1,7 +1,7 @@
 {
   "name": "reftown",
   "productName": "Reftown",
-  "version": "26.8.2509",
+  "version": "26.8.2510",
   "description": "영상에서 컷이 바뀔 때마다 대표 프레임을 자동으로 뽑아주는 도구 (레퍼런스 타운)",
   "main": "main.js",
   "author": "FreeWillusion",
@@ -15,6 +15,7 @@
     "test:preview": "electron test/preview.e2e.js",
     "test:yt": "electron test/yt.e2e.js",
     "test:copy": "electron test/copy.e2e.js",
+    "test:edit": "electron test/edit.e2e.js",
     "dist": "electron-builder --win --x64",
     "dist:dir": "electron-builder --dir",
     "release": "electron-builder --win --x64 --publish always"

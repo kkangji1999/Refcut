@@ -376,8 +376,10 @@
   #oneTake{display:none; align-self:flex-end; margin:0 2px 6px 0;
     font-size:11.5px; color:var(--muted); opacity:.75; letter-spacing:-.2px}
   #oneTake.on{display:block}
-  /* 스타트 프레임의 한계를 솔직히 적어둔다 (스타트 모드일 때만) */
-  #startNote{display:none; font-size:10.5px; color:#8a7f5e; line-height:1.5;
+  /* 이 목록이 어떻게 뽑힌 것이고, 마음에 안 들면 어디서 고치는지 한 줄로 적어둔다.
+     ★ 예전에는 스타트 프레임일 때만 '한두 장 밀릴 수 있다' 고만 적어 두었다.
+       한계만 알려주고 고칠 길은 알려주지 않으니, 읽고 나면 막막해진다. */
+  #startNote{display:none; font-size:10.5px; color:#8a7f5e; line-height:1.55;
     background:rgba(255,212,0,.07); border:1px solid rgba(255,212,0,.18);
     border-radius:7px; padding:6px 9px; margin-top:7px; flex-shrink:0}
   #startNote.on{display:block}
@@ -417,6 +419,11 @@
   .pbtn{background:var(--panel2); border:1px solid var(--border); color:var(--fg);
     width:36px; height:32px; border-radius:7px; cursor:pointer; font-size:13px}
   .pbtn:hover{border-color:#4a5262}
+  /* 재생 줄 안에 함께 두는 작은 단추들.
+     ★ 예전에는 이것들이 아래에 '단축키 줄' 이라는 네 번째 줄을 따로 차지했다.
+       재생과 함께 쓰는 것이니 재생 줄에 두는 편이 찾기도 쉽고 줄도 는다. */
+  .pbtn.sm{width:30px; height:30px; font-size:12px; color:var(--muted)}
+  .pbtn.sm:hover{color:var(--fg)}
   #pTime{font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums;
     white-space:nowrap; min-width:100px}
   #track{position:relative; flex:1; height:26px; cursor:pointer; touch-action:none}
@@ -545,6 +552,20 @@
   .ioGroup .mini{border:0; background:transparent; padding:4px 7px}
   .ioGroup .mini:hover{background:#323846}
   .ioLabel{font-size:11px; color:#5d6472}
+  /* ---------------- 컷 정리 줄 ----------------
+     구간(I/O) 줄과 같은 모양으로 한 층 아래에 둔다.
+     같은 자리에서 같은 방식으로 눌리는 것이 헷갈리지 않는다. */
+  .editBar{margin-top:6px}
+  .editBar .ioGroup{border-color:#3a4353}
+  #cutReset.live{color:var(--accent); background:rgba(255,212,0,.12)}
+  #cutHelp{padding:4px 8px; color:#6b7385}
+  #editHint{font-size:10.5px; color:#5d6472; overflow:hidden; white-space:nowrap;
+    text-overflow:ellipsis; min-width:0; flex:1 1 40px !important}
+  .ioBar .mini[disabled]{opacity:.4; pointer-events:none}
+  #editedTag{display:none; margin-left:5px; font-size:10px; font-weight:700;
+    color:#0b0d12; background:var(--accent); border-radius:4px; padding:1px 5px;
+    vertical-align:middle}
+  #editedTag.on{display:inline-block}
   /* 영상 주소 입력 — 파일 넣기와 같은 무게의 '두 번째 길' 로 보이게 한다 */
   #orLine{display:none; align-items:center; gap:8px; flex:0 0 auto;
     font-size:10.5px; color:#5d6472; margin:1px 0}
@@ -646,21 +667,8 @@
   #markView.off{color:#5d6472; border-style:dashed}
   #ioText{font-size:11.5px; color:var(--accent); font-variant-numeric:tabular-nums;
     min-width:120px; text-align:center}
-  /* ★ 창을 줄이면 2~3줄로 늘어지던 문제.
-     줄바꿈 자체를 막고, 넘치면 그 줄 안에서만 옆으로 밀린다.
-     → 창 크기와 상관없이 언제나 딱 한 줄로 고정된다. */
-  .keybar{display:flex; flex-wrap:nowrap; gap:4px; margin-top:7px;
-    flex-shrink:0; overflow-x:auto; overflow-y:hidden; padding-bottom:2px}
-  .keybar .kb{flex:0 0 auto; white-space:nowrap}
-  .keybar::-webkit-scrollbar,.ioRow::-webkit-scrollbar,
+  .ioBar::-webkit-scrollbar,.ioRow::-webkit-scrollbar,
   .resHead .actions::-webkit-scrollbar{height:5px}
-  .kb{background:var(--panel2); border:1px solid var(--border); color:var(--muted);
-      border-radius:6px; padding:4px 7px; font-size:10.5px; font-family:inherit;
-      cursor:pointer; display:inline-flex; align-items:center; gap:4px}
-  .kb:hover{color:var(--fg); border-color:#4a5262}
-  .kb .sc{font-size:10px; color:#6b7385; background:#1a1e26; border-radius:4px;
-          padding:1px 5px; border:1px solid #2e3542}
-  .kb:hover .sc{color:var(--accent)}
 
   /* 스틸 패널 */
   #grid{display:grid; gap:7px; padding-bottom:36px; grid-template-columns:repeat(auto-fill,minmax(126px,1fr));
@@ -682,9 +690,13 @@
     background:rgba(16,19,25,.82); color:#e8eaf0;
     display:flex; align-items:center; justify-content:center; padding:0}
   .gTools button:hover{background:#000; border-color:var(--accent)}
-  /* 이미 내려받은 컷 — 저장 버튼이 초록으로 바뀌고 항상 보인다.
-     번호표 옆 작은 체크로 마우스를 올리지 않아도 한눈에 구분된다. */
-  #grid figure.done .gTools{opacity:1}
+  /* ★ 저장 아이콘을 글자(내려가는 화살표)로 찍었더니 글꼴에 따라 획이 뭉개져서
+     그냥 막대기처럼 보였다. 어디서나 같은 모양이 나오도록 그림으로 그린다. */
+  .gTools button svg{display:block; width:13px; height:13px; fill:none;
+    stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round}
+  /* 이미 내려받은 컷 — 마우스를 올리면 저장 단추가 초록으로 보인다.
+     ★ 예전에는 단추 세 개를 늘 띄워 두었다. 내려받은 컷이 늘어날수록 그림 위가
+       단추로 덮여 정작 그림이 안 보였다. 표시는 번호표 옆 체크(✓)만으로 충분하다. */
   #grid figure.done .gTools button:last-child{
     background:rgba(34,120,72,.92); border-color:#3ddc84; color:#eafff2}
   #grid figure.done .gTools button:last-child:hover{background:#1d6b41}
@@ -724,6 +736,8 @@
   #grid figure:hover .favMark{opacity:1}
   .favMark.on{color:#f871a0; border-color:#f871a0; opacity:1}
   #grid figure.copied{outline:2px solid var(--ok); outline-offset:-2px}
+  /* 사람이 직접 고른 대표 화면 — 번호표에 연필 표시가 붙는다 */
+  #grid figure.hand .cap{color:var(--accent)}
   #arcGrid .acard.copied{outline:2px solid var(--ok); outline-offset:-2px}
 
   /* ---------------- 크게 보기 ---------------- */
@@ -817,9 +831,7 @@
   #vPane:fullscreen .paneHead{margin-bottom:5px; flex-shrink:0}
   #vPane:fullscreen .pstage{flex:1; min-height:0}
   #vPane:fullscreen .ctl,
-  #vPane:fullscreen .ioBar,
-  #vPane:fullscreen .keybar{flex-shrink:0}
-  #vPane:fullscreen .keybar{margin-top:7px}
+  #vPane:fullscreen .ioBar{flex-shrink:0}
   #lb:fullscreen{background:#000}
 
   /* ---------------- 창 크기 ----------------
@@ -841,7 +853,6 @@
     .compact #drop{padding:10px 12px}
     .compact #dSub{display:none}
     #run{padding:11px; font-size:14px}
-    .keybar{margin-top:6px}
   }
   @media(max-height:720px){
     .compact .head{margin-bottom:2px}
@@ -973,7 +984,9 @@
             <div id="pvNote"></div>
           </div>
           <div class="ctl">
-            <button class="pbtn" id="pPlay">▶</button>
+            <button class="pbtn" id="pPlay" title="재생 / 멈춤 (Space)">▶</button>
+            <button class="pbtn sm" id="pPrev" title="한 프레임 뒤로 (D)">◀▌</button>
+            <button class="pbtn sm" id="pNext" title="한 프레임 앞으로 (F)">▌▶</button>
             <span id="pTime">0:00.00 / 0:00.00</span>
             <div id="track">
               <div id="trackBg"></div><div id="trackFill"></div>
@@ -985,6 +998,10 @@
               </div>
               <div id="markTip"><img alt=""><span></span></div>
             </div>
+            <button class="pbtn sm" id="pCopy"
+              title="지금 화면을 복사 (Ctrl+C · 화면에서 오른쪽 클릭)">📋</button>
+            <button class="pbtn sm" id="pInfo"
+              title="영상 정보 · 코덱 (Tab)">ℹ</button>
             <button class="pbtn" id="pMute">🔊</button>
             <input id="pVol" type="range" min="0" max="1" step="0.05" value="1">
           </div>
@@ -996,16 +1013,34 @@
               <button class="mini" id="setOut" title="현재 위치를 끝점으로 (단축키 O)">아웃점 ⟧</button>
               <button class="mini" id="clrIO" title="구간 해제 (Ctrl+Shift+X)">✕</button>
             </span>
-            <button class="mini" id="markView">⋮ 눈금 보기</button>
-            <button class="mini" id="ioShots" title="이 구간 안에 있는 캡쳐 컷들만 ZIP 으로 저장합니다">🖼 구간 컷 저장</button>
-            <button class="mini" id="ioSeq" title="이 구간을 원본 해상도 프레임 연속으로 저장합니다 (프리미어 이미지 시퀀스)">🎞 구간 연속 프레임 저장</button>
+            <button class="mini" id="ioSeq"
+              title="잡은 구간을 원본 해상도 프레임 연속으로 저장합니다 (프리미어 이미지 시퀀스)&#10;소리는 들어가지 않습니다">🎞 구간 연속프레임 저장</button>
+            <button class="mini" id="ioClip"
+              title="잡은 구간을 영상 파일로 뽑습니다&#10;해상도·초당 장수는 원본 그대로, 잡은 구간도 딱 그만큼 나옵니다&#10;소리도 함께 들어갑니다">🎬 구간 영상 저장</button>
           </div>
-          <div class="keybar" id="pKeys"></div>
+          <div class="ioBar editBar" id="editBar">
+            <span class="ioGroup">
+              <span class="ioLabel">컷 정리</span>
+              <button class="mini" id="cutReplace"
+                title="교체 — 지금 재생 중인 화면을 그 컷의 대표로 삼습니다 (단축키 R)&#10;목록에서 여러 컷을 골라 두었다면, 한 컷으로 병합하면서 바꿀 수도 있습니다.">🖼 교체</button>
+              <button class="mini" id="cutMerge"
+                title="병합 — 목록에서 고른 컷들을 한 컷으로 합칩니다 (단축키 M)&#10;흔들리는 장면이 여러 컷으로 나뉘었을 때 씁니다.&#10;이어져 있는 컷만 병합할 수 있습니다.">⧉ 병합</button>
+              <button class="mini" id="cutSplit"
+                title="분할 — 재생 중인 컷을 지금 위치에서 두 컷으로 가릅니다&#10;서서히 넘어가는 전환이 한 컷으로 붙어 잡혔을 때 씁니다.">✂ 분할</button>
+              <button class="mini" id="cutReset"
+                title="초기화 — 분석 직후의 컷 목록으로 되돌립니다&#10;직접 병합·분할·교체한 것이 모두 사라집니다.">↺ 초기화</button>
+              <button class="mini" id="cutHelp" title="컷 정리 사용법">?</button>
+            </span>
+            <button class="mini" id="grabStill"
+              title="지금 재생 중인 화면 한 장을 원본 해상도 PNG 로 내려받습니다 (Ctrl+S)&#10;캡쳐된 컷 목록에는 넣지 않습니다.">⬇ 현재 화면 저장</button>
+            <button class="mini" id="markView">⋮ 눈금 보기</button>
+            <span id="editHint"></span>
+          </div>
         </div>
 
         <div class="pane">
           <div class="paneHead">
-            <div class="paneTitle">캡쳐된 컷 <b id="cutCount"></b></div>
+            <div class="paneTitle">캡쳐된 컷 <b id="cutCount"></b><span id="editedTag">✎ 수정됨</span></div>
             <span class="seg" id="modeSw">
               <button data-m="smart" class="on"
                 title="컷마다 한 장 — 그 컷에서 가장 또렷한 순간을 골라 뽑습니다.&#10;레퍼런스 수집용으로 권장합니다.">분석 프레임</button>
@@ -1013,10 +1048,10 @@
                 title="컷마다 한 장 — 그 컷이 시작되는 첫 프레임입니다.&#10;컷이 어디서 나뉘는지 확인할 때 좋습니다.">스타트 프레임</button>
             </span>
           </div>
-          <div id="startNote">컷마다 <b>첫 프레임</b> 한 장 · 분석 프레임과 컷 번호가 같습니다.
-            디졸브처럼 서서히 넘어가는 전환은 한두 장 밀릴 수 있습니다.</div>
+          <div id="startNote"></div>
           <div class="selBar" id="selBar">
             <b id="gSelCount"></b>
+            <button class="mini" id="gMerge" title="고른 컷들을 한 컷으로 병합합니다 (이어진 컷만)">⧉</button>
             <button class="mini" id="gFav">♥ 즐겨찾기</button>
             <button class="mini" id="gDl">⬇ 저장</button>
             <button class="mini" id="gCopy">📋 복사</button>
@@ -1684,8 +1719,8 @@ function download(blob,name){
    같은 날 두 번째로 내보내면 26.8.1602 로 올린다.
    업데이트 확인은 마디마다 숫자로 비교하므로(verNum) 자리수가 달라도 안전하다. */
 /* 앱으로 켰으면 설치된 진짜 버전을 그대로 쓴다 (여기 숫자는 웹으로 열 때의 몫) */
-const APP_VERSION = (window.CG && window.CG.version) || "26.8.2507";
-const APP_DATE    = "2026.08.19";
+const APP_VERSION = (window.CG && window.CG.version) || "26.8.2510";
+const APP_DATE    = "2026.08.21";
 /* 최신 index.html 이 올라가 있는 주소.
    여기에 넣어두면 [업데이트] 버튼이 새 버전을 확인합니다.
    설치 폴더의 update_url.txt 에 같은 주소를 적어두면
@@ -1873,13 +1908,15 @@ async function removeJob(id,purge){
     if(j && !purge){
       const keepS=(j.shots||[]).filter(x=>x.fav);
       const keepT=(j.startShots||[]).filter(x=>x.fav);
-      if(j.fav || keepS.length || keepT.length){
+      const keepK=(j.keepShots||[]);
+      if(j.fav || keepS.length || keepT.length || keepK.length){
         await jobPut({id:j.id, name:j.name, base:j.base, size:j.size,
           duration:j.duration, createdAt:j.createdAt, fav:!!j.fav, folder:j.folder||null,
           archived:true, handle:null, sheet:null,     // 샷리스트는 버려 용량을 줄인다
+          keepShots:keepK, keepMoved:true,
           shots:keepS.length?keepS:[(j.shots||[])[0]].filter(Boolean),
           startShots:keepT.length?keepT:null});
-        return {archived:true, kept:keepS.length+keepT.length};
+        return {archived:true, kept:keepS.length+keepT.length+keepK.length};
       }
     }
   }catch(e){}
@@ -1887,7 +1924,8 @@ async function removeJob(id,purge){
   return {archived:false, kept:0};
 }
 /* 이 기록에 즐겨찾기가 몇 개나 걸려 있는지 (삭제 전에 미리 알려주기 위해) */
-const favCountOf=j=>((j.shots||[]).filter(x=>x.fav).length
+const favCountOf=j=>((j.keepShots||[]).length
+                   +(j.shots||[]).filter(x=>x.fav).length
                    +(j.startShots||[]).filter(x=>x.fav).length
                    +(j.fav?1:0));
 /* 삭제 안내 → 사용자가 고르게 한다.
@@ -1941,9 +1979,15 @@ async function jobAll(){
   const list=(all||[]).filter(j=>j && !String(j.id).startsWith("__")
     && Array.isArray(j.shots) && j.shots.length);
   /* Electron 기록은 경로만 들고 있으므로, 화면에서 쓸 주소를 붙여준다 */
+  /* ?r= 은 그림이 바뀌었을 때 옛 그림이 그대로 보이지 않게 붙이는 표다.
+     컷을 손보면 CUT3.jpg 의 '내용' 이 달라지는데, 이름이 같아서 화면이
+     예전에 읽어둔 그림을 그대로 다시 쓰는 일이 있다. */
   if(IS_EL) list.forEach(j=>{
-    (j.shots||[]).forEach(x=>{ x.url=fileURL(x.thumb||x.file); x.thumbOnly=true; });
-    (j.startShots||[]).forEach(x=>{ x.url=fileURL(x.thumb||x.file); x.thumbOnly=true; });
+    const v=j.rev?`?r=${j.rev}`:"";
+    (j.shots||[]).forEach(x=>{ x.url=fileURL(x.thumb||x.file)+v; x.thumbOnly=true; });
+    (j.startShots||[]).forEach(x=>{ x.url=fileURL(x.thumb||x.file)+v; x.thumbOnly=true; });
+    /* 담아둔 사본은 자리가 바뀌지 않으므로 표(rev)를 붙이지 않는다 */
+    (j.keepShots||[]).forEach(x=>{ x.url=fileURL(x.thumb||x.file); x.thumbOnly=true; });
   });
   return list;
 }
@@ -3108,6 +3152,15 @@ async function runOneEl(item,tag,t0){
       `  각 컷이 시작되는 첫 프레임입니다.\r\n`+
       `  프로그램에서 [스타트 프레임] 을 눌러 따로 만들어야 생깁니다.\r\n`+
       `  컷이 어디서 나뉘는지 확인하는 용도입니다.\r\n\r\n`+
+      `[컷 정리를 하면]\r\n`+
+      `  프로그램에서 병합·분할·교체를 하면 이 폴더도 곧바로 따라옵니다.\r\n`+
+      `  CUT 번호가 1부터 다시 매겨지고, 없어진 컷의 그림은 지워집니다.\r\n`+
+      `  샷리스트 그림도 새 목록으로 다시 만들어집니다.\r\n`+
+      `  → 폴더에 보이는 것이 언제나 프로그램에 보이는 것과 같습니다.\r\n\r\n`+
+      `[구간 영상]  (있을 때만)\r\n`+
+      `  [🎬 구간 영상] 으로 잘라낸 영상이 담깁니다.\r\n\r\n`+
+      `[_작업중(지워도 됩니다)]  (있을 때만)\r\n`+
+      `  컷 정리와 [현재 화면 저장] 이 잠깐 쓰는 자리입니다. 지워도 됩니다.\r\n\r\n`+
       `[_목록미리보기(작은그림)]\r\n`+
       `  프로그램 목록에 띄우려고 작게 줄인 사본입니다.\r\n`+
       `  결과물이 아니니 쓰지 마세요. 지워도 되지만\r\n`+
@@ -3144,8 +3197,8 @@ async function runOneEl(item,tag,t0){
   if(viewing){
     toast(`${item.name} 추출 완료 — 기록에서 볼 수 있습니다`);
   }else{
-    S.out={shots,sheet:sheetBlob,base,startVer:0,startShots:null,
-           srcPath:item.path,outDir,sheetPath};
+    S.out={shots,sheet:sheetBlob,base,startVer:0,startShots:null,keepShots:[],
+           maxFiles:shots.length,rev:0,srcPath:item.path,outDir,sheetPath};
     S.fps=item.fps; S.playFile=item.file||null; S.jobId=job.id;
     S.meta={name:item.name,duration:item.duration,size:item.size,fps:item.fps,
             fpsSrc:item.fpsSrc||null, w:item.w,h:item.h,type:item.type};
@@ -3161,7 +3214,6 @@ function showResultEl(item){
   refreshShots();
   res.classList.add("on"); document.querySelector("main").classList.add("compact");
   if(item && item.path) attachVideoPath(item.path,item.name); else detachVideo();
-  buildKeybar();
 }
 function attachVideoPath(p,name){
   if(_pvUrl && _pvUrl!=="file"){ URL.revokeObjectURL(_pvUrl); }
@@ -3181,7 +3233,7 @@ function attachVideoPath(p,name){
           그대로 까만 화면이었다. 크기가 0 인지도 함께 본다. */
   pv.onloadedmetadata=()=>{
     if(!pv.videoWidth){ 미리보기만들기(p); return; }
-    재생메모(null); drawMarks(); paintHead(); paintIO();
+    재생메모(null); drawMarks(); paintHead(); paintIO(); paintEditBar();
   };
   pv.onerror=()=>미리보기만들기(p);
   pv.src=fileURL(p);
@@ -3305,6 +3357,12 @@ async function runOne(item,tag){
 }
 
 /* ======================= 결과 화면 ======================= */
+/* 마우스를 올렸을 때 뜨는 [저장] 아이콘.
+   ★ 예전에는 내려가는 화살표 '글자' 를 그대로 찍었다. 그런데 22px 칸 안에서
+     글꼴이 그 글자를 뭉개 버려서 그냥 막대기 하나처럼 보였다 — 무엇을 하는
+     단추인지 알아볼 수가 없었다. 글꼴에 기대지 않도록 직접 그린다. */
+const ICON_DL=`<svg viewBox="0 0 16 16" aria-hidden="true">`
+  +`<path d="M8 2.4v7.1"/><path d="M4.9 6.5 8 9.6l3.1-3.1"/><path d="M3.2 12.9h9.6"/></svg>`;
 /* 예전에 뽑아둔 기록은 내용이 JPEG 다. 확장자를 무조건 png 로 붙이면
    이름과 내용이 어긋나므로, 실제 파일을 보고 정한다. */
 const extOf=s=>{
@@ -3319,17 +3377,15 @@ function showResult(file){
   refreshShots();
   res.classList.add("on"); document.querySelector("main").classList.add("compact");
   if(file) attachVideo(file); else detachVideo();
-  buildKeybar();
 }
 function refreshShots(){
   const shots=curShots();
   drawGrid();
   $("cutCount").textContent=`${shots.length}장`;
-  /* 자석(Shift+드래그)도 컷이 나뉘는 자리에 붙는다.
-     눈금과 같은 자리여야 '가까운 눈금이 밝아지는' 표시도 맞는다. */
-  MARKS=shots.map(cutStartOf);
+  /* 자석(Shift+드래그)도 눈금과 같은 자리에 붙는다 */
+  MARKS=shots.map(markTimeOf);
   S.curShot=-1; S.sel.clear(); S.anchor=null;
-  drawMarks(); markCurrentShot(); hideTip();
+  drawMarks(); markCurrentShot(); hideTip(); paintEditBar();
 }
 function curShots(){
   return (S.mode==="start" && S.out && S.out.startShots) ? S.out.startShots : (S.out?S.out.shots:[]);
@@ -3345,19 +3401,19 @@ function drawGrid(){
     const fig=document.createElement("figure");
     fig.dataset.i=i;
     if(s.dl) fig.classList.add("done");
-    fig.title=`CUT${s.idx} · ${tcs(s.t)}\n클릭=선택+이동 · 더블클릭=크게 보기 · 우클릭/Ctrl+C=복사`;
+    if(s.hand) fig.classList.add("hand");
+    fig.title=`CUT${s.idx} · ${tcs(s.t)}${s.hand?" · ✎ 직접 고른 화면":""}\n클릭=선택+이동 · 더블클릭=크게 보기 · 우클릭/Ctrl+C=복사`;
     if(S.sel.has(i)) fig.classList.add("sel");
     const th=document.createElement("div"); th.className="thumb";
     const img=new Image(); img.src=s.url; img.loading="lazy"; img.draggable=false;
     th.appendChild(img);
 
     const hb=document.createElement("button");
-    hb.className="favMark"+(s.fav?" on":"");
-    hb.textContent=s.fav?"♥":"♡"; hb.title="즐겨찾기";
-    hb.onclick=async ev=>{ ev.stopPropagation();
-      s.fav=!s.fav; hb.className="favMark"+(s.fav?" on":"");
-      hb.textContent=s.fav?"♥":"♡";
-      await saveShotFav(i,s.fav); toast(s.fav?"즐겨찾기에 담았습니다":"즐겨찾기에서 뺐습니다"); };
+    const 담김=isKept(s);
+    hb.className="favMark"+(담김?" on":"");
+    hb.textContent=담김?"♥":"♡";
+    hb.title="즐겨찾기에 담기\u000a한 번 담으면 컷을 병합·분할·교체·초기화해도 보관함에 그대로 남습니다";
+    hb.onclick=ev=>{ ev.stopPropagation(); toggleKeep(i); };
 
     const ck=document.createElement("div");
     ck.className="selBox"+(S.sel.has(i)?" on":"");
@@ -3366,18 +3422,18 @@ function drawGrid(){
     ck.onclick=ev=>{ ev.stopPropagation(); toggleSel(i); };
 
     const tools=document.createElement("div"); tools.className="gTools";
-    const mk=(txt,title,fn)=>{ const b=document.createElement("button");
-      b.textContent=txt; b.title=title; b.onclick=ev=>{ ev.stopPropagation(); fn(); };
+    const mk=(html,title,fn)=>{ const b=document.createElement("button");
+      b.innerHTML=html; b.title=title; b.onclick=ev=>{ ev.stopPropagation(); fn(); };
       return b; };
     tools.append(
       mk("👁","크게 보기",()=>openShotsHere(i,shots)),
       mk("📋","복사",async()=>{ const ok=await copyShot(s);
         if(ok){ fig.classList.add("copied"); setTimeout(()=>fig.classList.remove("copied"),900); } }),
-      mk("⬇","저장",async()=>{ download(await fullBlob(s),fname(s)); markDownloaded([i]); toast("저장했습니다"); })
+      mk(ICON_DL,"이 컷 저장 (PNG)",async()=>{ download(await fullBlob(s),fname(s)); markDownloaded([i]); toast("저장했습니다"); })
     );
 
     const cap=document.createElement("div");
-    cap.className="cap"; cap.textContent=`CUT${s.idx}`;
+    cap.className="cap"; cap.textContent=(s.hand?"✎ ":"")+`CUT${s.idx}`;
     fig.append(th,hb,ck,tools,cap);
 
     let clickTimer=null;
@@ -3417,6 +3473,7 @@ function paintSel(){
   $("gSelCount").textContent = S.sel.size
     ? `${S.sel.size}장 선택`
     : "클릭 = 선택 · Shift = 범위 · Ctrl = 추가";
+  paintEditBar();
 }
 grid.onclick=ev=>{
   if(grid._justDragged){ grid._justDragged=false; return; }
@@ -3447,9 +3504,11 @@ $("gCopy").onclick=async()=>{
 };
 $("gFav").onclick=async()=>{
   const list=[...S.sel].sort((a,b)=>a-b);
-  for(const i of list){ const s=curShots()[i]; if(!s||s.fav) continue;
-    s.fav=true; await saveShotFav(i,true); }
-  drawGrid(); toast(`${list.length}장 즐겨찾기`);
+  let n=0;
+  for(const i of list){ const s=curShots()[i]; if(!s||isKept(s)) continue;
+    if(await keepAdd(s)) n++; }
+  paintFav();
+  toast(n? `${n}장을 즐겨찾기에 담았습니다` : "이미 다 담겨 있습니다");
 };
 /* 이미 내려받은 컷을 기억해 둔다 (즐겨찾기와 같은 방식으로 기록에 저장).
    인덱스는 '분석/스타트' 모드마다 따로이므로 모드를 함께 넘긴다. */
@@ -3476,15 +3535,11 @@ function paintDl(){
     el.classList.toggle("done", !!(s&&s.dl));
   });
 }
+/* (예전 이름 — 시험과 옛 코드가 부르던 자리. 지금은 보관함 방식으로 넘긴다) */
 async function saveShotFav(i,v){
-  if(!S.jobId) return;
-  try{
-    const j=await jobGet(S.jobId); if(!j) return;
-    const arr=(S.mode==="start")? j.startShots : j.shots;
-    if(arr&&arr[i]){ arr[i].fav=v; await jobPut(j); }
-    await renderHist();          // HIST 를 새로 읽어야 즐겨찾기 목록에 반영됨
-    renderArchive();
-  }catch(e){}
+  const s=curShots()[i]; if(!s) return;
+  if(v) await keepAdd(s); else await keepRemove(s);
+  paintFav();
 }
 /* 목록을 손으로 굴리면 2초 동안은 자동 추적을 멈춘다 */
 let _gridUserScroll=false, _gsT=0;
@@ -3511,6 +3566,7 @@ function markCurrentShot(){
   for(let i=0;i<shots.length;i++) if(pv.currentTime>=cutStartOf(shots[i])-0.02) cur=i;
   if(cur===S.curShot) return;
   S.curShot=cur;
+  paintEditBar();
   [...grid.querySelectorAll("figure")].forEach(el=>
     el.classList.toggle("cur",+el.dataset.i===cur));
   /* 재생 중에는 지금 지나가는 컷이 목록에서도 보이도록 따라간다.
@@ -3525,6 +3581,7 @@ function markCurrentShot(){
 $("dlZip").onclick=async e=>{
   const b=e.currentTarget; b.disabled=true; b.textContent="ZIP 만드는 중...";
   try{
+    await flushFolder();
     const base=S.out.base, shots=curShots(), files=[];
     const sheet=await currentSheet();
     for(const s of shots)
@@ -3549,7 +3606,7 @@ function attachVideo(file){
   const 못그림="이 형식은 여기서 재생되지 않습니다 — 캡쳐는 정상입니다";
   pv.onloadedmetadata=()=>{
     if(!pv.videoWidth){ 재생메모(못그림); return; }   // 소리만 읽히는 영상 (위 설명 참고)
-    재생메모(null); drawMarks(); paintHead(); paintIO();
+    재생메모(null); drawMarks(); paintHead(); paintIO(); paintEditBar();
   };
   pv.onerror=()=>재생메모(못그림);
   pv.src=_pvUrl;
@@ -3562,7 +3619,7 @@ function detachVideo(){
   _pvUrl=null;
   pv.style.display="none"; $("noVid").style.display="flex";
   $("vName").textContent=""; $("marks").innerHTML="";
-  hideTip();
+  hideTip(); paintEditBar();
   $("trackFill").style.width="0%"; $("head").style.left="0%";
 }
 const hasVideo=()=>!!_pvUrl;
@@ -3687,21 +3744,34 @@ function setMarkView(v){
 function paintMarkBtn(){
   const b=$("markView"); if(!b) return;
   b.textContent = MARKVIEW==="on" ? "\u22ee 눈금 보기" : "\u22ee 눈금 끔";
-  b.title="재생바의 컷 눈금을 켜고 끕니다";
+  b.title="재생바의 컷 눈금을 켜고 끕니다\u000a"
+    +"눈금은 지금 보고 있는 목록의 장 자리에 섭니다\u000a"
+    +"(분석 프레임 / 스타트 프레임에 따라 자리가 달라집니다)";
   b.classList.toggle("off", MARKVIEW!=="on");
+}
+/* 눈금 하나가 서는 자리.
+   ★ 예전에는 언제나 '컷이 바뀌는 자리' 에 찍었다. 그 자리는 곧 스타트 프레임의
+     자리이기도 해서, [분석 프레임] 을 보고 있어도 눈금은 스타트 프레임만
+     가리키는 것처럼 보였다. 목록의 컷을 눌러도 재생 위치가 눈금 사이에 섰다.
+   이제 눈금은 '지금 목록에 보이는 그 장' 을 따라간다.
+     · 분석 프레임 — 그 컷에서 고른 장의 자리
+     · 스타트 프레임 — 컷이 시작되는 자리
+   어느 쪽을 보든 눈금 = 목록의 그 장이므로 서로 어긋날 일이 없다. */
+function markTimeOf(s){
+  if(!s) return 0;
+  if(S.mode==="start") return cutStartOf(s);
+  return (s.t!=null) ? s.t : cutStartOf(s);
 }
 function drawMarks(){
   const box=$("marks"); box.innerHTML="";
   paintMarkBtn();
   if(MARKVIEW!=="on") return;
   const d=pv.duration||1;
-  /* 눈금은 '컷이 나뉘는 자리'에 찍는다 — 화면이 실제로 바뀌는 그 지점이라
-     재생하면서 보면 눈금과 화면이 딱 맞아떨어진다. */
   curShots().forEach(s=>{
     const m=document.createElement("div");
     m.className="mk";
-    m.style.left=(cutStartOf(s)/d*100)+"%";
-    m.title=`CUT${s.idx} 시작 · ${tcs(cutStartOf(s))}`;
+    m.style.left=(markTimeOf(s)/d*100)+"%";
+    m.title=`CUT${s.idx} · ${tcs(markTimeOf(s))}`;
     box.appendChild(m);
   });
 }
@@ -3773,15 +3843,15 @@ function showTipAt(clientX){
   const cx=Math.min(Math.max(clientX,r.left),r.right);
   const t=((cx-r.left)/W)*dur;
 
-  // 커서 위치에서 가장 가까운 컷 (눈금과 같은 기준 = 컷이 시작되는 자리)
+  // 커서 위치에서 가장 가까운 컷 (눈금과 같은 기준)
   let best=0, bd=Infinity;
-  shots.forEach((s,i)=>{ const d=Math.abs(cutStartOf(s)-t); if(d<bd){ bd=d; best=i; } });
+  shots.forEach((s,i)=>{ const d=Math.abs(markTimeOf(s)-t); if(d<bd){ bd=d; best=i; } });
 
   const s=shots[best], tip=$("markTip");
   if(tip._i!==best){
     tip._i=best;
     tip.querySelector("img").src=s.url;
-    tip.querySelector("span").textContent=`CUT${s.idx} · ${tcs(cutStartOf(s))}`;
+    tip.querySelector("span").textContent=`CUT${s.idx} · ${tcs(markTimeOf(s))}`;
   }
   const half=79;
   tip.style.left=Math.max(half,Math.min(cx-r.left,W-half))+"px";   // 커서를 따라감
@@ -3796,7 +3866,21 @@ function paintModeSw(){
   const sk=$("sheetKind");
   if(sk){ sk.textContent = S.mode==="start" ? "스타트" : "분석";
     sk.className = S.mode==="start" ? "kindTag start" : "kindTag"; }
-  const n=$("startNote"); if(n) n.classList.toggle("on",S.mode==="start");
+  /* 이 목록이 어떻게 뽑힌 것인지 + 마음에 안 들면 어디서 고치는지 */
+  const n=$("startNote");
+  if(n){
+    n.innerHTML = S.mode==="start"
+      ? `컷마다 <b>첫 프레임</b> 한 장 · 분석 프레임과 컷 번호가 같습니다. `
+        +`디졸브처럼 서서히 넘어가는 전환은 한두 장 밀릴 수 있습니다.<br>`
+        +`→ 아래 <b>컷 정리</b> 에서 <b>교체 · 병합 · 분할</b> 로 직접 맞출 수 있고, `
+        +`<b>초기화</b> 를 누르면 언제든 처음으로 돌아갑니다.`
+      : `컷마다 그 컷에서 <b>가장 또렷한 한 장</b>을 골라 뽑습니다. `
+        +`많이 흔들리거나 전환이 잦으면 한 컷이 여러 장으로 나뉘기도 합니다.<br>`
+        +`→ 아래 <b>컷 정리</b> 에서 <b>교체 · 병합 · 분할</b> 로 직접 맞출 수 있고, `
+        +`<b>초기화</b> 를 누르면 언제든 처음으로 돌아갑니다.`;
+    n.classList.add("on");
+  }
+  paintEditBar();
 }
 /* startVer 는 '어떤 규칙으로 만든 스타트 프레임인가'를 적어두는 번호다.
    3 = 컷 경계에서 곧바로 뽑은 것(지금 규칙). 2 이하로 적혀 있는 옛 기록은
@@ -3813,14 +3897,16 @@ $("modeSw").onclick=async e=>{
 };
 /* 이미 뽑은 결과의 컷 시작 시각(inT)을 그대로 써서 스타트 프레임만 새로 캡쳐한다.
    전체 재분석이 아니라 컷 수만큼만 이동하면 되므로 몇 초면 끝난다. */
-function toggleInfo(){
+/* 같은 파일을 두 번 읽지 않는다 (ffprobe 를 부르는 값이라 한 번이면 충분하다) */
+const _codecMemo=new Map();
+async function toggleInfo(){
   const b=$("pinfoBox"), m=S.meta||{};
   if(b.classList.contains("on")){ b.classList.remove("on"); return; }
   const w=m.w||pv.videoWidth, h=m.h||pv.videoHeight;
   const dur=pv.duration||m.duration||0;
   const br=(m.size&&dur)?(m.size*8/dur/1e6):0;
   const g=w&&h?gcd(w,h):1;
-  b.textContent=
+  const 기본=
     `파일       ${m.name||"-"}\n`+
     `형식       ${m.type||"-"}\n`+
     `해상도     ${w}×${h}   (${w&&h?`${w/g}:${h/g}`:"-"})\n`+
@@ -3830,7 +3916,52 @@ function toggleInfo(){
     `비트레이트 ${br?br.toFixed(2)+" Mbps":"-"}\n`+
     `캡쳐       ${MARKS.length}컷\n`+
     `현재       ${clock(pv.currentTime)}  (${Math.round(pv.currentTime*(m.fps||S.fps))}프레임)`;
+  b.textContent=기본+"\n\n코덱       읽는 중...";
   b.classList.add("on");
+  const 속=await codecLines();
+  if(!b.classList.contains("on")) return;        // 그새 닫았으면 그대로 둔다
+  b.textContent=기본+"\n\n"+(속||"코덱       원본 영상이 없어 읽지 못했습니다");
+}
+/* 그릇·코덱·색 형식·소리 — ffprobe 가 알려주는 것을 사람이 읽는 말로 옮긴다 */
+async function codecLines(){
+  const p=S.out&&S.out.srcPath;
+  if(!IS_EL||!p) return "";
+  if(_codecMemo.has(p)) return _codecMemo.get(p);
+  let r=null;
+  try{ r=await window.CG.probeFull(p); }catch(e){}
+  if(!r||!r.ok||!r.video) return "";
+  const v=r.video, a=r.audio, f=r.format||{};
+  const 속도=n=>{ n=+n; if(!n||!isFinite(n)) return "";
+    return n>=1e6 ? (n/1e6).toFixed(2)+" Mbps" : Math.round(n/1000)+" kbps"; };
+  const 색=[v.pix_fmt||"", v.bits_per_raw_sample?`${v.bits_per_raw_sample}bit`:""]
+    .filter(Boolean).join(" · ");
+  const 코덱=`${v.codec_name||"-"}`
+    +(v.profile?`  (${v.profile}${(+v.level>0)?` L${(v.level/10).toFixed(1)}`:""})`:"");
+  const 줄=[
+    `그릇       ${f.format_long_name||f.format_name||"-"}`,
+    `영상 코덱  ${코덱}`,
+    `색 형식    ${색||"-"}`,
+  ];
+  if(v.field_order && v.field_order!=="progressive")
+    줄.push(`주사 방식  ${v.field_order}  (인터레이스)`);
+  const vb=속도(v.bit_rate)||(속도(f.bit_rate)?"≈ "+속도(f.bit_rate):"");
+  줄.push(`영상 속도  ${vb||"-"}`);
+  줄.push(`소리       ${a
+    ? [a.codec_name, a.channels?a.channels+"ch":"",
+       a.sample_rate?Math.round(a.sample_rate/1000)+"kHz":"", 속도(a.bit_rate)]
+      .filter(Boolean).join("  ")
+    : "없음"}`);
+  const s=줄.join("\n");
+  _codecMemo.set(p,s);
+  return s;
+}
+/* 한 프레임씩 옮기기 — 재생 줄의 ◀▌ ▌▶ 와 D · F 가 같은 길을 쓴다 */
+function stepFrame(dir){
+  if(!hasVideo()) return toast("먼저 원본 영상을 불러와 주세요");
+  const fd=1/((S.fps&&isFinite(S.fps)&&S.fps>1)?S.fps:24);
+  pv.pause();
+  pv.currentTime=Math.max(0,Math.min(pv.duration||0,pv.currentTime+dir*fd));
+  paintHead();
 }
 async function copyFrame(){
   if(!hasVideo()) return toast("영상이 없습니다 — 컷을 골라서 복사해 주세요");
@@ -3844,23 +3975,16 @@ async function copyFrame(){
     toast("현재 화면을 복사했습니다 · Ctrl+V 로 붙여넣기");
   }catch(e){ toast("복사 실패 — ⬇ 저장을 써주세요"); }
 }
-function buildKeybar(){
-  const defs=[
-    ["◀▌","한 프레임 뒤","D",()=>{pv.pause();pv.currentTime=Math.max(0,pv.currentTime-1/S.fps);paintHead();}],
-    ["▌▶","한 프레임 앞","F",()=>{pv.pause();pv.currentTime=Math.min(pv.duration,pv.currentTime+1/S.fps);paintHead();}],
-    ["🧲","컷 시작에 자석","Shift+드래그",null],
-    ["📋","현재 화면 복사","Ctrl+C·우클릭",copyFrame],
-    ["ℹ","영상 정보","Tab",toggleInfo],
-  ];
-  const bar=$("pKeys"); bar.innerHTML="";
-  defs.forEach(([ic,label,sc,fn])=>{
-    const b=document.createElement("button");
-    b.className="kb"; b.title=`${label} (${sc})`;
-    b.innerHTML=`<span>${ic}</span><span>${label}</span><span class="sc">${sc}</span>`;
-    if(fn) b.onclick=()=>{ if(hasVideo()||!fn.length) fn(); else toast("먼저 원본 영상을 불러와 주세요"); };
-    else b.style.cursor="default";
-    bar.appendChild(b);
-  });
+/* ★ 예전에는 여기 아래에 '단축키 줄' 이 한 줄 더 있었다.
+   재생 줄 · 구간 줄 · 컷 정리 줄까지 네 줄이 쌓여 무엇이 무엇인지 흐려졌다.
+   자주 쓰는 것(한 프레임 이동 · 복사 · 정보)은 재생 줄 안으로 들여보내고,
+   단축키는 각 단추의 설명말과 [?] 사용법 창에 적어 두었다. */
+{ /* on$ 는 아래에서 만들어지므로 여기서는 직접 건다 */
+  const bind=(id,fn)=>{ const el=$(id); if(el) el.onclick=fn; };
+  bind("pPrev",()=>stepFrame(-1));
+  bind("pNext",()=>stepFrame(1));
+  bind("pCopy",()=>copyFrame());
+  bind("pInfo",()=>toggleInfo());
 }
 
 
@@ -4047,7 +4171,15 @@ function paintIO(){
   band.style.width=(Math.max(0,e-s)/dur*100)+"%";
   pin1.classList.toggle("on",a!=null); pin1.style.left=((a??0)/dur*100)+"%";
   pin2.classList.toggle("on",b!=null); pin2.style.left=((b??dur)/dur*100)+"%";
-  $("ioText").textContent=`${tcs(s)} ~ ${tcs(e)}  (${(e-s).toFixed(2)}초)`;
+  /* 얼마나 긴 구간인지보다 '몇 장이 나오는지' 가 실제로 궁금한 값이다
+     (연속 프레임 저장이 만들 장 수 · 구간 컷 저장이 담을 컷 수) */
+  const fps=(S.fps&&isFinite(S.fps)&&S.fps>1)?S.fps:24;
+  const 장=Math.max(0,Math.floor((e-s)*fps));
+  const 컷=curShots().filter(x=>x.t>=s && x.t<=e).length;
+  $("ioText").textContent=
+    `${tcs(s)}~${tcs(e)} · ${(e-s).toFixed(2)}초 · ${장}장 · ${컷}컷`;
+  $("ioText").title=`이 구간은 ${(e-s).toFixed(2)}초입니다.\u000a`
+    +`· 연속 프레임으로 뽑으면 ${장}장\u000a· 이 안에 들어 있는 캡쳐 컷은 ${컷}개`;
 }
 $("setIn").onclick=()=>{ if(!hasVideo())return;
   S.inT=pv.currentTime; if(S.outT!=null&&S.outT<=S.inT) S.outT=null; paintIO(); };
@@ -4057,22 +4189,6 @@ $("clrIO").onclick=clearIO;
 /* 눈금 표시 방식 돌려가며 바꾸기: 주요 컷만 → 전부 → 끔 */
 $("markView").onclick=()=>setMarkView(MARKVIEW==="on" ? "off" : "on");
 paintMarkBtn();
-
-$("ioShots").onclick=async e=>{
-  if(!S.out) return;
-  const a=S.inT??0, b=S.outT??(pv.duration||1e9);
-  const shots=curShots().filter(s=>s.t>=a && s.t<=b);
-  if(!shots.length) return toast("이 구간에 캡쳐가 없습니다");
-  const btn=e.currentTarget; btn.disabled=true;
-  try{
-    const files=[];
-    for(const s of shots)
-      files.push({name:`${S.out.base}_구간/${fname(s)}`,
-                  data:new Uint8Array(await (await fullBlob(s)).arrayBuffer())});
-    download(await makeZip(files),`${S.out.base}_구간_${tcs(a).replace(":","m")}-${tcs(b).replace(":","m")}.zip`);
-    toast(`${shots.length}장 저장`);
-  } finally { btn.disabled=false; }
-};
 
 /* 구간을 원본 해상도 프레임 연속으로 저장 (화질 손실 없음, 소리 없음) */
 $("ioSeq").onclick=async e=>{
@@ -4099,6 +4215,681 @@ $("ioSeq").onclick=async e=>{
     download(await makeZip(files),`${S.out.base}_시퀀스_${n}장.zip`);
     toast(`${n}장 저장 (${can.width}×${can.height} 원본 해상도)`);
   }catch(err){ toast("실패: "+err.message); }
+  finally{ progWrap.style.display="none"; btn.disabled=false; }
+};
+
+/* ======================= 컷 다듬기 =======================
+   분석이 끝난 컷 목록을 사람이 직접 손보는 자리다.
+
+   ★ 왜 필요한가.
+     · 흔들리거나 크게 움직이는 장면(핸드헬드·휘프팬)은 한 컷인데도
+       장과 장 사이가 원래 많이 달라서 여러 컷으로 나뉘어 잡히곤 한다.
+     · 반대로 서서히 넘어가는 전환(디졸브)은 두 컷이 한 컷으로 붙기도 한다.
+     · 자동으로 고른 대표 화면이 늘 마음에 드는 것도 아니다.
+   검출 규칙을 더 건드리면 잘 맞던 영상까지 흔들린다 (findCuts 설명 참고).
+   그래서 규칙은 그대로 두고, 결과를 손으로 고칠 길을 낸다.
+
+   할 수 있는 것은 넷뿐이다 — 교체 · 병합 · 분할 · 초기화.
+   무엇을 하든 [초기화] 한 번이면 분석 직후로 완전히 돌아간다.
+   그래서 마음 놓고 눌러볼 수 있다. */
+
+let _editing=false;                        // 손질 두 개가 겹치지 않게
+
+const FPSNOW=()=>(S.fps&&isFinite(S.fps)&&S.fps>1)?S.fps:24;
+/* 재생 위치를 '그 장이 시작되는 시각' 으로 맞춘다.
+   ffmpeg 에게 넘길 시각이라 장 한가운데를 짚으면 다음 장이 나올 수 있다. */
+const snapT=t=>{ const f=FPSNOW(); return Math.max(0,Math.floor(t*f+1e-4)/f); };
+/* 파일 이름에 쓰는 짧은 시각 — 01m23s (분·초). 사람이 눈으로 찾기 좋은 길이다. */
+function 짧은시각(t){
+  const n=Math.max(0,Math.floor(t||0));
+  return `${String(Math.floor(n/60)).padStart(2,"0")}m${String(n%60).padStart(2,"0")}s`;
+}
+/* 파일 이름에 쓰는 시각 표기 — 00m12s07f (분·초·장).
+   같은 장이면 언제나 같은 이름이 나오므로 같은 그림이 여러 개 쌓이지 않는다. */
+function tcode(t){
+  const f=Math.round(FPSNOW()), n=Math.max(0,Math.floor(t*FPSNOW()+1e-4));
+  const sec=Math.floor(n/f), ff=n%f, m=Math.floor(sec/60), s=sec%60;
+  return `${String(m).padStart(2,"0")}m${String(s).padStart(2,"0")}s${String(ff).padStart(2,"0")}f`;
+}
+/* 지금 재생 위치가 들어 있는 컷 (없으면 -1) */
+function playingCut(){
+  const shots=curShots(); let cur=-1;
+  for(let i=0;i<shots.length;i++) if(pv.currentTime>=cutStartOf(shots[i])-0.02) cur=i;
+  return cur;
+}
+const isRun=a=>a.every((v,i)=>i===0||v===a[i-1]+1);   // 이어진 번호인가
+
+/* ---------- 안내줄 ---------- */
+function paintEditBar(){
+  const hint=$("editHint"); if(!hint) return;
+  const 있다=!!(S.out&&S.out.shots&&S.out.shots.length);
+  const 고쳤다=!!(S.out&&S.out.origShots);
+  const tag=$("editedTag"); if(tag) tag.classList.toggle("on",고쳤다);
+  const rst=$("cutReset"); if(rst) rst.classList.toggle("live",고쳤다);
+  if(_editing){ hint.textContent="컷을 손보는 중..."; return; }
+  if(_syncing){ hint.textContent="저장 폴더에 반영하는 중..."; return; }
+  if(!있다){ hint.textContent="컷을 뽑으면 이 자리에서 정리할 수 있습니다"; return; }
+  if(S.mode==="start"){
+    hint.textContent="컷 정리는 [분석 프레임] 목록에서 합니다"; return; }
+  if(S.sel.size>=2){
+    hint.textContent=`${S.sel.size}개 선택됨 — [병합] 으로 한 컷으로 묶습니다`; return; }
+  if(!hasVideo()){
+    hint.textContent="원본 영상을 불러오면 교체·분할도 쓸 수 있습니다"; return; }
+  const s=S.out.shots[playingCut()];
+  hint.textContent = s
+    ? `재생 중 CUT${s.idx}${고쳤다?" · 손본 목록":""} — 목록에서 컷을 골라 합칠 수 있습니다`
+    : "재생 위치가 첫 컷보다 앞입니다";
+}
+function editBusy(on){
+  _editing=on;
+  ["cutReplace","cutMerge","cutSplit","cutReset","grabStill","gMerge"]
+    .forEach(id=>{ const b=$(id); if(b) b.disabled=on; });
+  paintEditBar();
+}
+
+/* ---------- 손질을 시작하기 전에 확인할 것들 ---------- */
+async function editReady(needVideo){
+  if(!(S.out&&S.out.shots&&S.out.shots.length)){
+    toast("먼저 영상에서 컷을 뽑아주세요"); return false; }
+  if(S.running){ toast("추출이 끝난 뒤에 손볼 수 있습니다"); return false; }
+  if(_editing){ toast("앞의 작업을 끝내는 중입니다"); return false; }
+  if(IS_EL && !(S.out.outDir && S.out.base)){
+    toast("저장 폴더를 알 수 없는 기록이라 손볼 수 없습니다"); return false; }
+  /* 컷 목록은 하나다. 손질은 언제나 [분석 프레임] 쪽에서 한다 —
+     두 곳에서 따로 고치면 컷 번호가 어긋난다. */
+  if(S.mode==="start"){
+    const ok=await appConfirm(
+      "컷 정리는 <b>분석 프레임</b> 목록에서 합니다.\n"+
+      "지금 보고 계신 것은 스타트 프레임입니다.\n\n분석 프레임으로 바꿀까요?","컷 정리");
+    if(!ok) return false;
+    S.mode="smart"; paintModeSw(); refreshShots();
+  }
+  if(needVideo){
+    if(!hasVideo()){ toast("먼저 원본 영상을 불러와 주세요"); return false; }
+    if(!pv.videoWidth){ toast("영상을 아직 읽는 중입니다 — 잠시 뒤에 다시 눌러주세요"); return false; }
+  }
+  return true;
+}
+/* 이미 만들어 둔 스타트 프레임은 컷 목록에서 나온 것이라 함께 낡는다.
+   조용히 버리지 않고 무엇이 사라지는지 먼저 알려준다. */
+async function warnStart(){
+  const st=S.out.startShots;
+  if(!(st&&st.length)) return true;
+  return await appConfirm(
+    "컷을 손보면 이미 만들어 둔 <b>스타트 프레임</b> 목록은 컷 번호가 어긋납니다.\n"+
+    "그래서 목록을 비우고, 필요할 때 다시 만들도록 합니다.\n\n"+
+    "(즐겨찾기에 담아둔 것은 그대로 남습니다)\n\n계속할까요?","스타트 프레임");
+}
+
+/* ---------- 지금 화면 한 장 ---------- */
+/* 원본 해상도 PNG 한 장을 만든다.
+   ★ 되도록 ffmpeg 로 원본에서 직접 뽑는다. 재생 칸은 크롬이 돌리는데,
+     ProRes 같은 형식은 작은 mp4 사본으로 재생되고 있을 수 있어서
+     화면을 그대로 베끼면 그 사본의 화질이 그대로 남는다. */
+async function stillBlobAt(t){
+  if(IS_EL && S.out && S.out.srcPath && S.out.outDir && S.out.base){
+    try{
+      const r=await window.CG.grabPNGs(
+        S.out.srcPath,[grabAt(snapT(t),FPSNOW())],작업칸(),"지금화면");
+      if(r&&r.ok&&r.files&&r.files[0]){
+        const buf=await window.CG.readFile(r.files[0]);
+        return new Blob([buf],{type:"image/png"});
+      }
+    }catch(e){ /* 아래 화면 베끼기로 넘어간다 */ }
+  }
+  if(!pv.videoWidth) throw new Error("영상을 아직 읽는 중입니다");
+  const c=document.createElement("canvas");
+  c.width=pv.videoWidth; c.height=pv.videoHeight;
+  c.getContext("2d").drawImage(pv,0,0);
+  return await toOutBlob(c);
+}
+/* 교체·분할에 쓸 그림 한 장을 만들어 '컷이 가리킬 자리' 까지 마련한다.
+   Electron 은 파일로 남겨야 한다 — 기록(JSON)에는 경로만 적히기 때문이다. */
+async function newShotSource(t){
+  const blob=await stillBlobAt(t);
+  if(!IS_EL) return {blob, url:URL.createObjectURL(blob)};
+  /* ★ 결과 폴더([분석 프레임])에는 언제나 CUT1..N 만 있어야 한다.
+     그래서 새로 뽑은 그림은 '작업중' 칸에 먼저 놓고, 잠시 뒤 자리 맞추기가
+     제 번호를 붙여 옮겨 넣는다 (folderSync 참고). */
+  const file=`${작업칸()}/직접_${tcode(t)}.png`;
+  await window.CG.writeFile(file,new Uint8Array(await blob.arrayBuffer()));
+  let thumb=null;
+  try{
+    const tb=await makeThumb(blob,480);
+    thumb=`${작업칸()}/직접_${tcode(t)}.jpg`;
+    await window.CG.writeFile(thumb,new Uint8Array(await tb.arrayBuffer()));
+  }catch(e){ thumb=null; }
+  return {file, thumb, url:fileURL(thumb||file)+"?t="+Date.now()};
+}
+/* 컷 하나의 대표 화면을 바꿔 끼운다 */
+async function applyReplace(i,t){
+  const s=S.out.shots[i];
+  const src=await newShotSource(t);
+  if(s.url && String(s.url).startsWith("blob:")) URL.revokeObjectURL(s.url);
+  s.t=snapT(t); s.hand=true; s.dl=false; s.url=src.url;
+  if(IS_EL){ s.file=src.file; s.thumb=src.thumb; s.thumbOnly=true; delete s.blob; }
+  else{ s.blob=src.blob; s.thumbOnly=false;
+        delete s.file; delete s.thumb; delete s.dirName; delete s.fileName; delete s.subDir; }
+}
+
+/* ---------- 되돌리기 위한 밑그림 · 저장 ---------- */
+/* 처음 분석한 목록을 딱 한 번만 적어둔다 ([초기화] 가 쓸 것) */
+function keepOriginal(){
+  if(!S.out.origShots) S.out.origShots=S.out.shots.map(s=>({...s}));
+}
+/* 컷 목록에서 나온 것들은 목록이 바뀌면 함께 낡는다 — 스타트 프레임과 샷리스트.
+   남겨두면 컷 번호가 어긋난 채로 보이므로 여기서 같이 비운다. */
+function dropDerived(){
+  for(const s of (S.out.startShots||[]))
+    if(s.url && String(s.url).startsWith("blob:")) URL.revokeObjectURL(s.url);
+  S.out.startShots=null; S.out.startVer=0;
+  S.out.sheet=null; S.out.sheetPath=null;
+  S.out.startSheet=null; S.out.startSheetPath=null;
+  if(S.mode==="start"){ S.mode="smart"; paintModeSw(); }
+}
+const renumber=arr=>arr.forEach((s,i)=>{ s.idx=i+1; });
+/* 화면에 쓰는 주소(url)와 Electron 의 그림 덩어리는 기록에 적지 않는다 */
+const stripShot=s=>{ const o={...s}; delete o.url; if(IS_EL) delete o.blob; return o; };
+async function persistCuts(){
+  if(!S.jobId) return;
+  try{
+    const j=await jobGet(S.jobId); if(!j) return;
+    j.shots=S.out.shots.map(stripShot);
+    j.origShots=S.out.origShots ? S.out.origShots.map(stripShot) : null;
+    j.edited=!!S.out.origShots;
+    j.startShots=null; j.startVer=0;
+    j.startSheetPath=null;
+    j.sheetPath=S.out.sheetPath||null;
+    j.rev=S.out.rev||0;                 // 그림이 바뀌었음을 알리는 표 (그림 캐시 방지)
+    j.maxFiles=S.out.maxFiles||S.out.shots.length;
+    if(!IS_EL){ j.sheet=S.out.sheet||null; j.startSheet=null; }
+    await jobPut(j);
+  }catch(e){ toast("기록 저장 실패: "+(e.message||"저장소 오류")); }
+  /* 왼쪽 기록 목록과 즐겨찾기 보관함도 새 목록으로 다시 그린다 */
+  try{ await renderHist(); }catch(e){}
+  try{ renderArchive(); }catch(e){}
+}
+/* 손질이 끝날 때마다 거치는 자리 — 번호를 다시 매기고, 저장하고, 화면을 맞춘다 */
+async function afterEdit(sel){
+  dropDerived();
+  renumber(S.out.shots);
+  markDirty();                      // 저장 폴더도 곧 이 목록에 맞춘다
+  await persistCuts();
+  refreshShots();
+  /* 맨 위 제목의 장수도 맞춰 둔다 — 추출 직후에 적어둔 숫자라 손보면 어긋난다 */
+  if(resTitle.textContent)
+    resTitle.textContent=resTitle.textContent.replace(/[0-9]+장/,`${S.out.shots.length}장`);
+  if(sel!=null && sel>=0 && sel<S.out.shots.length){
+    S.sel.clear(); S.sel.add(sel); S.anchor=sel; paintSel();
+    const el=grid.querySelector(`figure[data-i="${sel}"]`);
+    if(el) el.scrollIntoView({behavior:"smooth",block:"nearest"});
+  }
+}
+
+/* ---------- 저장 폴더에 반영하기 ----------
+   ★ 컷을 손보면 저장 폴더의 CUT 번호가 목록과 어긋난다. 그대로 두면
+     "앱에는 6컷인데 폴더에는 7장이고 번호도 안 맞는" 상태가 되어,
+     결국 폴더를 믿을 수 없게 된다 — 이 앱은 폴더가 곧 결과물이다.
+
+   그림을 매번 다시 뽑으면 확실하지만 컷이 많으면 몇 십 초가 걸린다.
+   대부분은 그림 내용은 그대로이고 '번호'만 밀린 것이므로 이름만 바꾼다.
+   병합·분할·교체를 잇달아 해도 마지막 한 번만 돌도록 잠깐 모아서 처리한다. */
+const 폴더칸  = ()=>`${S.out.outDir}/${S.out.base}_CUTS`;
+const 작업칸  = ()=>`${폴더칸()}/_작업중(지워도 됩니다)`;
+const 분석칸  = ()=>`${폴더칸()}/분석 프레임`;
+const 미리칸  = ()=>`${폴더칸()}/_목록미리보기(작은그림)`;
+const 스타트칸= ()=>`${폴더칸()}/스타트 프레임`;
+
+let _syncT=null, _syncing=false, _dirty=false;
+function markDirty(){
+  if(!IS_EL) return;
+  _dirty=true; clearTimeout(_syncT);
+  _syncT=setTimeout(()=>{ folderSync(); }, 900);
+  paintEditBar();
+}
+/* 지금 당장 맞춘다 — ZIP·샷리스트처럼 폴더를 실제로 읽어 가기 전에 부른다 */
+async function flushFolder(){
+  clearTimeout(_syncT);
+  for(let i=0;i<200 && _syncing;i++) await new Promise(k=>setTimeout(k,50));
+  if(_dirty) await folderSync();
+}
+async function folderSync(){
+  if(!IS_EL || _syncing) return;
+  if(!(S.out && S.out.outDir && S.out.base && S.out.shots)){ _dirty=false; return; }
+  _syncing=true; _dirty=false; paintEditBar();
+  const myJob=S.jobId;
+  try{
+    const shots=S.out.shots, base=S.out.base;
+    /* ① 아직 그림이 없는 컷이 있으면 원본 영상에서 그것만 뽑아 온다.
+       (기록을 지웠다 되살렸을 때처럼 파일이 사라진 경우까지 여기서 메꾼다) */
+    const 빈자리=shots.map((s,i)=>s.file?-1:i).filter(i=>i>=0);
+    if(빈자리.length && S.out.srcPath){
+      const r=await window.CG.grabPNGs(S.out.srcPath,
+        빈자리.map(i=>grabAt(shots[i].t,FPSNOW())), 작업칸(), "메꿈");
+      if(r&&r.files) 빈자리.forEach((i,k)=>{ if(r.files[k]) shots[i].file=r.files[k]; });
+    }
+    /* ② 번호 맞추기 계획 — 이름만 바꾸므로 컷이 많아도 순식간이다 */
+    const moves=[], remove=[];
+    for(let i=0;i<shots.length;i++){
+      const s=shots[i];
+      const 그림=`${분석칸()}/${base}_CUT${i+1}.png`;
+      const 작은=`${미리칸()}/CUT${i+1}.jpg`;
+      if(s.file && s.file!==그림) moves.push({from:s.file,to:그림});
+      if(s.thumb && s.thumb!==작은) moves.push({from:s.thumb,to:작은});
+      s.file=그림; s.thumb=작은; s.thumbOnly=true;
+    }
+    /* ③ 컷이 줄었으면 남는 번호는 지운다 */
+    const 예전=Math.max(S.out.maxFiles||0, shots.length);
+    for(let i=shots.length+1;i<=예전;i++){
+      remove.push(`${분석칸()}/${base}_CUT${i}.png`);
+      remove.push(`${미리칸()}/CUT${i}.jpg`);
+    }
+    /* ★ 스타트 프레임은 목록이 비워졌으면 폴더에서도 통째로 치운다.
+       번호만 맞춰 남겨두면 '컷 3의 스타트' 라고 적힌 옛 컷 그림이 폴더에 남아
+       가장 헷갈리는 물건이 된다. 다시 만들면 몇 초면 새로 채워진다. */
+    const 스타트비었나=!(S.out.startShots && S.out.startShots.length);
+    for(let i=(스타트비었나?1:shots.length+1);i<=예전;i++){
+      remove.push(`${스타트칸()}/${base}_START_CUT${i}.png`);
+      remove.push(`${미리칸()}/START_CUT${i}.jpg`);
+    }
+    /* 스타트 프레임 목록은 이미 비워졌으므로 그쪽 샷리스트도 낡았다 */
+    remove.push(`${폴더칸()}/${base}_샷리스트_스타트프레임.png`);
+    const r=await window.CG.arrangeFiles(moves,remove);
+    if(!r||!r.ok) throw new Error((r&&r.error)||"파일 자리를 옮기지 못했습니다");
+
+    /* ④ 그림 파일이 바뀌었으니 화면이 옛 그림을 붙들지 않게 표를 하나 올린다 */
+    S.out.rev=(S.out.rev||0)+1;
+    S.out.maxFiles=shots.length;
+    shots.forEach(s=>{ s.url=fileURL(s.thumb||s.file)+`?r=${S.out.rev}`; });
+
+    /* ⑤ 샷리스트도 지금 목록으로 다시 만든다 (작은 그림으로 그리므로 빠르다) */
+    try{
+      const sheet=await makeSheet(shots);
+      const p=`${폴더칸()}/${base}_샷리스트_분석프레임.png`;
+      await window.CG.writeFile(p,new Uint8Array(await sheet.arrayBuffer()));
+      S.out.sheet=sheet; S.out.sheetPath=p;
+    }catch(e){ S.out.sheet=null; S.out.sheetPath=null; }
+
+    if(S.jobId!==myJob) return;                  // 그새 다른 기록으로 옮겨갔다
+    await persistCuts();
+    refreshShots();
+  }catch(err){
+    _dirty=true;                                  // 다음 기회에 다시 해본다
+    toast("저장 폴더 반영 실패: "+(err.message||"오류"));
+  }finally{ _syncing=false; paintEditBar(); }
+}
+
+/* ---------- 즐겨찾기 보관 ----------
+   ★ 즐겨찾기는 '그 그림 한 장을 보관함에 담아 두는 것' 이다.
+     예전에는 컷 목록에 표(fav)만 찍어 두었다. 그래서 컷을 병합하거나 초기화하면
+     목록과 함께 표도 사라져서, 담아둔 것이 없던 일이 됐다.
+   이제 담을 때 그림을 [즐겨찾기] 칸에 따로 복사해 두고 그 사본을 가리킨다.
+   컷을 어떻게 손보든(병합·분할·교체·초기화) 담아둔 것은 그대로 남는다.
+   빼는 길은 하트를 다시 누르거나 보관함에서 빼는 것뿐이다. */
+const 즐겨칸=()=>`${폴더칸()}/즐겨찾기`;
+/* 어느 장을 담았는지는 '그 장의 시각' 으로 알아본다 —
+   컷 번호는 손볼 때마다 바뀌지만 장의 시각은 바뀌지 않는다. */
+const keepKey=s=>String(Math.round(((s&&s.t)||0)*1000));
+const keptList=()=>(S.out&&S.out.keepShots)||[];
+function isKept(s){ return !!s && keptList().some(x=>x.k===keepKey(s)); }
+
+/* 화면의 하트만 다시 칠한다 (격자를 통째로 다시 그리면 스크롤이 튄다) */
+function paintFav(){
+  const shots=curShots();
+  [...grid.querySelectorAll("figure")].forEach(el=>{
+    const s=shots[+el.dataset.i], b=el.querySelector(".favMark");
+    if(!s||!b) return;
+    const on=isKept(s);
+    b.className="favMark"+(on?" on":""); b.textContent=on?"♥":"♡";
+  });
+}
+async function persistKeep(){
+  if(!S.jobId) return;
+  try{
+    const j=await jobGet(S.jobId); if(!j) return;
+    j.keepShots=keptList().map(stripShot);
+    j.keepMoved=true;
+    await jobPut(j);
+  }catch(e){ toast("즐겨찾기 저장 실패: "+(e.message||"저장소 오류")); }
+  try{ await renderHist(); }catch(e){}
+  try{ renderArchive(); }catch(e){}
+}
+async function keepAdd(s){
+  if(!s || isKept(s)) return false;
+  const ent={ k:keepKey(s), idx:s.idx, t:s.t, inT:s.inT, outT:s.outT, sT:s.sT,
+              base:s.base||(S.out&&S.out.base), fav:true, kept:true,
+              addedAt:new Date().toISOString() };
+  if(IS_EL){
+    if(!(S.out.outDir && s.file)){ toast("그림 파일을 찾지 못해 담지 못했습니다"); return false; }
+    const nm=`${S.out.base}_즐겨_${tcode(s.t)}`;
+    ent.file=`${즐겨칸()}/${nm}.png`;
+    ent.thumb=s.thumb? `${즐겨칸()}/${nm}.jpg` : null;
+    const 복사=[{from:s.file,to:ent.file}];
+    if(s.thumb) 복사.push({from:s.thumb,to:ent.thumb});
+    const r=await window.CG.arrangeFiles([],[],복사);
+    if(!r||!r.ok){ toast("즐겨찾기 사본을 만들지 못했습니다"); return false; }
+    ent.thumbOnly=true;
+    ent.url=fileURL(ent.thumb||ent.file);
+  }else{
+    ent.blob=s.blob; ent.url=s.url;
+  }
+  S.out.keepShots=[...keptList(), ent];
+  await persistKeep();
+  return true;
+}
+async function keepRemove(s){
+  const k=keepKey(s);
+  const 뺄것=keptList().filter(x=>x.k===k);
+  if(!뺄것.length) return false;
+  S.out.keepShots=keptList().filter(x=>x.k!==k);
+  if(IS_EL){
+    const rm=[];
+    뺄것.forEach(x=>{ if(x.file) rm.push(x.file); if(x.thumb) rm.push(x.thumb); });
+    if(rm.length) try{ await window.CG.arrangeFiles([],rm,[]); }catch(e){}
+  }
+  await persistKeep();
+  return true;
+}
+async function toggleKeep(i){
+  const s=curShots()[i]; if(!s) return;
+  const 담을까=!isKept(s);
+  const ok= 담을까 ? await keepAdd(s) : await keepRemove(s);
+  if(!ok) return;
+  paintFav();
+  toast(담을까 ? "즐겨찾기에 담았습니다 — 컷을 손봐도 그대로 남습니다"
+               : "즐겨찾기에서 뺐습니다");
+}
+/* 예전 기록을 열 때 한 번만 — 컷에 찍혀 있던 표를 보관함 방식으로 옮겨 담는다 */
+async function migrateFavs(j){
+  if(j.keepMoved) return;
+  const 옛=[];
+  (j.shots||[]).forEach(x=>{ if(x.fav) 옛.push(x); });
+  (j.startShots||[]).forEach(x=>{ if(x.fav) 옛.push(x); });
+  j.keepShots=j.keepShots||[];
+  j.keepMoved=true;
+  if(옛.length && IS_EL && j.outDir && j.base){
+    const 복사=[], 새것=[];
+    for(const x of 옛){
+      const t=x.t||0;
+      const k=String(Math.round(t*1000));
+      if(j.keepShots.some(y=>y.k===k)) continue;
+      const 칸=`${j.outDir}/${j.base}_CUTS/즐겨찾기`;
+      const f=Math.round((j.fps&&j.fps>1)?j.fps:24);
+      const n=Math.max(0,Math.floor(t*((j.fps&&j.fps>1)?j.fps:24)+1e-4));
+      const sec=Math.floor(n/f), ff=n%f, m=Math.floor(sec/60), ss=sec%60;
+      const nm=`${j.base}_즐겨_${String(m).padStart(2,"0")}m${String(ss).padStart(2,"0")}s${String(ff).padStart(2,"0")}f`;
+      const ent={k, idx:x.idx, t, inT:x.inT, outT:x.outT, sT:x.sT, base:x.base||j.base,
+                 fav:true, kept:true, thumbOnly:true,
+                 file:`${칸}/${nm}.png`, thumb:x.thumb? `${칸}/${nm}.jpg`:null,
+                 folders:x.folders||(x.folder?[x.folder]:undefined)};
+      if(x.file) 복사.push({from:x.file,to:ent.file});
+      if(x.thumb) 복사.push({from:x.thumb,to:ent.thumb});
+      새것.push(ent);
+    }
+    if(복사.length) try{ await window.CG.arrangeFiles([],[],복사); }catch(e){}
+    j.keepShots=j.keepShots.concat(새것);
+  }else if(옛.length && !IS_EL){
+    옛.forEach(x=>{
+      const k=String(Math.round((x.t||0)*1000));
+      if(j.keepShots.some(y=>y.k===k)) return;
+      j.keepShots.push({k, idx:x.idx, t:x.t, inT:x.inT, outT:x.outT, sT:x.sT,
+        base:x.base||j.base, fav:true, kept:true, blob:x.blob,
+        folders:x.folders||(x.folder?[x.folder]:undefined)});
+    });
+  }
+  (j.shots||[]).forEach(x=>{ x.fav=false; });
+  (j.startShots||[]).forEach(x=>{ x.fav=false; });
+  try{ await jobPut(j); }catch(e){}
+}
+
+/* ---------- ① 교체 ---------- */
+async function replaceHere(){
+  if(!await editReady(true)) return;
+  const shots=S.out.shots, t=pv.currentTime;
+  const sel=[...S.sel].sort((a,b)=>a-b);
+  const i=playingCut();
+  /* 여러 컷을 골라 두었다면 "이 구간을 한 컷으로" 라는 뜻으로 읽는다.
+     — 흔들리는 장면이 서너 컷으로 나뉘었을 때 가장 자주 하고 싶어 하는 일이다. */
+  if(sel.length>=2 && isRun(sel)){
+    const a=sel[0], b=sel[sel.length-1];
+    const 안쪽 = t>=cutStartOf(shots[a])-0.02
+              && (shots[b].outT==null || t<=shots[b].outT+0.02);
+    const opts=[{k:"merge",t:`${sel.length}개를 한 컷으로 병합하고 이 화면을 대표로`,
+        d:안쪽?`CUT${shots[a].idx}~CUT${shots[b].idx} 가 한 컷이 되고, 지금 화면(${tcs(t)})이 그 컷의 대표가 됩니다.`
+             :`지금 재생 위치(${tcs(t)})는 고른 구간 밖입니다. 그래도 이 화면을 대표로 씁니다.`}];
+    if(i>=0) opts.push({k:"one",t:`재생 중인 CUT${shots[i].idx} 하나만 교체`,
+        d:"골라둔 것은 그대로 두고, 재생 중인 컷의 대표 화면만 바꿉니다."});
+    opts.push({k:"cancel",t:"취소",d:"아무것도 하지 않습니다."});
+    const pick=await appChoice("고른 컷이 여러 개입니다",
+      `<b>CUT${shots[a].idx} ~ CUT${shots[b].idx}</b> ${sel.length}개를 골라 두셨습니다.<br>어떻게 할까요?`,
+      opts);
+    if(pick==="merge") return doMerge(sel,t);
+    if(pick!=="one") return;
+  }
+  if(i<0) return toast("재생 위치가 첫 컷보다 앞에 있습니다 — 컷 안으로 옮겨주세요");
+  if(!await warnStart()) return;
+  editBusy(true);
+  try{
+    keepOriginal();
+    await applyReplace(i,t);
+    await afterEdit(i);
+    toast(`CUT${S.out.shots[i].idx} 의 대표 화면을 지금 화면으로 바꿨습니다`);
+  }catch(err){ toast("교체 실패: "+(err.message||"오류")); }
+  finally{ editBusy(false); }
+}
+
+/* ---------- ② 병합 ---------- */
+async function doMerge(sel,repT){
+  if(!await warnStart()) return;
+  editBusy(true);
+  try{
+    const shots=S.out.shots, a=sel[0], b=sel[sel.length-1];
+    keepOriginal();
+    if(repT!=null) await applyReplace(a,repT);   // 실패하면 여기서 멈춘다 (목록은 그대로)
+    else shots[a].hand=true;
+    shots[a].outT = shots[b].outT!=null ? shots[b].outT : shots[a].outT;
+    shots.splice(a+1,b-a);
+    await afterEdit(a);
+    toast(`${sel.length}개 컷을 CUT${S.out.shots[a].idx} 하나로 병합했습니다`);
+  }catch(err){ toast("병합 실패: "+(err.message||"오류")); }
+  finally{ editBusy(false); }
+}
+async function mergeSelected(){
+  if(!await editReady(false)) return;
+  const sel=[...S.sel].sort((a,b)=>a-b);
+  if(sel.length<2)
+    return toast("병합할 컷을 2개 이상 골라주세요 — 첫 컷을 누르고 마지막 컷을 Shift+클릭");
+  if(!isRun(sel)) return toast("이어져 있는 컷만 병합할 수 있습니다");
+  const shots=S.out.shots, a=sel[0], b=sel[sel.length-1], t=pv.currentTime;
+  const 안쪽 = hasVideo() && pv.videoWidth
+            && t>=cutStartOf(shots[a])-0.02
+            && (shots[b].outT==null || t<=shots[b].outT+0.02);
+  const opts=[{k:"first",t:`CUT${shots[a].idx} 의 화면 그대로`,
+      d:"고른 것 중 첫 컷의 대표 화면을 그대로 씁니다."}];
+  if(안쪽) opts.push({k:"now",t:`지금 재생 중인 화면 (${tcs(t)})`,
+      d:"원하는 장면에 세워두고 고르면 그 화면이 대표가 됩니다."});
+  opts.push({k:"cancel",t:"취소",d:"아무것도 하지 않습니다."});
+  const pick=await appChoice("컷 병합",
+    `<b>CUT${shots[a].idx} ~ CUT${shots[b].idx}</b> ${sel.length}개를 한 컷으로 병합합니다.<br>`+
+    `합친 컷의 <b>대표 화면</b>을 무엇으로 할까요?`, opts);
+  if(pick!=="first" && pick!=="now") return;
+  await doMerge(sel, pick==="now"? t : null);
+}
+
+/* ---------- ③ 분할 ---------- */
+async function splitHere(){
+  if(!await editReady(true)) return;
+  const shots=S.out.shots, i=playingCut();
+  if(i<0) return toast("재생 위치가 첫 컷보다 앞에 있습니다");
+  const s=shots[i], t=snapT(pv.currentTime), fd=1/FPSNOW();
+  const 시작=cutStartOf(s), 끝=(s.outT!=null? s.outT : (pv.duration||t+fd));
+  if(t<=시작+fd*0.5 || t>=끝-fd*0.5)
+    return toast("컷 한가운데에서만 분할할 수 있습니다 — D·F 로 위치를 옮겨보세요");
+  if(!await warnStart()) return;
+  editBusy(true);
+  try{
+    keepOriginal();
+    const src=await newShotSource(t);
+    const 뒤={ idx:0, t, inT:t, sT:t, outT:s.outT, base:s.base,
+      hand:true, fav:false, dl:false,
+      ...(IS_EL ? {file:src.file, thumb:src.thumb, thumbOnly:true, url:src.url}
+                : {blob:src.blob, url:src.url}) };
+    /* 앞 컷의 대표 화면이 뒤 컷 쪽으로 넘어갔으면 앞 컷 것도 새로 잡아준다 */
+    if(s.t>=t) await applyReplace(i,(시작+t)/2);
+    s.outT=t;
+    shots.splice(i+1,0,뒤);
+    await afterEdit(i+1);
+    toast(`CUT${S.out.shots[i].idx} 를 두 컷으로 분할했습니다`);
+  }catch(err){ toast("분할 실패: "+(err.message||"오류")); }
+  finally{ editBusy(false); }
+}
+
+/* ---------- ④ 초기화 ---------- */
+async function resetCuts(){
+  if(!(S.out&&S.out.shots)) return toast("먼저 영상에서 컷을 뽑아주세요");
+  if(S.running) return toast("추출이 끝난 뒤에 되돌릴 수 있습니다");
+  if(_editing) return toast("앞의 작업을 끝내는 중입니다");
+  if(!(S.out.origShots&&S.out.origShots.length))
+    return toast("아직 손댄 것이 없습니다 — 처음 분석한 그대로입니다");
+  const 지금=S.out.shots.length, 처음=S.out.origShots.length;
+  const ok=await appConfirm(
+    "처음 분석한 컷 목록으로 되돌립니다.\n\n"+
+    `  지금  <b>${지금}컷</b>\n  처음  <b>${처음}컷</b>\n\n`+
+    "직접 병합·분할·교체한 것이 모두 사라집니다.\n"+
+    "저장 폴더의 컷 그림과 샷리스트도 함께 처음 상태로 다시 맞춰집니다.\n\n"+
+    "<b>즐겨찾기에 담아둔 것은 그대로 남습니다.</b>\n\n계속할까요?","초기화");
+  if(!ok) return;
+  editBusy(true);
+  try{
+    const 살릴것=new Set(S.out.origShots.map(o=>o.url));
+    for(const s of S.out.shots)
+      if(s.url && String(s.url).startsWith("blob:") && !살릴것.has(s.url))
+        URL.revokeObjectURL(s.url);
+    S.out.shots=S.out.origShots.map(s=>({...s}));
+    S.out.origShots=null;
+    renumber(S.out.shots);
+    dropDerived();
+    markDirty();
+    await persistCuts();
+    refreshShots();
+    toast(`처음 분석한 ${S.out.shots.length}컷으로 되돌렸습니다`);
+  }catch(err){ toast("되돌리기 실패: "+(err.message||"오류")); }
+  finally{ editBusy(false); }
+}
+
+/* ---------- ⑤ 현재 화면만 따로 저장 ----------
+   캡쳐된 컷 목록은 건드리지 않는다. 지금 보이는 한 장을 그냥 내려받는다. */
+async function grabStillNow(){
+  if(!hasVideo()) return toast("먼저 원본 영상을 불러와 주세요");
+  if(!pv.videoWidth) return toast("영상을 아직 읽는 중입니다 — 잠시 뒤에 다시 눌러주세요");
+  if(_editing) return toast("앞의 작업을 끝내는 중입니다");
+  const b=$("grabStill"); if(b) b.disabled=true;
+  const t=pv.currentTime;
+  try{
+    const blob=await stillBlobAt(t);
+    const base=(S.out&&S.out.base)||"화면";
+    download(blob,`${base}_${tcode(t)}.${OUT_EXT}`);
+    toast(`현재 화면을 저장했습니다 · ${tcs(t)}`);
+  }catch(err){ toast("저장 실패: "+(err.message||"오류")); }
+  finally{ if(b) b.disabled=false; }
+}
+
+/* ---------- 사용법 ---------- */
+function cutHelp(){
+  appAlert(
+    "흔들리거나 크게 움직이는 장면은 한 컷인데도 여러 컷으로 나뉘어 잡히곤 합니다.\n"+
+    "반대로 서서히 넘어가는 전환은 두 컷이 한 컷으로 붙어 잡히기도 합니다.\n"+
+    "그럴 때 여기서 직접 손볼 수 있습니다.\n\n"+
+    "<b>🖼 교체</b>   (R)\n"+
+    "  원하는 장면에 세워두고 누르면 그 컷의 대표 화면이 바뀝니다.\n"+
+    "  ◀▌ ▌▶ (D · F) 로 한 장씩 옮기며 고르면 정확합니다.\n"+
+    "  컷을 여러 개 골라둔 채로 누르면 '병합하면서 교체' 도 고를 수 있습니다.\n\n"+
+    "<b>⧉ 병합</b>   (M)\n"+
+    "  오른쪽 목록에서 이어진 컷 여러 개를 고르고 누르면 한 컷이 됩니다.\n"+
+    "  첫 컷을 누르고 마지막 컷을 Shift+클릭 하면 한 번에 골라집니다.\n"+
+    "  대표 화면은 '첫 컷 그대로' 와 '지금 재생 중인 화면' 중에 고릅니다.\n\n"+
+    "<b>✂ 분할</b>\n"+
+    "  재생 중인 컷을 지금 위치에서 두 컷으로 가릅니다.\n\n"+
+    "<b>↺ 초기화</b>\n"+
+    "  분석 직후의 컷 목록으로 한 번에 되돌립니다. 언제 눌러도 됩니다.\n\n"+
+    "<b>⬇ 현재 화면 저장</b>   (Ctrl+S)\n"+
+    "  지금 보고 있는 화면 한 장만 PNG 로 내려받습니다.\n"+
+    "  캡쳐된 컷 목록은 건드리지 않습니다.\n\n"+
+    "<b>재생바 눈금</b>\n"+
+    "  │ 세로줄 = 컷이 바뀌는 자리 (스타트 프레임 자리)\n"+
+    "  ● 점    = 지금 목록에 뽑혀 있는 분석 프레임 자리\n"+
+    "  Shift 를 누른 채 끌면 컷 시작에 자석처럼 붙습니다.\n\n"+
+    "<b>저장 폴더</b>\n"+
+    "  손보면 저장 폴더도 곧바로 따라옵니다 — CUT 번호가 다시 매겨지고,\n"+
+    "  없어진 컷의 그림은 지워지고, 샷리스트도 새로 만들어집니다.\n"+
+    "  손본 컷은 번호표에 ✎ 이 붙습니다.\n"+
+    "  [스타트 프레임] 목록은 컷 번호가 어긋나므로 비워집니다 —\n"+
+    "  필요할 때 누르면 새 컷 목록에 맞춰 다시 만듭니다.",
+    "컷 정리 사용법");
+}
+
+/* 단추 걸기 (on$ 는 아직 만들어지기 전이라 여기서 따로 쓴다) */
+{
+  const bind=(id,fn)=>{ const el=$(id); if(el) el.onclick=fn; };
+  bind("cutReplace",replaceHere);
+  bind("cutMerge",mergeSelected);
+  bind("cutSplit",splitHere);
+  bind("cutReset",resetCuts);
+  bind("cutHelp",cutHelp);
+  bind("grabStill",grabStillNow);
+  bind("gMerge",mergeSelected);
+}
+paintEditBar();
+
+/* 구간을 '영상 그대로' 잘라낸다.
+   ★ 연속 프레임 저장은 화질은 완벽하지만 소리가 없고 파일이 수백 장이 된다.
+     레퍼런스로 "이 구간" 을 통째로 남기고 싶을 때가 더 많아서 영상으로도 뽑는다.
+     해상도는 어느 쪽을 고르든 원본 그대로다. */
+/* 구간을 영상으로 뽑는다 — 프리미어에서 구간을 내보내는 것과 같은 자리다.
+   ★ 해상도와 초당 장수는 손대지 않는다. 잡은 구간도 딱 그만큼 나온다.
+     (왜 '다시 만들기' 인지는 main.js 의 clipRange 설명 참고 —
+      자르기만 하면 시작 자리가 열쇠장까지 앞으로 밀려 다른 구간이 나온다)
+   ★ e.currentTarget 은 await 를 한 번이라도 지나면 비어 버린다.
+     그래서 단추는 처음에 붙잡아 둔다 — 예전에 여기서 조용히 멈췄던 원인이다. */
+$("ioClip").onclick=async ()=>{
+  const btn=$("ioClip");
+  if(!IS_EL) return toast("앱에서만 쓸 수 있습니다");
+  if(!(S.out&&S.out.srcPath&&S.out.outDir))
+    return toast("원본 영상 파일이 있어야 구간을 뽑을 수 있습니다");
+  if(S.inT==null && S.outT==null)
+    return toast("먼저 구간을 잡아주세요 — I(인점) · O(아웃점)");
+  const a=S.inT??0, b=S.outT??(pv.duration||0), dur=b-a;
+  if(!(dur>0.05)) return toast("구간이 너무 짧습니다");
+  if(dur>600 && !await appConfirm(
+      `${(dur/60).toFixed(1)}분짜리 구간입니다. 몇 분 걸릴 수 있어요.\n\n계속할까요?`,"구간 영상 저장"))
+    return;
+  btn.disabled=true;
+  progWrap.style.display="block"; resetProg();
+  prog(1,"구간 영상 만드는 중...","");
+  try{
+    const r=await window.CG.clipRange(
+      /* 이름은 짧게 — 영상이름_구간_시작시각. 같은 자리를 또 뽑으면 뒤에 번호가 붙는다.
+         (예전에는 시작·끝 시각을 장 수까지 붙여 적어서 이름만 봐서는 알아보기 어려웠다) */
+      {src:S.out.srcPath, destNoExt:`${폴더칸()}/구간 영상/${S.out.base}_구간_${짧은시각(a)}`,
+       start:a, dur, jobId:"c"+Date.now()},
+      m=>{ if(typeof m.percent==="number")
+             prog(m.percent,`구간 영상 만드는 중...  ${m.percent.toFixed(0)}%`,""); });
+    if(!r||!r.ok) throw new Error((r&&r.error)||"만들지 못했습니다");
+    const 이름=String(r.path).split("/").pop();
+    const 자리=String(r.path).slice(0,String(r.path).length-이름.length-1).replace(/\//g,"\\");
+    toast(`구간 영상 저장 · ${((r.size||0)/1048576).toFixed(1)} MB`);
+    await appAlert(
+      `<b>${이름}</b>\n\n`+
+      `구간     ${tcs(a)} ~ ${tcs(b)}   (${dur.toFixed(2)}초)\n`+
+      `크기     ${((r.size||0)/1048576).toFixed(1)} MB\n`+
+      `화질     ${r.kind==="prores"?"ProRes 422 HQ (편집용)":"H.264 아주 높은 화질"}\n`+
+      `그대로   해상도 · 초당 장수 · 소리\n\n`+
+      `<b>저장한 곳</b>\n${자리}`,
+      "구간 영상 저장 완료");
+  }catch(err){
+    await appAlert("구간 영상을 만들지 못했습니다.\n\n"+(err.message||"오류"),
+      "구간 영상 저장");
+  }
   finally{ progWrap.style.display="none"; btn.disabled=false; }
 };
 
@@ -4207,6 +4998,7 @@ function openShots(i,list){
 const openShotsHere=(i,list)=>{ LB.jobId=null; openShots(i,list); };
 async function openSheet(){
   LB.mode="sheet"; LB.jobId=null;
+  await flushFolder();                 // 손본 것이 샷리스트에도 들어가게 한다
   const sheet=await currentSheet();
   if(!sheet) return;
   if(LB.sheetUrl) URL.revokeObjectURL(LB.sheetUrl);
@@ -4505,6 +5297,8 @@ function releaseOut(){
   const drop=u=>{ if(u && u.startsWith("blob:")) URL.revokeObjectURL(u); };
   for(const s of (S.out.shots||[]))      drop(s.url);
   for(const s of (S.out.startShots||[])) drop(s.url);
+  for(const s of (S.out.origShots||[]))  drop(s.url);
+  for(const s of (S.out.keepShots||[]))  drop(s.url);
   S.out=null;
 }
 /* 프로젝트마다 따로 가져가야 하는 화면 상태를 초기값으로 되돌린다.
@@ -4525,20 +5319,28 @@ function resetViewState(){
 let _loadToken=0;
 async function loadJob(id){
   if(S.jobId===id && S.out) return;            // 같은 프로젝트 재클릭은 무시
+  try{ await flushFolder(); }catch(e){}        // 손본 것을 폴더에 마저 반영하고 넘어간다
   const my=++_loadToken;
   const j=await jobGet(id);
   if(!j || my!==_loadToken) return;
+  await migrateFavs(j);        // 예전 기록의 즐겨찾기를 보관함 방식으로 한 번만 옮긴다
   releaseOut(); resetViewState(); detachVideo();
   S.jobId=id; S.fps=j.fps||24; S.curShot=-1;
   S.meta={name:j.name,duration:j.duration,size:j.size,fps:j.fps||24,
           fpsSrc:j.fpsSrc||null, w:j.w,h:j.h,type:j.type};
+  const v = j.rev ? `?r=${j.rev}` : "";
   const mk = x => IS_EL
-    ? {...x, base:x.base||j.base, url:x.url||fileURL(x.thumb||x.file), thumbOnly:true}
+    ? {...x, base:x.base||j.base, url:fileURL(x.thumb||x.file)+v, thumbOnly:true}
     : {...x, base:x.base||j.base, url:URL.createObjectURL(x.blob)};
   S.out={base:j.base, sheet:j.sheet, startSheet:j.startSheet||null, handle:j.handle||null,
     srcPath:j.srcPath||null, outDir:j.outDir||null, sheetPath:j.sheetPath||null,
     startSheetPath:j.startSheetPath||null,
     shots:j.shots.map(mk),
+    origShots: (j.origShots && j.origShots.length) ? j.origShots.map(mk) : null,
+    rev: j.rev||0, maxFiles: j.maxFiles||j.shots.length,
+    keepShots: (j.keepShots||[]).map(x=>IS_EL
+      ? {...x, url:fileURL(x.thumb||x.file), thumbOnly:true}
+      : {...x, url:x.blob?URL.createObjectURL(x.blob):x.url}),
     startVer: j.startVer||0,
     startShots: (j.startShots && j.startVer===3) ? j.startShots.map(mk) : null};
   resTitle.textContent=`✓ ${j.name} — ${j.shots.length}장 · ${fmtDate(j.createdAt)} 추출`;
@@ -4572,7 +5374,11 @@ function favURL(x){
 function favShotsOf(job){
   const mk=(arr,mode)=>(arr||[]).map((x,idx)=>x.fav?{...x,job,mode,kind:"shot",
     key:job.id+"|"+mode+"|"+idx}:null).filter(Boolean);
-  return mk(job.shots,"smart").concat(mk(job.startShots,"start"));
+  /* keep = 따로 담아 둔 사본 (컷 목록과 상관없이 남는다)
+     smart·start = 예전 방식으로 컷에 표만 찍어둔 것 (옛 기록 호환) */
+  return mk(job.keepShots,"keep")
+    .concat(mk(job.shots,"smart"))
+    .concat(mk(job.startShots,"start"));
 }
 const allFavShots=()=>HIST.flatMap(favShotsOf);
 const allFavVids=()=>HIST.filter(j=>j.fav).map(j=>({job:j,kind:"video",key:"V|"+j.id}));
@@ -4735,7 +5541,7 @@ on$("arcNewFolder","onclick",async()=>{
 function bodyIn(j,x){
   if(x.kind==="video") return j;
   const [,mode,idx]=x.key.split("|");
-  const arr=mode==="start"?j.startShots:j.shots;
+  const arr=mode==="keep"?j.keepShots : mode==="start"?j.startShots : j.shots;
   return (arr&&arr[+idx])||null;
 }
 /* 폴더 목록을 정해진 대로 바꿔 저장한다 (folder 도 함께 맞춰 둔다) */
@@ -4772,15 +5578,31 @@ async function setFav(list,v){
   list.forEach(x=>{ (byJob[x.job.id]=byJob[x.job.id]||[]).push(x); });
   for(const jid of Object.keys(byJob)){
     const j=await jobGet(jid); if(!j) continue;
+    const 뺄자리=[];
     byJob[jid].forEach(x=>{
-      if(x.kind==="video") j.fav=v;
-      else{ const [,mode,idx]=x.key.split("|");
-        const arr=mode==="start"?j.startShots:j.shots;
-        if(arr&&arr[+idx]) arr[+idx].fav=v; }
+      if(x.kind==="video"){ j.fav=v; return; }
+      const [,mode,idx]=x.key.split("|");
+      /* 따로 담아 둔 사본은 '표를 내리는' 것이 아니라 목록에서 빼는 것이다 */
+      if(mode==="keep"){ if(!v) 뺄자리.push(+idx); return; }
+      const arr=mode==="start"?j.startShots:j.shots;
+      if(arr&&arr[+idx]) arr[+idx].fav=v;
     });
+    if(뺄자리.length){
+      const rm=[];
+      뺄자리.sort((a,b)=>b-a).forEach(i=>{
+        const e=(j.keepShots||[])[i]; if(!e) return;
+        if(IS_EL){ if(e.file) rm.push(e.file); if(e.thumb) rm.push(e.thumb); }
+        j.keepShots.splice(i,1);
+      });
+      if(IS_EL && rm.length) try{ await window.CG.arrangeFiles([],rm,[]); }catch(e){}
+      if(S.jobId===jid && S.out)
+        S.out.keepShots=(j.keepShots||[]).map(x=>({...x,
+          url: IS_EL ? fileURL(x.thumb||x.file) : x.url}));
+    }
     await jobPut(j);
   }
   await renderHist();
+  if(S.out) paintFav();
 }
 
 /* ---------- 보관함 본문 ---------- */
@@ -5094,6 +5916,21 @@ document.addEventListener("keydown",e=>{
     e.preventDefault(); document.exitFullscreen().catch(()=>{}); return; }
   if((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key.toLowerCase()==="x"){
     e.preventDefault(); clearIO(); toast("구간 해제"); return; }
+  /* ---------- 컷 정리 단축키 ----------
+     글자를 입력하는 중에는 손대지 않는다 (영상 주소 칸에 'r' 을 못 적으면 곤란하다) */
+  {
+    const ae=document.activeElement;
+    const 입력중 = ae && (ae.tagName==="INPUT"||ae.tagName==="TEXTAREA"||ae.isContentEditable);
+    const kk=String(e.key||"").toLowerCase();
+    if(!입력중 && !e.altKey){
+      if((e.ctrlKey||e.metaKey) && !e.shiftKey && kk==="s"){
+        e.preventDefault(); grabStillNow(); return; }
+      if(!e.ctrlKey && !e.metaKey && !e.shiftKey){
+        if(kk==="m"){ e.preventDefault(); mergeSelected(); return; }
+        if(kk==="r"){ e.preventDefault(); replaceHere(); return; }
+      }
+    }
+  }
   if(!hasVideo()) return;
   const k=e.key.toLowerCase();
   if(e.key===" "||e.code==="Space"){

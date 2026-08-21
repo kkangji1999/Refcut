@@ -77,6 +77,24 @@ contextBridge.exposeInMainWorld("CG", {
   grabPNGs: (filePath, times, outDir, prefix) =>
     ipcRenderer.invoke("grabPNGs", { filePath, times, outDir, prefix }),
 
+  /* 컷을 손보고 나서 저장 폴더의 CUT 번호를 목록과 다시 맞춘다.
+     그림을 새로 뽑지 않고 이름만 바꾸므로 컷이 많아도 순식간이다. */
+  arrangeFiles: (moves, remove, copy) =>
+    ipcRenderer.invoke("arrangeFiles",
+      { moves: moves || [], remove: remove || [], copy: copy || [] }),
+
+  /* 구간을 딱 그만큼 영상으로 뽑기 (해상도·초당 장수는 원본 그대로) */
+  clipRange: (o, onProgress) => {
+    const h = (_e, m) => { if (m.jobId === o.jobId) onProgress && onProgress(m); };
+    ipcRenderer.on("clipProgress", h);
+    return ipcRenderer.invoke("clipRange", o)
+      .finally(() => ipcRenderer.removeListener("clipProgress", h));
+  },
+  clipCancel: (jobId) => ipcRenderer.invoke("clipCancel", jobId),
+
+  /* 정보창에서만 쓰는 자세한 속내용 (코덱·프로파일·색 형식·소리) */
+  probeFull: (filePath) => ipcRenderer.invoke("probeFull", filePath),
+
   /* 파일 · 폴더 */
   pickVideos: () => ipcRenderer.invoke("pickVideos"),
   pickFolder: () => ipcRenderer.invoke("pickFolder"),
