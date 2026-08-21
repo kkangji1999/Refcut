@@ -17,7 +17,54 @@ const { app, BrowserWindow, ipcMain, dialog, shell, net,
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
-const { spawn, execFile } = require("child_process");
+const { spawn: 원래spawn, spawnSync, execFile } = require("child_process");
+
+/* =========================================================================
+   띄운 자식 프로그램은 꺼질 때 데리고 나간다
+   -------------------------------------------------------------------------
+   ★ 왜 필요한가 — 동료 컴퓨터에서 설치가 통째로 실패하던 진짜 이유다.
+
+     ffmpeg 는 설치 폴더 안(resourcesinfmpeg.exe)에서 돌아간다.
+     그런데 앱이 꺼져도 그것들은 그대로 살아남았다 — 끌 때 아무도 죽이지
+     않았기 때문이다. 윈도우는 '돌고 있는 프로그램의 파일' 을 지우지 못하므로,
+     설치 프로그램이 옛 버전 폴더를 지우려다 실패한다:
+         Reftown cannot be closed. please close it manually and click retry
+         Failed to uninstall old application files ... :2
+     그러면 옛 버전은 지워지고 새 버전은 안 들어와, 아예 켜지지 않는다.
+
+     백신(V3) 깔린 컴퓨터에서만 유난히 잘 났다. 실시간 검사가 그 파일들을
+     붙잡고 있는 시간이 겹쳐, 살아남은 자식이 잡히는 창이 훨씬 넓어진다.
+
+   그래서 띄운 것을 하나도 빠짐없이 적어두고, 꺼질 때 모두 데리고 나간다.
+   ========================================================================= */
+const 자식들 = new Set();
+function spawn(...args) {
+  const c = 원래spawn(...args);
+  자식들.add(c);
+  const 지우기 = () => 자식들.delete(c);
+  c.on("close", 지우기);
+  c.on("error", 지우기);
+  return c;
+}
+/* ★ 반드시 동기로 끝낸다. 꺼지는 길목에서 부르는 것이라,
+     비동기로 맡기면 앱이 먼저 사라져 아무도 죽이지 못한다. */
+function 자식모두정리() {
+  for (const c of 자식들) {
+    /* ★ 윈도우의 kill 은 손자까지 못 잡는다.
+       yt-dlp 는 소리와 영상을 합치려고 ffmpeg 를 따로 띄운다 —
+       그 손자가 설치 폴더의 ffmpeg.exe 를 붙잡고 남으면 헛일이다.
+       taskkill /T 로 딸린 것까지 한 번에 정리한다. */
+    if (process.platform === "win32" && c.pid) {
+      try { spawnSync("taskkill", ["/pid", String(c.pid), "/f", "/t"],
+                      { windowsHide: true, stdio: "ignore" }); } catch (e) {}
+    }
+    try { c.kill("SIGKILL"); } catch (e) {}
+  }
+  자식들.clear();
+}
+app.on("before-quit", 자식모두정리);
+app.on("will-quit", 자식모두정리);
+process.on("exit", 자식모두정리);
 
 const isDev = !app.isPackaged;
 
@@ -912,6 +959,9 @@ ipcMain.handle("downloadUpdate", async () => {
 
 /* 다시 켜면서 갈아끼우기 */
 ipcMain.handle("installUpdate", () => {
+  /* ★ 여기가 제일 중요한 자리다 — 지금부터 설치 프로그램이 옛 폴더를 지운다.
+     띄워둔 ffmpeg 가 하나라도 살아 있으면 그 폴더를 못 지우고 설치가 깨진다. */
+  자식모두정리();
   setImmediate(() => autoUpdater.quitAndInstall(false, true));
   return { ok: true };
 });
@@ -1007,10 +1057,15 @@ async function ensureYtdlp(send) {
        백신이 '인터넷에서 exe 를 받아 실행한다' 고 오해할 일도 사라진다. */
     if (동봉본심기("yt-dlp", exe)) {
       도구확인(exe, YT_최소, "영상 받기 도구");
-      /* 동봉본은 설치 파일을 만들던 날의 것이다. 유튜브는 구조를 자주 바꾸므로
-         바로 아래 '하루 한 번 갱신' 으로 넘겨 최신으로 맞춘다. */
-      writeSettings({ ...readSettings(), ytUpdated: 0 });
-      if (send) send({ stage: "setup", text: "영상 받기 도구를 최신으로 맞추는 중... (처음 한 번만)" });
+      /* ★ 심자마자 갱신하지 않는다.
+         예전에는 ytUpdated 를 0 으로 두어 바로 아래 '하루 한 번 갱신' 이
+         그 자리에서 걸리게 했다. 그런데 yt-dlp -U 는 깃허브에서 새 exe 를
+         받아 자기 자신을 덮어쓴다 — 동봉해서 없애려던 바로 그 행동
+         ('정체 모를 프로그램이 인터넷에서 exe 를 받아 갈아끼운다')이
+         설치 직후 첫 링크에서 되살아나, 백신이 그 자리에서 경고를 띄웠다.
+         동봉본은 설치 파일을 만들던 날 받아둔 것이라 이미 최신에 가깝다.
+         하루 뒤 조용한 갱신에 맡긴다. */
+      writeSettings({ ...readSettings(), ytUpdated: Date.now() });
     } else {
       /* ② 동봉본이 없거나 백신이 설치 폴더에서 지웠다면 예전처럼 받아온다 */
       if (send) send({ stage: "setup", text: "영상 받기 도구를 준비하는 중... (처음 한 번만)" });
