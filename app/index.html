@@ -91,7 +91,21 @@
   .afold.on{border-color:var(--accent); background:#2a2716}
   .afold.drop{border-color:#f871a0; background:#2b1a24;
     box-shadow:0 0 0 2px rgba(248,113,160,.35)}
-  .afold .ic{font-size:15px}
+  .afold .ic{font-size:15px; line-height:1; border-radius:6px; padding:2px}
+  .afold .ic.pick{cursor:pointer; border:1px dashed transparent}
+  .afold .ic.pick:hover{border-color:#5c6478}
+  /* 폴더 그림표 고르기 */
+  #icPick{position:fixed; z-index:490; display:none; padding:9px; gap:3px;
+    grid-template-columns:repeat(8,1fr);
+    background:var(--panel); border:1px solid var(--border); border-radius:12px;
+    box-shadow:0 16px 38px rgba(0,0,0,.55)}
+  #icPick.on{display:grid}
+  #icPick .icHead{grid-column:1/-1; font-size:11px; color:var(--muted); margin:0 2px 3px}
+  #icPick b{cursor:pointer; font-size:17px; line-height:1; width:31px; height:31px;
+    display:flex; align-items:center; justify-content:center; border-radius:8px;
+    border:1px solid transparent}
+  #icPick b:hover{background:var(--panel2); border-color:#4a5262}
+  #icPick b.on{border-color:var(--accent); background:#2a2716}
   .afold .cnt{background:var(--panel2); border-radius:99px; padding:1px 8px;
     font-size:10.5px; color:var(--muted)}
   .afold.on .cnt{background:#3d3718; color:var(--accent)}
@@ -405,10 +419,27 @@
   #noVid{position:absolute; inset:0; display:flex; flex-direction:column;
     align-items:center; justify-content:center; gap:11px; color:var(--muted);
     font-size:13px; text-align:center; padding:20px}
-  #pinfoBox{position:absolute; left:11px; top:11px; background:rgba(0,0,0,.85);
-    font-size:12px; line-height:1.9; padding:12px 15px; border-radius:8px;
-    display:none; white-space:pre; font-variant-numeric:tabular-nums}
-  #pinfoBox.on{display:block}
+  /* Tab 정보창.
+     ★ 예전에는 글자 사이에 공백을 손으로 넣어 줄을 맞췄다. 그런데 '해상도'
+       처럼 글자 수가 다른 이름이 섞이면 값이 제각각인 자리에서 시작해
+       읽기가 나빴다. 이제 이름칸·값칸 두 줄기로 세워 저절로 맞춘다.
+     ★ 배경도 새까맣던 것을 옅게 하고 뒤를 흐리게만 한다 — 글자는 그대로
+       읽히면서 가려지던 화면이 비쳐 보인다. */
+  #pinfoBox{position:absolute; left:11px; top:11px;
+    background:rgba(13,16,21,.55); backdrop-filter:blur(14px) saturate(1.25);
+    -webkit-backdrop-filter:blur(14px) saturate(1.25);
+    border:1px solid rgba(255,255,255,.09);
+    box-shadow:0 10px 30px rgba(0,0,0,.35);
+    font-size:12px; line-height:1.75; padding:12px 15px; border-radius:9px;
+    display:none; max-width:calc(100% - 22px); color:#e8ebf1;
+    font-variant-numeric:tabular-nums}
+  #pinfoBox.on{display:grid; grid-template-columns:auto minmax(0,1fr);
+    column-gap:18px; row-gap:1px}
+  #pinfoBox .k{color:#98a0b2; white-space:nowrap}
+  #pinfoBox .v{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  #pinfoBox .v i{color:#98a0b2; font-style:normal; margin-left:7px}
+  #pinfoBox .sep{grid-column:1/-1; height:10px; margin:3px 0 0;
+    border-top:1px solid rgba(255,255,255,.08)}
   /* 재생 칸이 왜 비어 있는지 한 줄로 알려주는 자리 */
   #pvNote{position:absolute; left:0; right:0; bottom:0; display:none;
     background:rgba(0,0,0,.82); color:#c9d0de; font-size:12.5px;
@@ -928,7 +959,7 @@
     <!-- 추출 전에 미리 알아두면 좋은 것들 -->
     <div class="preNote">
       <span>컷은 <b>원본 해상도 PNG</b>로 저장됩니다</span>
-      <span id="speedNote">분석에는 <b>영상 길이만큼</b> 시간이 걸립니다</span>
+      <span id="speedNote"><b>영상 길이의 1/3</b>정도 분석 시간 소요</span>
       <span>기록을 지워도 <b>즐겨찾기한 컷은 남습니다</b></span>
     </div>
 
@@ -1113,6 +1144,7 @@
       <div id="arcFolders"></div>
       <button class="mini" id="arcNewFolder">＋ 새 폴더</button>
       <div class="arcTip">폴더 이름을 <b>더블클릭</b>하면 바꿀 수 있어요.<br>
+        앞의 <b>그림을 누르면</b> 다른 그림으로 바꿉니다.<br>
         항목을 폴더 위로 <b>끌어다 놓으면</b> 옮겨집니다.</div>
     </div>
     <div class="arcMain">
@@ -1719,8 +1751,8 @@ function download(blob,name){
    같은 날 두 번째로 내보내면 26.8.1602 로 올린다.
    업데이트 확인은 마디마다 숫자로 비교하므로(verNum) 자리수가 달라도 안전하다. */
 /* 앱으로 켰으면 설치된 진짜 버전을 그대로 쓴다 (여기 숫자는 웹으로 열 때의 몫) */
-const APP_VERSION = (window.CG && window.CG.version) || "26.8.2511";
-const APP_DATE    = "2026.08.21";
+const APP_VERSION = (window.CG && window.CG.version) || "26.8.2513";
+const APP_DATE    = "2026.08.28";
 /* 최신 index.html 이 올라가 있는 주소.
    여기에 넣어두면 [업데이트] 버튼이 새 버전을 확인합니다.
    설치 폴더의 update_url.txt 에 같은 주소를 적어두면
@@ -1729,7 +1761,7 @@ const APP_URL     = "";
 /* ▲▲▲ 여기까지 ▲▲▲ */
 
 const S = { queue:[], out:null, jobId:null, running:false,
-            playFile:null, fps:24, meta:null, curShot:-1, mode:"smart", focusArea:"video", side:"hist", favTab:"all", inT:null, outT:null, keepView:false, sel:new Set(), anchor:null, favAnchor:null, favSel:new Set(), folder:"all" };
+            playFile:null, playSrc:null, fps:24, meta:null, curShot:-1, mode:"smart", focusArea:"video", side:"hist", favTab:"all", inT:null, outT:null, keepView:false, sel:new Set(), anchor:null, favAnchor:null, favSel:new Set(), folder:"all" };
 const LB = { list:[], idx:0, mode:"shots", sheetUrl:null };
 let HIST=[], MARKS=[];
 const DUPC=["#fbbf24","#60a5fa","#f472b6","#4ade80","#a78bfa","#fb923c"];
@@ -3261,6 +3293,11 @@ function showResultEl(item){
 function attachVideoPath(p,name){
   if(_pvUrl && _pvUrl!=="file"){ URL.revokeObjectURL(_pvUrl); }
   _pvUrl="file";
+  /* ★ 지금 화면에 붙은 영상이 어느 파일인지 여기서 적어둔다.
+     예전에는 추출이 끝날 때 S.playFile 에만 적고, 기록을 열 때는 아무도
+     고쳐 쓰지 않았다. 그래서 4번째 기록을 열어도 [⬇ 영상] 은 2번째 기록의
+     영상을 내주었다 — 화면과 단추가 서로 다른 영상을 보고 있었다. */
+  S.playSrc=p; S.playFile=null;
   $("noVid").style.display="none"; pv.style.display="block";
   $("vName").textContent=name||p;
   /* ★ 추출은 ffmpeg 가 하므로 ProRes·DNxHD·AVI·WMV·MPEG-TS 도 잘 된다.
@@ -3643,7 +3680,7 @@ let _pvUrl=null;
 function attachVideo(file){
   if(_pvUrl) URL.revokeObjectURL(_pvUrl);
   _pvUrl=URL.createObjectURL(file);
-  S.playFile=file;
+  S.playFile=file; S.playSrc=null;
   $("noVid").style.display="none"; pv.style.display="block";
   $("vName").textContent=file.name;
   const 못그림="이 형식은 여기서 재생되지 않습니다 — 캡쳐는 정상입니다";
@@ -3656,6 +3693,7 @@ function attachVideo(file){
 }
 function detachVideo(){
   pv.onerror=null; pv.onloadedmetadata=null; 재생메모(null); _prevTried=null;
+  S.playFile=null; S.playSrc=null;          // 끊긴 영상이 다음 기록까지 따라오지 않게
   if(_prevJob){ try{ window.CG.cancelPreview(_prevJob); }catch(e){} _prevJob=null; }
   pv.pause(); pv.removeAttribute("src"); pv.load();
   if(_pvUrl && _pvUrl!=="file"){ URL.revokeObjectURL(_pvUrl); }
@@ -3675,10 +3713,36 @@ $("attachBtn").onclick=async()=>{
 };
 $("reattach").onchange=e=>{ const f=e.target.files[0]; if(f) attachVideo(f); e.target.value=""; };
 
-$("saveVid").onclick=()=>{
+/* [⬇ 영상] — 지금 화면에 붙어 있는 그 영상을 내준다.
+   ★ 앱(Electron)에서는 '내려받지' 않고 탐색기에서 그 파일을 짚어 준다.
+     원본은 이미 디스크에 있다. 한 벌 더 받으면 같은 영상이 두 개가 되고
+     (용량 두 배) 큰 파일은 다 옮길 때까지 기다려야 한다. 짚어 주기는
+     복사가 없어서 즉시 끝나고, 거기서 바로 열어 보거나 어디로든 끌어갈 수 있다.
+     파일이 그 자리에 없으면(옮겼거나 지웠으면) 그 기록의 폴더라도 열어준다. */
+$("saveVid").onclick=async()=>{
+  if(IS_EL){
+    const p=S.playSrc || (S.out&&S.out.srcPath) || null;
+    if(p){
+      const r=await window.CG.revealFile(p.replace(/\//g,"\\"));
+      if(r&&r.ok) return toast("탐색기에서 원본 영상을 짚었습니다");
+    }
+    const j=HIST.find(x=>x.id===S.jobId);
+    const dir=j?jobFolder(j):"";
+    if(dir){
+      const r=await window.CG.revealFolder(dir.replace(/\//g,"\\"));
+      if(r&&r.ok) return toast("원본 영상이 제자리에 없어 기록 폴더를 열었습니다");
+    }
+    return toast("원본 영상 파일을 찾지 못했습니다");
+  }
   if(!S.playFile) return toast("연결된 원본 영상이 없습니다");
   download(S.playFile,S.playFile.name); toast("원본 영상을 저장합니다");
 };
+if(IS_EL){
+  const sv=$("saveVid");
+  if(sv){ sv.textContent="📂 영상 위치";
+    sv.title="지금 보고 있는 원본 영상을 탐색기에서 짚어 줍니다"
+            +" (복사하지 않으므로 즉시 열리고 공간도 더 쓰지 않습니다)"; }
+}
 $("dropVid").onclick=async()=>{
   if(!S.jobId) return;
   if(!await appConfirm("원본 영상 연결만 해제합니다.\n캡쳐된 컷과 샷리스트는 그대로 남습니다. 계속할까요?")) return;
@@ -3942,6 +4006,23 @@ $("modeSw").onclick=async e=>{
    전체 재분석이 아니라 컷 수만큼만 이동하면 되므로 몇 초면 끝난다. */
 /* 같은 파일을 두 번 읽지 않는다 (ffprobe 를 부르는 값이라 한 번이면 충분하다) */
 const _codecMemo=new Map();
+/* 이름·값·(곁들임말) 세 조각을 받아 두 줄기로 세워 그린다.
+   이름칸 너비가 저절로 맞으므로 줄이 제각각으로 어긋나지 않는다. */
+function paintInfo(box, 앞, 뒤){
+  box.innerHTML="";
+  const add=rows=>rows.forEach(([k,v,note])=>{
+    const kd=document.createElement("div"); kd.className="k"; kd.textContent=k;
+    const vd=document.createElement("div"); vd.className="v"; vd.textContent=v;
+    if(note){ const i=document.createElement("i"); i.textContent=note; vd.appendChild(i); }
+    vd.title=v+(note?"  "+note:"");        // 길어서 잘렸을 때 올려보면 다 보이게
+    box.append(kd,vd);
+  });
+  add(앞);
+  if(뒤 && 뒤.length){
+    box.appendChild(Object.assign(document.createElement("div"),{className:"sep"}));
+    add(뒤);
+  }
+}
 async function toggleInfo(){
   const b=$("pinfoBox"), m=S.meta||{};
   if(b.classList.contains("on")){ b.classList.remove("on"); return; }
@@ -3949,54 +4030,56 @@ async function toggleInfo(){
   const dur=pv.duration||m.duration||0;
   const br=(m.size&&dur)?(m.size*8/dur/1e6):0;
   const g=w&&h?gcd(w,h):1;
-  const 기본=
-    `파일       ${m.name||"-"}\n`+
-    `형식       ${m.type||"-"}\n`+
-    `해상도     ${w}×${h}   (${w&&h?`${w/g}:${h/g}`:"-"})\n`+
-    `길이       ${clock(dur)}\n`+
-    `프레임     ${fmtFps(m.fps||S.fps)} fps${m.fpsSrc?`   (${m.fpsSrc})`:""}\n`+
-    `용량       ${((m.size||0)/1048576).toFixed(1)} MB\n`+
-    `비트레이트 ${br?br.toFixed(2)+" Mbps":"-"}\n`+
-    `캡쳐       ${MARKS.length}컷\n`+
-    `현재       ${clock(pv.currentTime)}  (${Math.round(pv.currentTime*(m.fps||S.fps))}프레임)`;
-  b.textContent=기본+"\n\n코덱       읽는 중...";
+  const 기본=[
+    ["파일",       m.name||"-"],
+    ["형식",       m.type||"-"],
+    ["해상도",     w&&h?`${w}×${h}`:"-", w&&h?`${w/g}:${h/g}`:""],
+    ["길이",       clock(dur)],
+    ["프레임",     `${fmtFps(m.fps||S.fps)} fps`, m.fpsSrc||""],
+    ["용량",       `${((m.size||0)/1048576).toFixed(1)} MB`],
+    ["비트레이트", br?br.toFixed(2)+" Mbps":"-"],
+    ["캡쳐",       `${MARKS.length}컷`],
+    ["현재",       clock(pv.currentTime),
+                   `${Math.round(pv.currentTime*(m.fps||S.fps))}프레임`],
+  ];
+  paintInfo(b, 기본, [["코덱","읽는 중..."]]);
   b.classList.add("on");
-  const 속=await codecLines();
+  const 속=await codecRows();
   if(!b.classList.contains("on")) return;        // 그새 닫았으면 그대로 둔다
-  b.textContent=기본+"\n\n"+(속||"코덱       원본 영상이 없어 읽지 못했습니다");
+  paintInfo(b, 기본, 속.length?속:[["코덱","원본 영상이 없어 읽지 못했습니다"]]);
 }
-/* 그릇·코덱·색 형식·소리 — ffprobe 가 알려주는 것을 사람이 읽는 말로 옮긴다 */
-async function codecLines(){
-  const p=S.out&&S.out.srcPath;
-  if(!IS_EL||!p) return "";
+/* 그릇·코덱·색 형식·소리 — ffprobe 가 알려주는 것을 사람이 읽는 말로 옮긴다.
+   [이름, 값, 곁들임말] 꼴로 돌려주므로 위 정보와 같은 줄기에 맞춰 선다. */
+async function codecRows(){
+  const p=S.playSrc||(S.out&&S.out.srcPath);
+  if(!IS_EL||!p) return [];
   if(_codecMemo.has(p)) return _codecMemo.get(p);
   let r=null;
   try{ r=await window.CG.probeFull(p); }catch(e){}
-  if(!r||!r.ok||!r.video) return "";
+  if(!r||!r.ok||!r.video) return [];
   const v=r.video, a=r.audio, f=r.format||{};
   const 속도=n=>{ n=+n; if(!n||!isFinite(n)) return "";
     return n>=1e6 ? (n/1e6).toFixed(2)+" Mbps" : Math.round(n/1000)+" kbps"; };
   const 색=[v.pix_fmt||"", v.bits_per_raw_sample?`${v.bits_per_raw_sample}bit`:""]
     .filter(Boolean).join(" · ");
-  const 코덱=`${v.codec_name||"-"}`
-    +(v.profile?`  (${v.profile}${(+v.level>0)?` L${(v.level/10).toFixed(1)}`:""})`:"");
+  const 프로파일=v.profile
+    ? `${v.profile}${(+v.level>0)?` L${(v.level/10).toFixed(1)}`:""}` : "";
   const 줄=[
-    `그릇       ${f.format_long_name||f.format_name||"-"}`,
-    `영상 코덱  ${코덱}`,
-    `색 형식    ${색||"-"}`,
+    ["그릇",      f.format_long_name||f.format_name||"-"],
+    ["영상 코덱", v.codec_name||"-", 프로파일],
+    ["색 형식",   색||"-"],
   ];
   if(v.field_order && v.field_order!=="progressive")
-    줄.push(`주사 방식  ${v.field_order}  (인터레이스)`);
+    줄.push(["주사 방식", v.field_order, "인터레이스"]);
   const vb=속도(v.bit_rate)||(속도(f.bit_rate)?"≈ "+속도(f.bit_rate):"");
-  줄.push(`영상 속도  ${vb||"-"}`);
-  줄.push(`소리       ${a
+  줄.push(["영상 속도", vb||"-"]);
+  줄.push(["소리", a
     ? [a.codec_name, a.channels?a.channels+"ch":"",
        a.sample_rate?Math.round(a.sample_rate/1000)+"kHz":"", 속도(a.bit_rate)]
       .filter(Boolean).join("  ")
-    : "없음"}`);
-  const s=줄.join("\n");
-  _codecMemo.set(p,s);
-  return s;
+    : "없음"]);
+  _codecMemo.set(p,줄);
+  return 줄;
 }
 /* 한 프레임씩 옮기기 — 재생 줄의 ◀▌ ▌▶ 와 D · F 가 같은 길을 쓴다 */
 function stepFrame(dir){
@@ -5469,10 +5552,65 @@ async function pasteFavs(){
 
 /* ---------- 보관함 열고 닫기 ---------- */
 on$("openFav","onclick",()=>{ $("archive").classList.add("on"); renderArchive(); });
-on$("arcClose","onclick",()=>$("archive").classList.remove("on"));
+on$("arcClose","onclick",()=>{ closeIcPick(); $("archive").classList.remove("on"); });
 function updateFavCount(){
   const n=allFavs().length;
   const el=$("favCount"); if(el) el.textContent=n;
+}
+
+/* ---------- 폴더 그림표 ---------- */
+/* 폴더마다 앞에 붙는 그림 하나. 적어둔 것이 없으면 예전과 같은 📁 다. */
+const FOL_ICONS=[
+  "📁","📂","🗂","🗃","📦","📋","🏷","🔖",
+  "⭐","🌟","✨","🔥","💡","🎯","⚡","🧩",
+  "🎬","🎞","📽","📸","🎥","🖼","🎨","🖌",
+  "❤","🧡","💛","💚","💙","💜","🖤","🤍",
+  "🌈","🌊","🌿","🌸","🍀","🍁","☀","🌙",
+  "🐱","🐶","🦊","🐰","🐻","🦉","🐳","🦋",
+];
+const folIcon=f=>(f&&f.icon)||"📁";
+const folIconOf=id=>folIcon(FOLDERS.find(f=>f.id===id));
+
+let _icTarget=null;
+function icPickBox(){
+  let b=$("icPick");
+  if(b) return b;
+  b=document.createElement("div"); b.id="icPick";
+  const h=document.createElement("div"); h.className="icHead";
+  h.textContent="폴더 그림 고르기"; b.appendChild(h);
+  FOL_ICONS.forEach(e=>{
+    const s=document.createElement("b"); s.textContent=e; s.title=e;
+    s.onclick=async ev=>{
+      ev.stopPropagation();
+      const f=FOLDERS.find(x=>x.id===_icTarget);
+      closeIcPick();
+      if(f){ f.icon=e; await folPut(f); await loadFolders(); }
+      renderArchive();
+      if($("fmodal").classList.contains("on")) paintFolderModal();
+    };
+    b.appendChild(s);
+  });
+  document.body.appendChild(b);
+  /* 바깥을 누르면 닫는다 (누르는 순간에 닫아야 밑에 있는 폴더가 안 눌린다) */
+  document.addEventListener("pointerdown",e=>{
+    if(b.classList.contains("on") && !b.contains(e.target)
+       && !e.target.closest(".afold .ic.pick")) closeIcPick();
+  },true);
+  return b;
+}
+function closeIcPick(){ const b=$("icPick"); if(b) b.classList.remove("on"); _icTarget=null; }
+function openIcPick(anchor,id){
+  const b=icPickBox();
+  if(_icTarget===id && b.classList.contains("on")){ closeIcPick(); return; }
+  _icTarget=id;
+  const cur=folIconOf(id);
+  [...b.querySelectorAll("b")].forEach(s=>s.classList.toggle("on",s.textContent===cur));
+  b.classList.add("on");
+  const r=anchor.getBoundingClientRect(), bb=b.getBoundingClientRect();
+  let x=r.left-6, y=r.bottom+7;
+  x=Math.max(8,Math.min(x,innerWidth-bb.width-8));
+  if(y+bb.height>innerHeight-8) y=Math.max(8,r.top-bb.height-7);
+  b.style.left=x+"px"; b.style.top=y+"px";
 }
 
 /* ---------- 폴더 목록 ---------- */
@@ -5488,6 +5626,12 @@ function renderFolders(){
     d.className="afold"+(S.folder===id?" on":"");
     d.dataset.f=id;
     const ic=document.createElement("span"); ic.className="ic"; ic.textContent=icon;
+    if(editable){                       // 만든 폴더만 그림을 바꿀 수 있다
+      ic.classList.add("pick");
+      ic.title="눌러서 폴더 그림 바꾸기";
+      ic.onclick=e=>{ e.stopPropagation(); clearTimeout(t); openIcPick(ic,id); };
+      ic.ondblclick=e=>e.stopPropagation();
+    }
     const nm=document.createElement("span"); nm.className="nm"; nm.textContent=name;
     const cnt=document.createElement("span"); cnt.className="cnt"; cnt.textContent=countIn(id);
     d.append(ic,nm,cnt);
@@ -5567,7 +5711,7 @@ function renderFolders(){
   };
   row("all","🗂","전체",false);
   row("none","📂","미분류",false);
-  sortedFolders().forEach(f=>row(f.id,"📁",f.name,true));
+  sortedFolders().forEach(f=>row(f.id,folIcon(f),f.name,true));
 }
 on$("arcNewFolder","onclick",async()=>{
   const base="새 폴더"; let name=base, n=2;
@@ -5708,14 +5852,16 @@ function renderArchive(){
 
   if(S.folder==="all"){
     // 폴더별로 묶어서 한눈에 (폴더를 누르지 않아도 미리 보임)
-    const groups=[{id:null,name:"미분류"}].concat(sortedFolders().map(f=>({id:f.id,name:f.name})));
+    const groups=[{id:null,name:"미분류",icon:"📂"}]
+      .concat(sortedFolders().map(f=>({id:f.id,name:f.name,icon:folIcon(f)})));
     let any=false;
     groups.forEach(g=>{
       const items=list.filter(x=>g.id?foldersOf(x).includes(g.id):!foldersOf(x).length);
       if(!items.length) return;
       any=true;
       const h=document.createElement("div"); h.className="grpHead";
-      h.innerHTML=`<span>${g.id?"📁":"📂"} ${g.name}</span><b>${items.length}</b>`;
+      h.innerHTML=`<span></span><b>${items.length}</b>`;
+      h.firstChild.textContent=`${g.icon} ${g.name}`;   // 이름은 사용자가 지은 것이라 그대로 넣지 않는다
       if(g.id) h.onclick=()=>{ S.folder=g.id; S.favSel.clear(); renderArchive(); };
       box.appendChild(h);
       const gw=document.createElement("div"); gw.className="grpGrid";
@@ -5823,7 +5969,7 @@ function paintFolderModal(){
     box.appendChild(d);
   };
   row("__none__","📂","미분류",countIn("none"));
-  sortedFolders().forEach(f=>row(f.id,"📁",f.name,countIn(f.id)));
+  sortedFolders().forEach(f=>row(f.id,folIcon(f),f.name,countIn(f.id)));
 }
 on$("fmCancel","onclick",()=>$("fmodal").classList.remove("on"));
 on$("fmodal","onclick",e=>{ if(e.target.id==="fmodal") $("fmodal").classList.remove("on"); });
@@ -5905,7 +6051,11 @@ document.addEventListener("keydown",e=>{
   if(e.key==="Escape" && $("archive").classList.contains("on")
      && !$("lb").classList.contains("on") && !$("dlg").classList.contains("on")
      && !$("fmodal").classList.contains("on")){
-    e.preventDefault(); $("archive").classList.remove("on"); return;
+    e.preventDefault();
+    /* 그림표 고르는 창이 떠 있으면 그것부터 닫는다 (보관함은 그대로) */
+    const ip=$("icPick");
+    if(ip && ip.classList.contains("on")){ closeIcPick(); return; }
+    $("archive").classList.remove("on"); return;
   }
   /* ---------- 즐겨찾기 보관함: 복사 / 붙여넣기 ----------
      같은 사진을 다른 폴더에도 넣고 싶을 때 쓴다.
@@ -6353,7 +6503,7 @@ async function askOutDirOnce(){
 if(IS_EL){
   const sn=$("speedNote");
   if(sn) sn.innerHTML=
-    "파일 · <b>영상 길이의 1/3</b> 정도<br>"+
+    "파일 · <b>영상 길이의 1/3</b>정도 분석 시간 소요<br>"+
     "주소 · <b>내려받는 시간이 더 붙습니다</b>";
 }
 setTimeout(askOutDirOnce, 700);   // 화면이 다 그려진 뒤에 띄운다

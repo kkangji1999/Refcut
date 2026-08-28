@@ -880,6 +880,18 @@ ipcMain.handle("revealFolder", async (_e, p) => {
   } catch (e) { return { ok: false, error: String(e) }; }
 });
 
+/* 파일 하나를 탐색기에서 '짚어' 준다 (폴더가 열리고 그 파일이 선택된다).
+   ★ 원본 영상은 이미 디스크에 있다. 화면 쪽에서 blob 으로 한 벌 더 내려받으면
+     같은 영상이 두 개가 되고(용량 두 배) 큰 파일은 기다리기까지 한다.
+     짚어 주기는 복사가 없으므로 즉시 끝나고 공간도 더 쓰지 않는다. */
+ipcMain.handle("revealFile", async (_e, p) => {
+  try {
+    if (!p || !fs.existsSync(p)) return { ok: false, error: "파일을 찾지 못했습니다" };
+    shell.showItemInFolder(path.normalize(p));
+    return { ok: true };
+  } catch (e) { return { ok: false, error: String(e) }; }
+});
+
 ipcMain.handle("defaultOutDir", () => rootDir());
 
 /* 화면에 보여줄 지금 버전. 손으로 적어둔 숫자를 쓰면 올리는 것을 잊는 순간

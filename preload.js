@@ -99,6 +99,8 @@ contextBridge.exposeInMainWorld("CG", {
   pickVideos: () => ipcRenderer.invoke("pickVideos"),
   pickFolder: () => ipcRenderer.invoke("pickFolder"),
   revealFolder: (p) => ipcRenderer.invoke("revealFolder", p),
+  /* 파일 하나를 탐색기에서 짚어 보여주기 (복사하지 않는다) */
+  revealFile: (p) => ipcRenderer.invoke("revealFile", p),
   defaultOutDir: () => ipcRenderer.invoke("defaultOutDir"),
   getRoot: () => ipcRenderer.invoke("getRoot"),
   setRoot: (d) => ipcRenderer.invoke("setRoot", d),
