@@ -799,6 +799,124 @@ ipcMain.handle("clipCancel", (_e, jobId) => {
 });
 
 /* =========================================================================
+   구간을 소리만 뽑기
+   -------------------------------------------------------------------------
+   ★ 왜 따로 두는가.
+     [구간 영상] 은 그림까지 다시 만드느라 무겁다. 그런데 레퍼런스를 모을 때는
+     "이 대사" · "이 효과음" 처럼 소리만 필요한 때가 많다. 소리만 뽑으면
+     한두 초면 끝나고 파일도 몇 십 분의 일이다.
+
+   세 가지 길을 둔다.
+     · 원본 그대로 — 다시 만들지 않고 소리만 떠낸다. 손실이 0 이고 가장 빠르다.
+                     담긴 방식(aac·mp3·flac...)에 맞는 그릇을 골라 담는다.
+     · WAV        — 편집 프로그램이 가장 잘 받아먹는 형태 (무압축)
+     · MP3        — 어디서나 열린다 (320k)
+   ========================================================================= */
+/* 소리가 어떤 방식으로 담겨 있는지 본다 (없으면 null).
+   ★ ffprobe 로 먼저 물어보되, 없으면 ffmpeg 가 뱉는 글에서 읽어낸다.
+     설치 파일에는 ffmpeg 만 들어가고 ffprobe 는 들어가지 않는다.
+     그래서 ffprobe 만 믿으면, 만든 사람 컴퓨터(PATH 에 ffprobe 가 깔려 있다)
+     에서는 멀쩡한데 사용자 컴퓨터에서는 어떤 영상이든
+     "소리가 들어 있지 않습니다" 라고 답하게 된다 — 있지도 않은 병을 만드는 셈이다.
+     probe 가 같은 방식으로 대비하고 있으니 여기도 그렇게 한다. */
+function 소리속내용(file) {
+  const 프로브 = () => new Promise((resolve) => {
+    execFile(ffprobePath(), [
+      "-v", "error", "-select_streams", "a:0",
+      "-show_entries", "stream=codec_name,channels,sample_rate", "-of", "json", file,
+    ], { maxBuffer: 1 << 20, timeout: 20000, windowsHide: true }, (err, stdout) => {
+      if (err) return resolve(null);
+      try {
+        const a = (JSON.parse(stdout).streams || [])[0];
+        resolve(a && a.codec_name ? a : null);
+      } catch (e) { resolve(null); }
+    });
+  });
+  /* ffmpeg 는 파일을 열어보고 이런 줄을 뱉는다 —
+     Stream #0:1(und): Audio: aac (LC) (mp4a / 0x...), 48000 Hz, stereo, fltp, 128 kb/s */
+  const 에프엠 = () => new Promise((resolve) => {
+    execFile(ffmpegPath(), ["-hide_banner", "-i", file],
+      { maxBuffer: 1 << 22, timeout: 30000, windowsHide: true }, (err, stdout, stderr) => {
+        const txt = String(stderr || "") + String(stdout || "");
+        const m = txt.match(/Stream #\d+:\d+[^\n]*?:\s*Audio:\s*([^\s,(]+)([^\n]*)/);
+        if (!m) return resolve(null);
+        const 뒤 = m[2] || "";
+        const hz = 뒤.match(/(\d+)\s*Hz/);
+        const ch = /\bmono\b/.test(뒤) ? 1
+                 : /\bstereo\b/.test(뒤) ? 2
+                 : (뒤.match(/,\s*(\d+)\s*channels/) || [])[1];
+        resolve({ codec_name: m[1], channels: ch ? +ch : 0,
+                  sample_rate: hz ? +hz[1] : 0 });
+      });
+  });
+  return 프로브().then((a) => a || 에프엠());
+}
+/* 담긴 방식마다 '그대로 떠낼 때' 쓸 수 있는 그릇.
+   목록에 없는 방식은 그대로 뜨지 못하므로 WAV 로 다시 만든다. */
+const 소리그릇 = {
+  aac: ".m4a", alac: ".m4a", mp3: ".mp3", opus: ".opus", vorbis: ".ogg",
+  flac: ".flac", ac3: ".ac3", eac3: ".eac3", dts: ".dts", truehd: ".thd",
+  pcm_s16le: ".wav", pcm_s24le: ".wav", pcm_s32le: ".wav", pcm_f32le: ".wav",
+};
+ipcMain.handle("audioRange", async (e, { src, destNoExt, start, dur, kind, jobId }) => {
+  if (!(dur > 0)) return { ok: false, error: "구간이 너무 짧습니다" };
+  const 속 = await 소리속내용(src);
+  if (!속 || !속.codec_name)
+    return { ok: false, error: "이 영상에는 소리가 들어 있지 않습니다." };
+
+  const codec = String(속.codec_name).toLowerCase();
+  let 방식 = kind || "copy";
+  if (방식 === "copy" && !소리그릇[codec]) 방식 = "wav";   // 그대로는 못 뜨는 방식이다
+
+  const 계획 = {
+    copy: { ext: 소리그릇[codec] || ".m4a", args: ["-c:a", "copy"], 이름: "원본 그대로" },
+    wav:  { ext: ".wav", args: ["-c:a", "pcm_s16le"], 이름: "WAV" },
+    mp3:  { ext: ".mp3", args: ["-c:a", "libmp3lame", "-b:a", "320k"], 이름: "MP3 320k" },
+  }[방식];
+
+  const dest = 빈자리(destNoExt + 계획.ext);
+  const tmp = dest.slice(0, dest.length - 계획.ext.length) + ".만드는중" + 계획.ext;
+  return await new Promise((resolve) => {
+    const ff = spawn(ffmpegPath(), [
+      "-v", "info", "-hide_banner", "-y",
+      "-ss", String(start), "-i", src, "-t", String(dur),
+      "-map", "0:a:0", "-vn",
+      ...계획.args, tmp,
+    ], { windowsHide: true });
+    let err = "", killed = false;
+    CLIP.set(jobId, () => { killed = true; try { ff.kill("SIGKILL"); } catch (x) {} });
+    ff.stderr.on("data", (d) => {
+      const t = d.toString();
+      const ts = t.match(/time=(\d+):(\d\d):(\d\d(?:\.\d+)?)/g);
+      if (ts) {
+        const l = ts[ts.length - 1].match(/time=(\d+):(\d\d):(\d\d(?:\.\d+)?)/);
+        const at = (+l[1]) * 3600 + (+l[2]) * 60 + parseFloat(l[3]);
+        e.sender.send("clipProgress",
+          { jobId, percent: Math.max(0, Math.min(100, at / dur * 100)) });
+      }
+      if (err.length < 4000) err += t;
+    });
+    ff.on("error", (x) => {
+      CLIP.delete(jobId);
+      resolve({ ok: false, error: "ffmpeg 를 실행하지 못했습니다: " + x.message });
+    });
+    ff.on("close", (code) => {
+      CLIP.delete(jobId);
+      if (killed) { try { fs.rmSync(tmp, { force: true }); } catch (x) {}
+                    return resolve({ ok: false, aborted: true }); }
+      if (code !== 0) { try { fs.rmSync(tmp, { force: true }); } catch (x) {}
+                        return resolve({ ok: false, error: readErr(err, null) }); }
+      try { fs.rmSync(dest, { force: true }); fs.renameSync(tmp, dest); }
+      catch (x) { return resolve({ ok: false, error: String(x.message || x) }); }
+      let size = 0;
+      try { size = fs.statSync(dest).size; } catch (x) {}
+      resolve({ ok: true, path: dest, size, kind: 방식, 이름: 계획.이름,
+                codec, channels: 속.channels || 0, rate: +(속.sample_rate || 0) });
+    });
+  });
+});
+
+/* =========================================================================
    영상 속내용 자세히 읽기 (Tab 정보창용)
    -------------------------------------------------------------------------
    probe 는 추출에 꼭 필요한 것만 빠르게 읽는다. 여기서는 그 위에
@@ -1179,6 +1297,46 @@ function cookiePlans() {
           ["--cookies-from-browser", "edge"],
           ["--cookies-from-browser", "firefox"]];
 }
+/* ---------- 시도 한 가지 ----------
+   ★ 예전에는 '붙일 옵션' 만 늘어놓았다. 그런데 비메오처럼 주소를 바꿔야만
+     열리는 곳이 있어서, 시도마다 '대신 쓸 주소' 도 함께 들고 다니게 했다.
+   옵션만 있는 예전 모양(배열)도 그대로 받는다. */
+const 시도풀기 = (p) => Array.isArray(p) ? { args: p, url: null }
+  : { args: (p && p.args) || [], url: (p && p.url) || null };
+
+/* ---------- 비메오: 플레이어 주소로 돌아가기 ----------
+   ★ 왜 필요한가.
+     vimeo.com/240129599 처럼 평범한 주소인데도 받지 못하는 영상이 있다.
+     yt-dlp 가 알려주는 이유는 이렇다.
+
+         The web client only works when logged-in
+         The android client is unable to fetch new OAuth tokens
+
+     비메오가 '영상 페이지' 로 들어오는 프로그램에게는 로그인을 요구하도록
+     바꿨기 때문이다. 로그인이 필요한 비공개 영상이라서가 아니다 —
+     브라우저로는 누구나 볼 수 있는 공개 영상인데도 이렇게 막힌다.
+
+   그런데 같은 영상을 '남의 사이트에 심을 때 쓰는 주소' 로 부르면 그대로 열린다.
+
+         https://player.vimeo.com/video/240129599     ← 1080p 까지 다 나온다
+
+     심어진 영상은 로그인한 사람만 보는 것이 아니므로, 이쪽 통로는 예나
+     지금이나 열려 있다. 그래서 영상 페이지가 막히면 이 주소로 한 번 더 간다.
+   주소 뒤의 h=... 는 '링크를 아는 사람만 보는' 영상의 열쇠다 — 함께 옮긴다. */
+function 비메오플레이어주소(u) {
+  try {
+    const x = new URL(String(u));
+    if (!/(^|\.)vimeo\.com$/i.test(x.hostname)) return "";
+    if (/^player\./i.test(x.hostname)) return "";          // 이미 플레이어 주소다
+    const 조각 = x.pathname.split("/").filter(Boolean);
+    const id = 조각.find((v) => /^\d{6,}$/.test(v));
+    if (!id) return "";
+    /* /240129599/abcdef0123 처럼 뒤에 붙는 것이 '숨은 영상의 열쇠' 다 */
+    const 뒤 = 조각[조각.indexOf(id) + 1] || "";
+    const h = x.searchParams.get("h") || (/^[0-9a-f]{6,}$/i.test(뒤) ? 뒤 : "");
+    return "https://player.vimeo.com/video/" + id + (h ? "?h=" + h : "");
+  } catch (e) { return ""; }
+}
 function retryPlans(url, useCookies, referer) {
   /* 스트림 주소를 직접 받을 때는 어느 페이지에서 왔는지 알려줘야 통과된다 */
   if (referer) {
@@ -1201,9 +1359,16 @@ function retryPlans(url, useCookies, referer) {
   }
   const plans = [[]];                                   // ① 기본
   if (/vimeo\.com/i.test(url)) {
-    plans.push(["--extractor-args", "vimeo:client=web"]);      // ② 웹 방식
-    plans.push(["--extractor-args", "vimeo:client=android"]);  // ③ 안드로이드 방식
-    plans.push(["--referer", "https://vimeo.com/"]);           // ④ 임베드 전용 영상
+    /* ★ 플레이어 주소를 앞쪽에 둔다 — 지금 비메오에서 가장 잘 통하는 길이다.
+       (영상 페이지 주소는 로그인을 요구받아 몇 초 뒤 물러난다) */
+    const 플레이어 = 비메오플레이어주소(url);
+    if (플레이어) {
+      plans.push({ args: [], url: 플레이어 });                                    // ② 심는 주소로
+      plans.push({ args: ["--referer", "https://vimeo.com/"], url: 플레이어 });   // ③ 출처를 밝히고
+    }
+    plans.push(["--extractor-args", "vimeo:client=web"]);      // ④ 웹 방식
+    plans.push(["--extractor-args", "vimeo:client=android"]);  // ⑤ 안드로이드 방식
+    plans.push(["--referer", "https://vimeo.com/"]);           // ⑥ 임베드 전용 영상
   }
   /* ★ yt-dlp 가 모르는 사이트는 '일반 방식'으로 긁는데,
      그때 브라우저인 척하지 않으면 403(접근 거부)으로 막히는 곳이 많다.
@@ -1359,14 +1524,16 @@ ipcMain.handle("ytInfo", async (_e, url, useCookies, referer) => {
   const plans = useCookies
     ? retryPlans(url, true, referer)
     : retryPlans(url, false, referer).filter((p) => !p.includes("--cookies-from-browser"));
-  for (const extra of plans) {
+  for (const 계획 of plans) {
+    const { args: extra, url: 대신 } = 시도풀기(계획);
     if (Date.now() > deadline) { errs.push("시간 초과"); break; }
-    /* 지원하지 않는 주소라고 이미 판명됐으면 더 시도하지 않는다 */
-    if (errs.some((e) => /unsupported url|is not a valid url/i.test(e))) break;
+    /* 지원하지 않는 주소라고 이미 판명됐으면 더 시도하지 않는다
+       (주소를 바꿔 가는 시도는 예외다 — 다른 주소는 아직 물어보지도 않았다) */
+    if (!대신 && errs.some((e) => /unsupported url|is not a valid url/i.test(e))) break;
     try {
       const out = await runYt(exe, ["--dump-single-json", "--no-warnings",
         "--no-playlist", "--socket-timeout", "10", "--retries", "1",
-        ...ffmpegLocArgs(), ...jsArgs(), ...extra, url], 25000);
+        ...ffmpegLocArgs(), ...jsArgs(), ...extra, 대신 || url], 25000);
       const j = JSON.parse(out);
       /* 이 영상이 실제로 제공하는 화질만 추린다 */
       const heights = [...new Set((j.formats || [])
@@ -1376,7 +1543,9 @@ ipcMain.handle("ytInfo", async (_e, url, useCookies, referer) => {
                ext: j.ext || "mp4", site: j.extractor_key || "",
                thumb: pickThumb(j),    // 대기열에 띄울 대표 그림 (있으면)
                heights,                // 고를 수 있는 화질
-               plan: extra };          // 성공한 방식을 기억해 두었다가 받을 때 그대로 쓴다
+               /* 성공한 방식을 기억해 두었다가 받을 때 그대로 쓴다
+                  (주소를 바꿔서 통했다면 그 주소까지 함께 들고 간다) */
+               plan: { args: extra, url: 대신 || null } };
     } catch (e) { errs.push(String(e.message || e)); }
   }
   /* 로그인이 필요해 보이는 경우에만 브라우저 로그인 정보를 빌려 한 번 시도한다.
@@ -1398,7 +1567,7 @@ ipcMain.handle("ytInfo", async (_e, url, useCookies, referer) => {
         return { ok: true, title: j.title || "영상", duration: j.duration || 0,
                  ext: j.ext || "mp4", site: j.extractor_key || "", heights,
                  thumb: pickThumb(j),
-                 plan: ["--cookies-from-browser", br] };
+                 plan: { args: ["--cookies-from-browser", br], url: null } };
       } catch (e) { errs.push(String(e.message || e)); }
     }
   }
@@ -1495,13 +1664,14 @@ ipcMain.handle("ytDownload", async (e, { url, dest, jobId, height, plan, useCook
        ("로딩만 계속 걸리고 끝나지 않는다"는 증상이 이것이다).
        이제는 아무 소식도 없이 조용한 시간이 이어지면 끊고 다음 방식으로 넘어간다. */
     const QUIET_MS = 120000;             // 2분 동안 아무 소식이 없으면 끊는다
-    const run = (extra, fmtSel) => new Promise((res, rej) => {
+    const run = (계획, fmtSel) => new Promise((res, rej) => {
+      const { args: extra, url: 대신 } = 시도풀기(계획);
       const args = [
         "--no-warnings", "--no-playlist", "--no-part", "--newline",
         "-f", fmtSel || fmt, "--merge-output-format", "mp4",
         ...ffmpegLocArgs(),              // ffmpeg 위치를 알려준다 (없으면 합치기가 실패한다)
         ...jsArgs(),                     // 유튜브 주소를 푸는 자바스크립트 실행기
-        ...extra, "-o", dest, url,
+        ...extra, "-o", dest, 대신 || url,
       ];
       const p2 = spawn(exe, args, { windowsHide: true });
       let over = false, err = "", lastAt = Date.now();
@@ -1532,8 +1702,12 @@ ipcMain.handle("ytDownload", async (e, { url, dest, jobId, height, plan, useCook
     });
 
     /* 정보를 읽을 때 성공했던 방식을 먼저 쓰고, 안 되면 나머지를 차례로 */
-    const plans = plan && plan.length ? [plan, ...retryPlans(url, useCookies, referer)]
-                                      : retryPlans(url, useCookies, referer);
+    /* 정보를 읽을 때 통했던 방식이 있으면 그것부터.
+       (예전 모양 — 옵션 배열 하나 — 로 넘어와도 그대로 받는다) */
+    const 먼저 = 시도풀기(plan);
+    const plans = (먼저.args.length || 먼저.url)
+      ? [먼저, ...retryPlans(url, useCookies, referer)]
+      : retryPlans(url, useCookies, referer);
     const dlDeadline = Date.now() + 30 * 60 * 1000;   // 큰 영상도 받을 수 있게 넉넉히
     const allErrs = [];
     let done = false;
@@ -1963,6 +2137,18 @@ ipcMain.handle("jobDelete", (_e, id) => {
   if (fs.existsSync(f)) fs.unlinkSync(f);
   return { ok: true };
 });
+/* ---------- 적힌 파일이 실제로 있는가 ----------
+   ★ 기록에 적힌 경로가 늘 살아 있는 것은 아니다.
+     [초기화] 로 옛 목록을 되돌리면, 그 사이 컷 정리가 이름을 바꾸거나 지워버린
+     자리를 가리키게 된다. 그래도 경로 글자는 멀쩡해서 화면 쪽은 "그림이 있다"
+     고 믿고 그대로 띄운다 — 컷 칸은 뜨는데 그림만 안 보이던 것이 이것이다.
+   그래서 쓰기 전에 한 번에 물어본다. 크기가 0 인 것도 없는 것으로 친다. */
+ipcMain.handle("filesExist", (_e, paths) =>
+  (paths || []).map((p) => {
+    try { return !!(p && fs.existsSync(p) && fs.statSync(p).size > 0); }
+    catch (e) { return false; }
+  }));
+
 /* 렌더러가 디스크의 파일을 직접 읽고 쓸 수 있게 해준다.
    (미리보기 저장, 원본 PNG 다시 읽기) */
 ipcMain.handle("readFile", (_e, p) => {

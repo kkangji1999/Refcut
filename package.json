@@ -19,6 +19,8 @@
     "test:av": "electron test/av.e2e.js",
     "test:quit": "electron test/quit.e2e.js",
     "test:vidbtn": "electron test/vidbtn.e2e.js",
+    "test:name": "electron test/name.e2e.js",
+    "test:audio": "electron test/audio.e2e.js",
     "bin": "node scripts/fetch-bin.js",
     "bin:force": "node scripts/fetch-bin.js --force",
     "dist": "npm run bin && electron-builder --win --x64",

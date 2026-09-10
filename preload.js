@@ -92,6 +92,15 @@ contextBridge.exposeInMainWorld("CG", {
   },
   clipCancel: (jobId) => ipcRenderer.invoke("clipCancel", jobId),
 
+  /* 구간을 소리만 뽑기 (kind: "copy" 원본 그대로 · "wav" · "mp3")
+     진행률은 구간 영상과 같은 통로로 오고, jobId 로 갈라 받는다 */
+  audioRange: (o, onProgress) => {
+    const h = (_e, m) => { if (m.jobId === o.jobId) onProgress && onProgress(m); };
+    ipcRenderer.on("clipProgress", h);
+    return ipcRenderer.invoke("audioRange", o)
+      .finally(() => ipcRenderer.removeListener("clipProgress", h));
+  },
+
   /* 정보창에서만 쓰는 자세한 속내용 (코덱·프로파일·색 형식·소리) */
   probeFull: (filePath) => ipcRenderer.invoke("probeFull", filePath),
 
@@ -156,6 +165,9 @@ contextBridge.exposeInMainWorld("CG", {
   /* 기록마다 실제로 차지하는 공간 (파일 묶음별 합계) */
   pathsSize: (groups) => ipcRenderer.invoke("pathsSize", groups || []),
   dirSizes: (dirs) => ipcRenderer.invoke("dirSizes", dirs || []),
+
+  /* 적힌 경로에 파일이 실제로 있는가 (여러 개를 한 번에) */
+  filesExist: (paths) => ipcRenderer.invoke("filesExist", paths || []),
 
   /* 파일 읽고 쓰기 */
   readFile: (p) => ipcRenderer.invoke("readFile", p),

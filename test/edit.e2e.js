@@ -74,6 +74,23 @@ app.whenReady().then(async () => {
                 keep:(j.keepShots||[]).length, keepFile:((j.keepShots||[])[0]||{}).file||null,
                 rev:j.rev||0, maxFiles:j.maxFiles||0}; };
       const 눈금=()=>({ mk:document.querySelectorAll("#marks .mk").length });
+      /* 컷이 가리키는 그림의 '내용' 을 시각별로 적어둔다.
+         ★ [초기화] 는 그림까지 처음으로 돌아가야 한다. 장 수만 세면
+           "칸은 7개인데 그림은 엉뚱한 것" 인 상태를 놓친다 (실제로 놓쳤다).
+         크기만 보면 다른 장도 우연히 같을 수 있어 속까지 훑어 더한다. */
+      const 그림표=async(list)=>{
+        const o={};
+        for(const s of list){
+          const k=(+s.t).toFixed(3);
+          if(!s.file){ o[k]="(없음)"; continue; }
+          try{
+            const b=new Uint8Array(await window.CG.readFile(s.file));
+            let h=0; for(let i=0;i<b.length;i+=97) h=(h*31+b[i])>>>0;
+            o[k]=b.length+":"+h;
+          }catch(e){ o[k]="(못읽음)"; }
+        }
+        return o;
+      };
 
       for(let i=0;i<10 && $("dlg").classList.contains("on");i++){ closeDlg(false); await 잠깐(120); }
       await jobPut({id:OUTKEY, dir:${JSON.stringify(SAVE)}});
@@ -90,6 +107,7 @@ app.whenReady().then(async () => {
       if(!pv.videoWidth) return {error:"재생 칸이 영상을 읽지 못했습니다"};
 
       const out={ 처음:목록(), base:S.out.base, outDir:S.out.outDir, 처음눈금:눈금() };
+      out.처음그림=await 그림표(S.out.shots);
 
       /* ---------- 즐겨찾기를 하나 담아 둔다 ----------
          이제 즐겨찾기는 컷 목록과 따로 사는 사본이다.
@@ -134,8 +152,12 @@ app.whenReady().then(async () => {
           떴다=true; break; }
       }
       out.클립알림=떴다 ? $("dlgBody").textContent.slice(0,200) : "(알림창이 뜨지 않았다)";
+      out.클립진단={ 떴다, 창:$("dlg").className,
+        제목:$("dlgTitle").textContent, 몸:$("dlgBody").textContent.slice(0,120),
+        진행:$("progWrap").style.display, 단추막힘:$("ioClip").disabled };
       closeDlg(true);
       await 클립;
+      out.클립끝난뒤={ 제목:$("dlgTitle").textContent, 창:$("dlg").className };
       clearIO();
 
       /* ---------- 정보창 코덱 ---------- */
@@ -156,6 +178,27 @@ app.whenReady().then(async () => {
       }
       S.mode="smart"; paintModeSw(); refreshShots();
 
+      /* ---------- 깊은 병합 : 컷을 크게 줄여 저장 폴더의 남는 번호를 지운다 ----------
+         ★ [초기화] 가 깨지던 진짜 자리가 여기다. 컷이 줄면 뒤쪽 CUT 파일이
+           통째로 지워지는데, 되돌릴 목록은 바로 그 지워진 자리를 가리키고 있었다.
+           그래서 초기화하면 컷 칸은 뜨는데 그림만 안 보였다.
+           컷을 조금만 손대는 시험으로는 파일이 지워지지 않아 영영 안 걸린다. */
+      S.sel.clear(); paintSel();
+      /* ★ 이 자리는 스타트 프레임을 이미 만들어 둔 뒤다 —
+         컷을 손보면 "스타트 프레임 목록을 비웁니다" 확인창이 먼저 뜬다.
+         닫아주지 않으면 시험이 그 자리에서 영영 멈춘다. */
+      const p1=doMerge([2,3,4,5], null);
+      for(let i=0;i<50;i++){ await 잠깐(100);
+        if($("dlg").classList.contains("on")
+           && /스타트 프레임/.test($("dlgTitle").textContent)) break; }
+      closeDlg(true);
+      await p1;
+      await flushFolder();
+      out.깊은병합=목록();
+      /* 컷이 줄면 남는 번호의 파일이 실제로 지워졌는가 (여기서 지워져야 다음이 시험이 된다) */
+      out.깊은병합사라짐=(await window.CG.filesExist(
+        out.처음.map(x=>x.file))).filter(v=>!v).length;
+
       /* ---------- ④ 초기화 ---------- */
       const p2=resetCuts();
       for(let i=0;i<50;i++){ await 잠깐(100);
@@ -166,6 +209,31 @@ app.whenReady().then(async () => {
       out.초기화=목록(); out.초기화기록=await 기록(); out.초기화눈금=눈금();
       out.수정표시=$("editedTag").classList.contains("on");
       out.초기화즐겨=내즐겨(); out.초기화즐겨기록=await 기록();
+      out.초기화그림=await 그림표(S.out.shots);
+
+      /* ---------- 옛 기록 되살리기 ----------
+         ★ 고친 뒤에 새로 뽑은 것만 멀쩡하면 반쪽짜리 수리다. 옛 버전이 이미
+           깨뜨려 놓은 기록들도, 열 때 스스로 나아야 한다.
+         그림 두 장을 일부러 지워 그 상태를 그대로 만들고 기록을 다시 연다. */
+      const 지울것=[S.out.shots[1].file, S.out.shots[3].file];
+      await window.CG.arrangeFiles([], 지울것, []);
+      out.일부러지움=(await window.CG.filesExist(지울것)).filter(Boolean).length;
+      const 그id=S.jobId;
+      S.jobId=null; S.out=null;                     // 다른 기록을 보고 있던 것처럼
+      await loadJob(그id);
+      /* ★ 그림이 '있다' 는 것만 보고 멈추면 안 된다.
+         메꾸는 동안 잠깐은 [_작업중] 칸에 있고, 자리 맞추기가 그 뒤에 제 번호로
+         옮겨 놓는다. 그 사이에 재어 버리면 옮기다 만 폴더를 보게 된다.
+         자리 맞추기가 완전히 끝난 것까지 기다린다. */
+      for(let i=0;i<200;i++){
+        await 잠깐(100);
+        if(S.out && S.out.shots && !_syncing && !_dirty
+           && (await window.CG.filesExist(S.out.shots.map(x=>x.file))).every(Boolean)) break;
+      }
+      await flushFolder();
+      out.되살림전체=S.out.shots.length;
+      out.되살림=(await window.CG.filesExist(S.out.shots.map(x=>x.file))).filter(Boolean).length;
+      out.되살림그림=await 그림표(S.out.shots);
       out.눈금기준={ smart:(drawMarks(),MARKS.slice()) };
       S.mode="start"; refreshShots(); out.눈금기준.start=MARKS.slice();
       S.mode="smart"; refreshShots();
@@ -189,9 +257,13 @@ app.whenReady().then(async () => {
 
     console.log(`처음 ${r.처음.length}컷 → 병합 ${r.병합.length}컷 `
       + `→ 분할 ${r.분할.length}컷 → 초기화 ${r.초기화.length}컷`);
+    console.log(`되살리기   그림 2장을 지우고 다시 열었더니 ${r.되살림}/${r.되살림전체}장이 살아났다`);
     console.log(`저장 폴더  분석 프레임 ${목록읽기(분석).length}장 · `
       + `미리보기 ${목록읽기(미리).length}장 · 구간 영상 ${목록읽기(구간).length}개`);
     console.log(`구간 표시  ${r.구간글}`);
+    /* 알림창이 안 떴을 때만 속을 들여다본다 — 무엇이 대신 떠 있었는지가 곧 원인이다 */
+    if (r.클립진단 && !r.클립진단.떴다)
+      console.log(`클립 진단  ${JSON.stringify(r.클립진단)} / 끝난뒤 ${JSON.stringify(r.클립끝난뒤)}`);
     console.log(`코덱       ${r.코덱 || "(못 읽음)"}`);
 
     /* ① 병합 */
@@ -296,6 +368,35 @@ app.whenReady().then(async () => {
     const 초기화파일 = 목록읽기(분석).filter(f => /\.png$/i.test(f)).length;
     if (초기화파일 !== r.처음.length)
       fails.push(`초기화: 저장 폴더가 ${초기화파일}장 — 처음(${r.처음.length}장)과 다르다`);
+
+    /* ★ 여기가 핵심이다 — 장 수가 아니라 '그림' 이 처음으로 돌아왔는가.
+       예전에는 칸만 7개 뜨고 그림은 빈 칸이거나 옆 컷의 것이었는데,
+       장 수만 세던 시험은 그것을 통과시켰다. */
+    if (!r.깊은병합사라짐)
+      fails.push("시험이 헐겁다: 깊은 병합에서 지워진 CUT 파일이 하나도 없다 "
+        + "— 초기화 시험이 실제 상황을 재현하지 못했다");
+    const 처음그림 = r.처음그림 || {}, 초기화그림 = r.초기화그림 || {};
+    const 빈칸 = Object.entries(초기화그림).filter(([, v]) => /없음|못읽음/.test(v));
+    if (빈칸.length)
+      fails.push(`초기화: ${빈칸.length}개 컷이 그림 없이 남았다 (${빈칸[0][0]}초 …)`);
+    const 딴그림 = Object.keys(처음그림)
+      .filter((k) => 초기화그림[k] !== undefined && 초기화그림[k] !== 처음그림[k]);
+    if (딴그림.length)
+      fails.push(`초기화: ${딴그림.length}개 컷의 그림이 처음과 다르다 (${딴그림.slice(0, 3).join("초, ")}초)`);
+    const 없어진시각 = Object.keys(처음그림).filter((k) => 초기화그림[k] === undefined);
+    if (없어진시각.length)
+      fails.push(`초기화: ${없어진시각.length}개 컷이 목록에서 사라졌다`);
+
+    /* 옛 버전이 깨뜨려 놓은 기록을 열면 스스로 낫는가 */
+    if (r.일부러지움 !== 0)
+      fails.push("시험이 헐겁다: 일부러 지운 그림이 실제로는 안 지워졌다");
+    if (r.되살림 !== r.되살림전체)
+      fails.push(`옛 기록 되살리기: ${r.되살림전체}개 중 ${r.되살림}개만 그림이 있다`);
+    const 되살림그림 = r.되살림그림 || {};
+    const 되살림다름 = Object.keys(처음그림)
+      .filter((k) => 되살림그림[k] !== undefined && 되살림그림[k] !== 처음그림[k]);
+    if (되살림다름.length)
+      fails.push(`옛 기록 되살리기: ${되살림다름.length}개 컷의 그림이 처음과 다르다`);
 
     /* ⑩ 기록 */
     if (r.병합기록.n !== r.병합.length || !r.병합기록.edited)
