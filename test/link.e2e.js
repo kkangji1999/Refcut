@@ -4,6 +4,8 @@
      · 핀터레스트 영상 핀 (핀터레스트가 직접 가진 영상)
      · 핀터레스트 → 유튜브로 이어지는 핀
      · 유튜브 (예전부터 되던 것 — 그대로인지 확인)
+     · 비메오 — 영상 페이지로는 로그인을 요구받는 것
+       (심을 때 쓰는 주소로 돌아가 받아내야 한다. main.js 의 비메오플레이어주소 참고)
    쓰는 법:  npm run test:link
    ========================================================================= */
 const { app, BrowserWindow } = require("electron");
@@ -21,6 +23,12 @@ const 대상 = [
   { nm: "핀터레스트(직접)", url: "https://www.pinterest.com/pin/739716307575438329/" },
   { nm: "핀터레스트(유튜브)", url: "https://www.pinterest.com/pin/10836855323494193/" },
   { nm: "유튜브", url: "https://www.youtube.com/watch?v=aqz-KE-bpKQ" },
+  /* ★ 이 주소는 브라우저로는 누구나 보이는 공개 영상인데, 프로그램이 영상
+     페이지로 들어가면 "The web client only works when logged-in" 으로 막힌다.
+     심는 주소(player.vimeo.com)로 돌아가야 열린다.
+     — 여기에 이 줄이 없어서, 시도 목록을 거르다 ytInfo 가 통째로 죽는 것을
+       (p.includes is not a function) 놓쳤다. 비메오는 반드시 함께 본다. */
+  { nm: "비메오(로그인 요구)", url: "https://vimeo.com/240129599" },
 ];
 app.whenReady().then(async () => {
   const win = await waitWindow();
@@ -60,6 +68,6 @@ app.whenReady().then(async () => {
   }
   console.log("");
   console.log(실패.length ? "실패  " + 실패.join(", ")
-    : "통과  세 사이트가 읽히고, 대기열에서 멈추며, 받기 버튼이 있다");
+    : "통과  네 사이트가 읽히고, 대기열에서 멈추며, 받기 버튼이 있다");
   app.exit(실패.length ? 1 : 0);
 });

@@ -1521,9 +1521,13 @@ ipcMain.handle("ytInfo", async (_e, url, useCookies, referer) => {
 
   const errs = [];
   const deadline = Date.now() + 45000;      // 로그인 시도까지 합쳐 60초를 넘기지 않는다
+  /* ★ 시도 하나는 옵션 배열일 수도, {args,url} 일 수도 있다 (비메오는 주소를 바꿔 간다).
+     여기서 배열이라고 넘겨짚으면 p.includes 가 없어 ytInfo 가 통째로 죽는다 —
+     "비메오 주소를 넣으면 아무 반응이 없다" 가 이것이었다. 풀어서 본다. */
   const plans = useCookies
     ? retryPlans(url, true, referer)
-    : retryPlans(url, false, referer).filter((p) => !p.includes("--cookies-from-browser"));
+    : retryPlans(url, false, referer)
+        .filter((p) => !시도풀기(p).args.includes("--cookies-from-browser"));
   for (const 계획 of plans) {
     const { args: extra, url: 대신 } = 시도풀기(계획);
     if (Date.now() > deadline) { errs.push("시간 초과"); break; }
