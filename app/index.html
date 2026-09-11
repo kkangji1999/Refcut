@@ -182,18 +182,35 @@
     align-items:center; justify-content:center; padding:24px}
   #storeBox.on,#prefBox.on{display:flex}
   /* 지금 규칙으로 이름이 어떻게 나오는지 그 자리에서 보여준다 */
-  /* 예시는 다 보여야 뜻이 있다 — 가로로 자르지 말고 줄을 바꾼다 */
-  .namePrev{font-size:12px; color:var(--fg); line-height:1.9; margin-top:8px;
+  /* ---------- 컷 목록 밑의 '파일 이름' 칸 ----------
+     ★ 예전에는 따로 창을 열게 하고, 쓸 수 있는 조각 열여덟 개를 설명과 함께
+       늘어놓았다. 만든 사람조차 무슨 말인지 모르겠다는 이야기를 들었다.
+       읽고 외워서 적는 것이 아니라, 눌러서 만들고 결과를 바로 보는 것이 맞다.
+     그래서 ① 조각은 눌러 넣는 알약으로, ② 예시는 딱 한 줄만,
+       ③ 자리는 컷 목록 바로 밑 — 내려받는 단추들 곁으로 옮겼다.
+     (여기 없는 조각도 적으면 그대로 동작한다 — 자주 쓰는 것만 내놓았을 뿐이다) */
+  .nameBar{flex-shrink:0; margin-top:8px; padding-top:8px;
+    border-top:1px solid var(--border)}
+  .nameRow{display:flex; align-items:center; gap:6px}
+  .nameLbl{font-size:11px; color:#5d6472; white-space:nowrap; flex-shrink:0}
+  #nameRule{flex:1; min-width:0; background:#0e1116; border:1px solid var(--border);
+    color:var(--fg); border-radius:7px; padding:5px 8px; font-size:11.5px;
+    font-family:inherit; outline:none}
+  #nameRule:focus{border-color:var(--accent)}
+  #nameReset{padding:4px 8px; font-size:10.5px; flex-shrink:0}
+  .nameRow2{display:flex; align-items:center; justify-content:space-between;
+    gap:8px; margin-top:5px; flex-wrap:wrap}
+  #namePrev{font-size:11px; color:var(--accent); font-weight:600;
+    min-width:0; overflow-wrap:anywhere}
+  #namePrev .warn{color:#f2a8a8; font-weight:400}
+  #nameChips{display:flex; gap:3px; flex-wrap:wrap; justify-content:flex-end}
+  .chip{background:var(--panel2); border:1px solid var(--border); border-radius:5px;
+    color:#8a94a8; font-size:10px; font-family:inherit; padding:2px 6px; cursor:pointer}
+  .chip:hover{border-color:var(--accent); color:var(--accent)}
+  /* 시간 표시 설정 창의 예시 줄 */
+  .timePrev{font-size:12px; line-height:1.9; margin-top:8px;
     background:#0e1116; border:1px solid var(--border); border-radius:7px;
     padding:8px 10px; overflow-wrap:anywhere}
-  .namePrev b{color:var(--accent); font-weight:600}
-  .namePrev .warn{color:#f2a8a8}
-  /* 쓸 수 있는 조각들 — 아주 작은 글씨로 줄줄이 적어 둔다 */
-  .nameHint{font-size:10px; color:#5d6472; line-height:1.85; margin-top:8px;
-    display:grid; grid-template-columns:repeat(auto-fill,minmax(148px,1fr)); gap:1px 10px}
-  .nameHint span{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-  .nameHint code{color:#8a94a8; font-family:inherit}
-  .nameHint .head{grid-column:1/-1; color:#6b7385; margin-top:4px}
   .storeInner{width:100%; max-width:600px; max-height:80vh; overflow-y:auto;
     background:var(--panel); border:1px solid var(--border); border-radius:13px; padding:20px 22px}
   .storeInner h3{margin:0 0 12px; font-size:16px}
@@ -253,10 +270,17 @@
   #openFav b{color:var(--muted); font-weight:700}
   h1{font-size:25px; margin:0; letter-spacing:-.4px}
   #ver{font-size:11px; color:#5d6472; font-weight:600}
+  /* 오른쪽 아래 [업데이트] 는 창에 붙박이로 떠 있다 — 그 밑에 깔리지 않도록
+     이 줄이 언제나 그만큼의 자리를 비워 둔다 */
   .footRow{display:flex; align-items:flex-end; justify-content:space-between;
-    gap:16px; flex-shrink:0}
+    gap:16px; flex-shrink:0; min-height:30px}
   .footRow .note{flex:1; min-width:0}
-  #verBar{display:flex; align-items:center; gap:6px; flex-shrink:0; padding-bottom:2px}
+  /* ★ 결과 화면 안에 있던 것을 밖으로 꺼냈다 — 기록을 열지 않으면 업데이트
+     단추를 찾을 수조차 없었다. 이제 창 오른쪽 아래에 늘 떠 있다. */
+  #verBar{position:fixed; right:14px; bottom:10px; z-index:60;
+    display:flex; align-items:center; gap:6px;
+    background:rgba(18,20,26,.92); border:1px solid var(--border);
+    border-radius:9px; padding:4px 8px}
   #ver{font-size:10.5px; color:#5d6472; white-space:nowrap}
   #updBtn{font-size:10.5px; padding:4px 8px}
   #howto{display:none; position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:450;
@@ -346,11 +370,22 @@
   #cancel{display:none}
   #cancel.on{display:block}
   /* 추출을 시작하기 전에 미리 알아두면 좋은 것들 */
+  /* ---------- 추출 전 안내 ----------
+     한 번 읽으면 되는 글인데 네 줄이나 차지하고 있어서, 그 밑의 기록 목록을
+     계속 밀어냈다. 접어두면 한 줄이 된다 — 접은 채로 기억한다. */
   .preNote{flex-shrink:0; display:flex; flex-direction:column; gap:3px;
     font-size:10.5px; color:#5d6472; line-height:1.55;
     border-top:1px solid var(--border); border-bottom:1px solid var(--border);
     padding:8px 2px}
   .preNote b{color:#98a0b2}
+  .preBody{display:flex; flex-direction:column; gap:3px; margin-top:4px}
+  .preNote.off .preBody{display:none}
+  .preToggle{background:none; border:0; padding:0; cursor:pointer; text-align:left;
+    font-family:inherit; font-size:10.5px; color:#6b7385; font-weight:600;
+    display:flex; align-items:center; gap:5px}
+  .preToggle:hover{color:#98a0b2}
+  .preToggle .arw{display:inline-block; transition:transform .12s}
+  .preNote.off .preToggle .arw{transform:rotate(-90deg)}
   /* 사이드바는 위에서부터 [넣기] [대기] [시작] [진행] [기록] 순서다.
      각 칸이 길어져도 서로 밀어내지 않도록, 늘어나는 칸만 정해두고
      나머지는 자기 안에서 스크롤하게 한다. */
@@ -705,6 +740,10 @@
   .choiceBtn span{font-size:11.5px; color:var(--muted); line-height:1.5;
     word-break:keep-all}
   .choiceBtn.warn:hover{border-color:var(--err)}
+  /* 아이콘으로 고르는 갈래 — 무엇이 나오는지 그림 하나로 먼저 알아본다 */
+  .choiceBtn.ic{flex-direction:row; align-items:center; gap:13px}
+  .choiceBtn.ic .icn{font-size:22px; width:28px; text-align:center; flex-shrink:0; line-height:1}
+  .choiceBtn.ic .txt{display:flex; flex-direction:column; gap:3px; min-width:0}
   /* 첫 실행 안내 — 글자보다 그림으로 */
   .welcome{text-align:center}
   .wsvg{width:100%; max-width:320px; height:auto; display:block; margin:2px auto 12px}
@@ -999,11 +1038,15 @@
       <div id="eta"></div>
     </div>
 
-    <!-- 추출 전에 미리 알아두면 좋은 것들 -->
-    <div class="preNote">
-      <span>컷은 <b>원본 해상도 PNG</b>로 저장됩니다</span>
-      <span id="speedNote"><b>영상 길이의 1/3</b>정도 분석 시간 소요</span>
-      <span>기록을 지워도 <b>즐겨찾기한 컷은 남습니다</b></span>
+    <!-- 추출 전에 미리 알아두면 좋은 것들 (한 번 읽으면 되는 글이라 접어둘 수 있다) -->
+    <div class="preNote" id="preNote">
+      <button class="preToggle" id="preToggle" title="접었다 펼 수 있습니다">
+        <span class="arw">▾</span> 알아두면 좋은 것</button>
+      <div class="preBody">
+        <span>컷은 <b>원본 해상도 PNG</b>로 저장됩니다</span>
+        <span id="speedNote"><b>영상 길이의 1/3</b>정도 분석 시간 소요</span>
+        <span>기록을 지워도 <b>즐겨찾기한 컷은 남습니다</b></span>
+      </div>
     </div>
 
     <div class="sideHead" style="margin-top:4px">
@@ -1033,7 +1076,7 @@
         <div id="resTitle"></div>
         <div class="actions">
           <button id="dlZip" class="main">📦 전체 ZIP</button>
-          <button id="prefBtn" title="내려받는 파일의 이름 규칙과, 시각을 어떻게 적을지 정합니다">🏷 이름·시간</button>
+          <button id="prefBtn" title="시각을 어떻게 적을지 정합니다 (재생기의 시각을 눌러서도 바꿉니다)">⏱ 시간 표시</button>
           <button id="viewSheet" title="지금 고른 기준(분석/스타트)의 컷을 한 장에 모아 봅니다">🖼 샷리스트 <b id="sheetKind">분석</b></button>
           <button id="goFull" title="영상 화면을 크게 봅니다 (Enter)">⛶ 전체화면</button>
         </div>
@@ -1088,12 +1131,8 @@
               <button class="mini" id="setOut" title="현재 위치를 끝점으로 (단축키 O)">아웃점 ⟧</button>
               <button class="mini" id="clrIO" title="구간 해제 (Ctrl+Shift+X)">✕</button>
             </span>
-            <button class="mini" id="ioSeq"
-              title="잡은 구간을 원본 해상도 프레임 연속으로 저장합니다 (프리미어 이미지 시퀀스)&#10;소리는 들어가지 않습니다">🎞 구간 연속프레임 저장</button>
-            <button class="mini" id="ioClip"
-              title="잡은 구간을 영상 파일로 뽑습니다&#10;해상도·초당 장수는 원본 그대로, 잡은 구간도 딱 그만큼 나옵니다&#10;소리도 함께 들어갑니다">🎬 구간 영상 저장</button>
-            <button class="mini" id="ioAudio"
-              title="잡은 구간의 소리만 뽑습니다 (그림 없음)&#10;대사·효과음·음악만 따로 챙길 때 씁니다&#10;원본 그대로 뜨면 소리가 하나도 깎이지 않고, 몇 초면 끝납니다">🎵 구간 음원 저장</button>
+            <button class="mini" id="ioExport"
+              title="잡은 구간을 내보냅니다&#10;프레임 · 음원 · 영상 중에서 고릅니다">⬆ 구간 내보내기</button>
           </div>
           <div class="ioBar editBar" id="editBar">
             <span class="ioGroup">
@@ -1136,6 +1175,21 @@
           </div>
           <div id="oneTake">한 컷으로 이어진 영상입니다 · 컷 나눔 없음</div>
           <div id="grid"></div>
+
+          <!-- 내려받을 때 붙는 이름. 컷 목록 바로 밑에 둔다 —
+               이름을 정하는 일은 컷을 내려받는 일과 한 몸이기 때문이다. -->
+          <div class="nameBar">
+            <div class="nameRow">
+              <span class="nameLbl">파일 이름</span>
+              <input id="nameRule" type="text" spellcheck="false" autocomplete="off"
+                     placeholder="{이름}_CUT{번호}{구분}">
+              <button class="mini" id="nameReset" title="처음 이름으로 되돌립니다">기본</button>
+            </div>
+            <div class="nameRow2">
+              <span id="namePrev"></span>
+              <span id="nameChips"></span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1143,13 +1197,16 @@
       <div class="note">
         <span id="compat" style="color:var(--err)"></span>
       </div>
-      <div id="verBar">
-        <span id="ver"></span>
-        <button class="mini" id="updBtn" title="새 버전이 있는지 확인합니다">🔄 업데이트</button>
-      </div>
       </div>
     </div>
   </main>
+</div>
+
+<!-- 버전과 업데이트 확인 — 언제나 오른쪽 아래 구석에 있다.
+     예전에는 결과 화면 안에 있어서, 기록을 하나 열기 전에는 보이지도 않았다. -->
+<div id="verBar">
+  <span id="ver"></span>
+  <button class="mini" id="updBtn" title="새 버전이 있는지 확인합니다">🔄 업데이트</button>
 </div>
 
 <div id="qPreview"><img alt=""></div>
@@ -1222,22 +1279,7 @@
   </div>
 </div></div>
 <div id="prefBox"><div class="storeInner">
-  <h3>이름 · 시간 표시</h3>
-
-  <div class="storeSec">
-    <div class="storeSecHead"><span class="num">🏷</span>
-      <div><b>내려받는 컷 파일의 이름</b>
-        <div class="storeSecSub">컷 위의 <b>⬇ 저장</b>, <b>⬇ 저장</b>(고른 컷),
-          <b>📦 전체 ZIP</b>, 크게 보기의 <b>⬇ 저장</b>, 즐겨찾기 보관함의
-          <b>⬇ 저장</b> 에 모두 이 이름이 붙습니다.</div></div></div>
-    <div class="pathRow">
-      <input id="nameRule" type="text" spellcheck="false" autocomplete="off"
-             placeholder="{이름}_CUT{번호}{구분}">
-      <button class="mini" id="nameReset" title="처음 이름으로 되돌립니다">기본값</button>
-    </div>
-    <div id="namePrev" class="namePrev"></div>
-    <div class="nameHint" id="nameHint"></div>
-  </div>
+  <h3>시간 표시</h3>
 
   <div class="storeSec">
     <div class="storeSecHead"><span class="num">⏱</span>
@@ -1250,7 +1292,7 @@
       <button data-tv="detail" title="몇 번째 장인지까지 (장 = 프레임)">자세히</button>
       <button data-tv="tc" title="편집 프로그램과 같은 표기">타임코드</button>
     </span>
-    <div id="timePrev" class="namePrev"></div>
+    <div id="timePrev" class="timePrev"></div>
   </div>
 
   <button class="mini" id="prefClose" style="width:100%;margin-top:14px">닫기</button>
@@ -1418,7 +1460,7 @@ async function scanEl(item,tag){
     const p=Math.min(1,t/dur), el=(now-t0)/1000;
     let left=p>0.05? Math.max(0,el/p-el):0;
     if(left>0) _etaSmooth=_etaSmooth? _etaSmooth*0.8+left*0.2 : left;
-    prog(2+p*60, `${tag||""}영상 분석 중...  ${t.toFixed(0)}초 / ${dur.toFixed(0)}초`,
+    prog(2+p*60, `${tag||""}영상 분석 중...  ${길이글(t)} / ${길이글(dur)}`,
          fmtLeft(_etaSmooth));
   });
   _elScanId=null;
@@ -1515,7 +1557,7 @@ async function scan(v,tag){
     let left = p>0.05 ? Math.max(0, el/p-el) : 0;
     /* 순간 값은 크게 흔들리므로 이전 추정치와 섞어 부드럽게 만든다 */
     if(left>0) _etaSmooth = _etaSmooth ? _etaSmooth*0.8 + left*0.2 : left;
-    prog(2+p*52, `${tag||""}영상 분석 중...  ${t.toFixed(0)}초 / ${dur.toFixed(0)}초`,
+    prog(2+p*52, `${tag||""}영상 분석 중...  ${길이글(t)} / ${길이글(dur)}`,
          fmtLeft(_etaSmooth));
   };
 
@@ -1832,6 +1874,18 @@ function setTimeView(v){
   try{ if($("lb").classList.contains("on")) paintLBFoot(); }catch(e){}
   try{ paintTimeView(); }catch(e){}
 }
+/* 얼마나 '긴가' 를 적는 자리 — 영상 길이, 걸린 시간, 남은 시간.
+   ★ 여기서는 장 수를 붙이지 않는다. 대기열의 영상은 초당 장수를 아직 모르고
+     (받아봐야 안다), 걸린 시간에 '몇 번째 장' 은 뜻이 없다.
+   대신 단위는 똑같이 붙인다 — 212초 보다 3분 32초가 한눈에 들어온다. */
+function 길이글(sec){
+  let t=Math.round(Number(sec)||0); if(t<0) t=0;
+  const p2=n=>String(n).padStart(2,"0");
+  const h=Math.floor(t/3600), m=Math.floor(t/60)%60, ss=t%60;
+  if(h) return `${h}시간 ${p2(m)}분 ${p2(ss)}초`;
+  if(m) return `${m}분 ${p2(ss)}초`;
+  return `${ss}초`;
+}
 const tcs   = s => 사람시각(s);
 const clock = s => 사람시각(s);
 
@@ -2118,8 +2172,10 @@ function appChoice(title, html, opts){
     $("dlgTitle").textContent=title;
     $("dlgBody").innerHTML=html+
       `<div class="choiceList">`+
-      opts.map(o=>`<button class="choiceBtn${o.warn?" warn":""}" data-k="${o.k}">
-          <b>${o.t}</b><span>${o.d||""}</span></button>`).join("")+
+      opts.map(o=>`<button class="choiceBtn${o.icon?" ic":""}${o.warn?" warn":""}" data-k="${o.k}">`+
+        (o.icon
+          ? `<span class="icn">${o.icon}</span><span class="txt"><b>${o.t}</b><span>${o.d||""}</span></span>`
+          : `<b>${o.t}</b><span>${o.d||""}</span>`)+`</button>`).join("")+
       `</div>`;
     $("dlgBtns").style.display="none";
     const box=$("dlg");
@@ -2203,57 +2259,60 @@ async function jobSizes(list){
 }
 $("storeClose").onclick=()=>$("storeBox").classList.remove("on");
 
-/* ======================= 이름 · 시간 표시 설정 =======================
-   ★ 규칙을 글자로 적게 하면서 예시를 안 보여주면, 무엇을 적어야 할지 알 수가 없다.
-     그래서 ① 지금 규칙으로 실제 이름이 어떻게 나오는지 바로 위에 띄우고,
-     ② 쓸 수 있는 조각을 '지금 값' 과 함께 아주 작은 글씨로 아래에 늘어놓는다.
-     적으면서 곧바로 결과가 바뀌므로, 설명을 읽지 않아도 알게 된다. */
-const 이름조각설명=[
-  ["이름","영상 이름"], ["번호","컷 번호"], ["번호2","번호 (01)"],
-  ["번호3","번호 (001)"], ["총","전체 컷 수"], ["구분","스타트면 _START"],
-  ["종류","분석 / 스타트"], ["시각","분·초·장"], ["분초","분·초"],
-  ["시분초","시분초 붙여서"], ["초","초 (소수)"], ["프레임","몇 번째 장"],
-  ["가로","가로 픽셀"], ["세로","세로 픽셀"], ["해상도","가로x세로"],
-  ["fps","초당 장수"], ["날짜","오늘 날짜"], ["시간","지금 시각"],
-];
+/* ======================= 파일 이름 · 시간 표시 =======================
+   ★ 처음에는 규칙을 적는 칸을 따로 창에 넣고, 쓸 수 있는 조각 열여덟 개를
+     설명과 함께 늘어놓았다. "만든 내가 봐도 뭐라는지 모르겠다" 는 말을 들었다.
+     읽고 외워서 적게 하는 것이 아니라, 눌러서 만들고 결과를 바로 보게 해야 했다.
+   그래서 이렇게 바꿨다.
+     · 자리   — 컷 목록 바로 밑 (내려받는 단추들 곁)
+     · 조각   — 눌러서 넣는 알약 일곱 개 (자주 쓰는 것만)
+     · 예시   — 지금 규칙으로 나올 이름 딱 한 줄
+   여기 없는 조각도 적으면 그대로 동작한다 (nameParts 참고). 내놓지 않았을 뿐이다. */
+const 이름조각들=[["이름","영상 이름"],["번호","1, 2, 3"],["번호3","001"],
+  ["시각","분·초·장"],["분초","분·초"],["날짜","오늘 날짜"],["구분","_START"]];
+/* 예시에 쓸 컷. 아직 뽑은 것이 없어도 감이 오도록 하나 지어 둔다 */
 function 이름예시감(){
   const shots=(S.out&&S.out.shots&&S.out.shots.length)? curShots() : null;
-  if(shots && shots.length)
-    return {list:shots.slice(0,3), opt:{total:shots.length}};
-  /* 아직 뽑은 것이 없어도 창을 열자마자 감이 오도록 예시를 지어 보여준다 */
-  return {list:[{idx:1,t:3.5,base:"예시영상"},
-                {idx:2,t:12.28,base:"예시영상"},
-                {idx:7,t:204.75,base:"예시영상"}],
+  if(shots && shots.length) return {list:shots.slice(0,2), opt:{total:shots.length}};
+  return {list:[{idx:1,t:3.5,base:"예시영상"},{idx:2,t:12.28,base:"예시영상"}],
           opt:{total:24, base:"예시영상", start:false, fps:24,
                meta:{w:1920,h:1080,fps:24}}};
 }
-function paintNamePref(){
-  const box=$("namePrev"), hint=$("nameHint");
-  if(!box||!hint) return;
-  const 규칙=($("nameRule").value||"").trim() || NAME_DEFAULT;
+function paintNameBar(){
+  const box=$("namePrev"), chips=$("nameChips");
+  if(!box||!chips) return;
+  const el=$("nameRule");
+  const 규칙=(el.value||"").trim() || NAME_DEFAULT;
   const {list,opt}=이름예시감();
-  const 지금=fillName(규칙, nameParts(list[0],opt));
-  const 남은=규칙.match(/\{[^{}]*\}/g)||[];
-  const 모르는=[...new Set(남은.map(x=>x.slice(1,-1).trim())
-    .filter(k=>!이름조각설명.some(([n])=>n===k)))];
-  const 번호없음=!/\{(번호|번호2|번호3|번호4|시각|분초|시분초|초|프레임)\}/.test(규칙);
-  const 안겹치게=이름겹침막기();
-  box.innerHTML =
-    list.map(x=>`<b>${안겹치게(fillName(규칙,nameParts(x,opt))
-      +"."+((x.fileName||x.blob)?extOf(x):OUT_EXT))
-      .replace(/</g,"&lt;")}</b>`).join(" &nbsp;·&nbsp; ")
-    + (모르는.length
-        ? `<div class="warn">모르는 조각입니다 — 그대로 이름에 남습니다 : {${모르는.join("} {")}}</div>` : "")
-    + (번호없음
-        ? `<div class="warn">컷마다 달라지는 조각이 없어 이름이 겹칩니다 — 겹치면 뒤에 _2, _3 이 붙습니다</div>` : "")
-    + (지금 ? "" : `<div class="warn">이름이 비어 버립니다 — 기본값으로 저장됩니다</div>`);
-  hint.innerHTML =
-    `<span class="head">{ } 안의 것만 바뀝니다. 나머지 글자는 적은 그대로 붙습니다.</span>`
-    + 이름조각설명.map(([k,d])=>{
-        const v=nameParts(list[0],opt)[k];
-        return `<span><code>{${k}}</code> ${d}`
-          + (v? ` → ${String(v).replace(/</g,"&lt;").slice(0,14)}` : "")+`</span>`;
-      }).join("");
+  const 이름=fillName(규칙,nameParts(list[0],opt));
+  const 끝=(list[0].fileName||list[0].blob)? extOf(list[0]) : OUT_EXT;
+  /* ★ 이름이 겹치는지는 규칙을 뜯어보지 않고 직접 만들어 견준다 —
+     컷 둘의 이름이 같으면 그 규칙은 컷을 가릴 수 없다는 뜻이다. */
+  const 겹침 = list.length>1
+    && fillName(규칙,nameParts(list[0],opt))===fillName(규칙,nameParts(list[1],opt));
+  box.innerHTML = (이름 ? `${이름}.${끝}`.replace(/</g,"&lt;") : "")
+    + (이름 ? "" : `<span class="warn">이름이 비어 버립니다 — 기본 이름으로 저장됩니다</span>`)
+    + (겹침 ? `<span class="warn">  · 컷마다 달라지는 것이 없어 겹칩니다 (뒤에 _2, _3 이 붙습니다)</span>` : "");
+  if(!chips.childElementCount){
+    이름조각들.forEach(([k,d])=>{
+      const b=document.createElement("button");
+      b.className="chip"; b.type="button"; b.textContent=k;
+      b.title=`{${k}} — ${d}   (눌러서 넣습니다)`;
+      b.onclick=()=>조각넣기("{"+k+"}");
+      chips.appendChild(b);
+    });
+  }
+}
+/* 알약을 누르면 커서 자리에 끼워 넣는다 */
+function 조각넣기(tok){
+  const el=$("nameRule"); if(!el) return;
+  /* 비어 있으면 기본 이름에서 시작한다 — 알약 하나만 덩그러니 남지 않게 */
+  let v=el.value, a, b;
+  if(!v.trim()){ v=NAME_DEFAULT; a=b=v.length; }
+  else{ a=el.selectionStart??v.length; b=el.selectionEnd??v.length; }
+  const 새값=v.slice(0,a)+tok+v.slice(b);
+  el.value=새값; setNameRule(새값); paintNameBar();
+  try{ el.focus(); el.setSelectionRange(a+tok.length,a+tok.length); }catch(e){}
 }
 function paintTimePref(){
   const el=$("timePrev"); if(!el) return;
@@ -2263,26 +2322,38 @@ function paintTimePref(){
     +`${TIMEVIEW_NAME[v]} ${사람시각(t,v)}</span>`).join(" &nbsp;·&nbsp; ");
 }
 function openPref(){
-  $("nameRule").value = NAMERULE===NAME_DEFAULT ? "" : NAMERULE;
-  paintNamePref(); paintTimePref(); paintTimeView();
+  paintTimePref(); paintTimeView();
   $("prefBox").classList.add("on");
-  setTimeout(()=>{ try{ $("nameRule").focus(); }catch(e){} },50);
 }
 /* ★ on$ 는 이 아래에서 만들어지는 상수다 — 여기서 부르면 스크립트가 통째로 멈춘다.
    (그러면 추출도 파일 넣기도 전부 죽는다) 직접 연결한다. */
 $("prefBtn").onclick=openPref;
 $("prefClose").onclick=()=>$("prefBox").classList.remove("on");
-$("nameRule").oninput=()=>{ setNameRule($("nameRule").value); paintNamePref(); };
-$("nameReset").onclick=()=>{
-  $("nameRule").value=""; setNameRule(""); paintNamePref();
-  toast("처음 이름 규칙으로 되돌렸습니다");
-};
 $("prefBox").addEventListener("click",e=>{
   if(e.target===$("prefBox")) $("prefBox").classList.remove("on"); });
 [...($("timeViewSw")||{children:[]}).children].forEach(b=>{
-  b.onclick=()=>{ setTimeView(b.dataset.tv); paintTimePref(); paintNamePref(); };
+  b.onclick=()=>{ setTimeView(b.dataset.tv); paintTimePref(); };
 });
 paintTimeView();
+
+/* ---------- 추출 전 안내 접기 ----------
+   한 번 읽으면 되는 글이 네 줄이나 차지하고 기록 목록을 밀어냈다.
+   접은 채로 기억해 두어, 다음에 켤 때도 접혀 있다. */
+(()=>{
+  const box=$("preNote"), btn=$("preToggle");
+  if(!box||!btn) return;
+  const 그리기=접힘=>{
+    box.classList.toggle("off",접힘);
+    btn.title=접힘? "펼치기" : "접기";
+  };
+  let 접힘=false;
+  try{ 접힘 = localStorage.getItem("cg_prenote")==="off"; }catch(e){}
+  그리기(접힘);
+  btn.onclick=()=>{
+    접힘=!접힘; 그리기(접힘);
+    try{ localStorage.setItem("cg_prenote", 접힘?"off":"on"); }catch(e){}
+  };
+})();
 $("storeBox").onclick=e=>{ if(e.target.id==="storeBox") $("storeBox").classList.remove("on"); };
 /* 사용자가 고른 컴퓨터 폴더에 결과를 자동으로 저장한다.
    브라우저 저장 공간과 무관하므로 디스크가 허용하는 만큼 계속 쌓을 수 있다. */
@@ -3151,7 +3222,6 @@ function renderQueue(){
       th.textContent=it.checking? "···" : (it.isLink? "🔗" : "🎬");
     }
     const body=document.createElement("div"); body.className="qbody";
-    const mm=Math.floor(it.duration/60), ss=Math.round(it.duration%60);
     body.innerHTML=`<div class="qname"></div>`;
     /* ★ 이름은 사이트가 지어준 글자다 — 그대로 붙이면 그 안의 < > 가 화면을
        헤집는다. 글로만 넣고, 전체는 마우스를 올렸을 때 보여준다. */
@@ -3178,7 +3248,7 @@ function renderQueue(){
     }
     const sub=document.createElement("div"); sub.className="qsub";
     const bits=[];
-    if(it.duration>0) bits.push(`${mm}분 ${ss}초`);
+    if(it.duration>0) bits.push(길이글(it.duration));
     if(it.size>0) bits.push(`${(it.size/1048576).toFixed(0)}MB`);
     if(!bits.length) bits.push(it.isLink? "받을 때 확인됩니다" : "정보 없음");
     sub.append(bits.join(" · "));
@@ -3500,7 +3570,7 @@ async function runOneEl(item,tag,t0){
     S.meta={name:item.name,duration:item.duration,size:item.size,fps:item.fps,
             fpsSrc:item.fpsSrc||null, w:item.w,h:item.h,type:item.type};
     resTitle.textContent=`✓ ${item.name} — ${shots.length}장 · `
-      +`${((performance.now()-t0)/1000).toFixed(1)}초 · 폴더에 저장됨`;
+      +`${길이글((performance.now()-t0)/1000)} · 폴더에 저장됨`;
     showResultEl(item);
   }
   await renderHist();
@@ -3651,7 +3721,7 @@ async function runOne(item,tag){
     S.fps=fps; S.playFile=item.file; S.jobId=job.id;
     S.meta={name:item.name,duration:item.duration,size:item.size,fps,
             w:v.videoWidth,h:v.videoHeight,type:item.type};
-    resTitle.textContent=`✓ ${item.name} — ${shots.length}장 · ${((performance.now()-t0)/1000).toFixed(0)}초`
+    resTitle.textContent=`✓ ${item.name} — ${shots.length}장 · ${길이글((performance.now()-t0)/1000)}`
       +(saved?" · 폴더에 저장됨":"");
     showResult(item.file);
   }
@@ -3781,6 +3851,7 @@ function refreshShots(){
   MARKS=shots.map(markTimeOf);
   S.curShot=-1; S.sel.clear(); S.anchor=null;
   drawMarks(); markCurrentShot(); hideTip(); paintEditBar();
+  try{ paintNameBar(); }catch(e){}     // 예시 이름도 지금 목록으로 다시 적는다
 }
 function curShots(){
   return (S.mode==="start" && S.out && S.out.startShots) ? S.out.startShots : (S.out?S.out.shots:[]);
@@ -4655,13 +4726,18 @@ $("markView").onclick=()=>setMarkView(MARKVIEW==="on" ? "off" : "on");
 paintMarkBtn();
 
 /* 구간을 원본 해상도 프레임 연속으로 저장 (화질 손실 없음, 소리 없음) */
-$("ioSeq").onclick=async e=>{
+async function 구간프레임저장(btn){
   if(!hasVideo()) return toast("원본 영상을 먼저 불러와 주세요");
   const a=S.inT??0, b=S.outT??(pv.duration||0);
   const n=Math.floor((b-a)*S.fps);
   if(n<1) return toast("구간이 너무 짧습니다");
-  if(n>900 && !appConfirm(`${n}장이 만들어집니다. 시간이 오래 걸릴 수 있어요. 계속할까요?`)) return;
-  const btn=e.currentTarget; btn.disabled=true;
+  /* ★ await 가 빠져 있었다. 물어보는 창은 떴는데 대답을 기다리지 않고 그대로
+     뽑기 시작했다 — !Promise 는 언제나 거짓이라 조건이 성립할 수가 없었다. */
+  if(n>900 && !await appConfirm(
+      `${n}장이 만들어집니다. 시간이 오래 걸릴 수 있어요.
+
+계속할까요?`,"연속 프레임")) return;
+  btn.disabled=true;
   const can=document.createElement("canvas");
   can.width=pv.videoWidth; can.height=pv.videoHeight;
   const ctx=can.getContext("2d");
@@ -4680,7 +4756,7 @@ $("ioSeq").onclick=async e=>{
     toast(`${n}장 저장 (${can.width}×${can.height} 원본 해상도)`);
   }catch(err){ toast("실패: "+err.message); }
   finally{ progWrap.style.display="none"; btn.disabled=false; }
-};
+}
 
 /* ======================= 컷 다듬기 =======================
    분석이 끝난 컷 목록을 사람이 직접 손보는 자리다.
@@ -5415,8 +5491,7 @@ paintEditBar();
       자르기만 하면 시작 자리가 열쇠장까지 앞으로 밀려 다른 구간이 나온다)
    ★ e.currentTarget 은 await 를 한 번이라도 지나면 비어 버린다.
      그래서 단추는 처음에 붙잡아 둔다 — 예전에 여기서 조용히 멈췄던 원인이다. */
-$("ioClip").onclick=async ()=>{
-  const btn=$("ioClip");
+async function 구간영상저장(btn){
   if(!IS_EL) return toast("앱에서만 쓸 수 있습니다");
   if(!(S.out&&S.out.srcPath&&S.out.outDir))
     return toast("원본 영상 파일이 있어야 구간을 뽑을 수 있습니다");
@@ -5425,7 +5500,7 @@ $("ioClip").onclick=async ()=>{
   const a=S.inT??0, b=S.outT??(pv.duration||0), dur=b-a;
   if(!(dur>0.05)) return toast("구간이 너무 짧습니다");
   if(dur>600 && !await appConfirm(
-      `${(dur/60).toFixed(1)}분짜리 구간입니다. 몇 분 걸릴 수 있어요.\n\n계속할까요?`,"구간 영상 저장"))
+      `${길이글(dur)} 짜리 구간입니다. 몇 분 걸릴 수 있어요.\n\n계속할까요?`,"구간 영상 저장"))
     return;
   btn.disabled=true;
   progWrap.style.display="block"; resetProg();
@@ -5455,7 +5530,7 @@ $("ioClip").onclick=async ()=>{
       "구간 영상 저장");
   }
   finally{ progWrap.style.display="none"; btn.disabled=false; }
-};
+}
 
 /* 구간의 '소리만' 뽑는다.
    ★ 왜 따로 두는가.
@@ -5466,8 +5541,7 @@ $("ioClip").onclick=async ()=>{
      '원본 그대로' 는 다시 만들지 않고 떠내기만 하므로 소리가 하나도 깎이지
      않는다 — 대개 이것이 맞다. 다만 나오는 그릇이 원본을 따라가므로
      (m4a·opus 처럼) 열리지 않는 프로그램이 있다. 그때 고를 수 있게 둔다. */
-$("ioAudio").onclick=async ()=>{
-  const btn=$("ioAudio");
+async function 구간음원저장(btn){
   if(!IS_EL) return toast("앱에서만 쓸 수 있습니다");
   if(!(S.out&&S.out.srcPath&&S.out.outDir))
     return toast("원본 영상 파일이 있어야 구간을 뽑을 수 있습니다");
@@ -5516,6 +5590,33 @@ $("ioAudio").onclick=async ()=>{
       "구간 음원 저장");
   }
   finally{ progWrap.style.display="none"; btn.disabled=false; }
+}
+
+/* ---------- 구간 내보내기 (한 자리에서 고른다) ----------
+   ★ 예전에는 [연속프레임] [영상] [음원] 세 단추를 나란히 두었다. 이름이 길어
+     구간 줄이 가로로 넘쳤고, 셋 다 "잡은 구간을 내보낸다" 는 같은 일이라
+     매번 세 개를 읽고 고르는 꼴이었다.
+   이제 단추는 하나다. 무엇으로 내보낼지는 그림을 보고 고른다. */
+$("ioExport").onclick=async ()=>{
+  const btn=$("ioExport");
+  if(!hasVideo()) return toast("원본 영상을 먼저 불러와 주세요");
+  const a=S.inT??0, b=S.outT??(pv.duration||0), dur=b-a;
+  if(!(dur>0.05)) return toast("구간이 너무 짧습니다 — I(인점) · O(아웃점) 으로 잡아주세요");
+  const fps=(S.fps&&isFinite(S.fps)&&S.fps>1)?S.fps:24;
+  const 장수=Math.max(0,Math.floor(dur*fps));
+  const 전체=(S.inT==null && S.outT==null);
+  const 갈래=await appChoice("구간 내보내기",
+    `<b>${tcs(a)} ~ ${tcs(b)}</b>  (${dur.toFixed(2)}초${전체?" · 구간을 안 잡아 전체입니다":""})<br>무엇으로 내보낼까요?`,
+    [{k:"frames", icon:"🎞", t:`연속 프레임  ${장수}장`,
+      d:"원본 해상도 PNG 를 한 장씩 뽑아 ZIP 으로 묶습니다. 편집 프로그램의 이미지 시퀀스로 바로 씁니다. 소리는 들어가지 않습니다."},
+     {k:"audio",  icon:"🎵", t:"음원만",
+      d:"그림 없이 소리만 뽑습니다. 대사·효과음·음악을 챙길 때. 몇 초면 끝나고 파일도 가장 작습니다."},
+     {k:"video",  icon:"🎬", t:"영상",
+      d:"해상도·초당 장수·소리를 원본 그대로 둔 채, 잡은 구간만큼만 영상으로 뽑습니다."},
+     {k:"cancel", icon:"✕", t:"취소", d:"아무것도 하지 않습니다."}]);
+  if(갈래==="frames") return 구간프레임저장(btn);
+  if(갈래==="audio")  return 구간음원저장(btn);
+  if(갈래==="video")  return 구간영상저장(btn);
 };
 
 /** 지금 보고 있는 버전(분석/스타트)의 샷리스트를 만든다 */
@@ -7039,6 +7140,18 @@ if(IS_EL){
     "파일 · <b>영상 길이의 1/3</b>정도 분석 시간 소요<br>"+
     "주소 · <b>내려받는 시간이 더 붙습니다</b>";
 }
+/* ---------- 이름 칸 준비 ----------
+   ★ 여기서 한다. NAME_DEFAULT · NAMERULE 은 이 아래쪽이 아니라 '한참 위' 에서
+     만들어지는 상수인데, 상수는 만들어지기 전에는 건드릴 수 없다(TDZ).
+     화면 만드는 자리에서 미리 부르면 그 한 줄에 스크립트가 통째로 멈춘다. */
+$("nameRule").value = NAMERULE===NAME_DEFAULT ? "" : NAMERULE;
+$("nameRule").oninput=()=>{ setNameRule($("nameRule").value); paintNameBar(); };
+$("nameReset").onclick=()=>{
+  $("nameRule").value=""; setNameRule(""); paintNameBar();
+  toast("처음 이름으로 되돌렸습니다");
+};
+paintNameBar();
+
 setTimeout(askOutDirOnce, 700);   // 화면이 다 그려진 뒤에 띄운다
 
 </script>

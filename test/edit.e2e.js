@@ -144,7 +144,9 @@ app.whenReady().then(async () => {
       /* ---------- 구간 표시 · 구간 영상 ---------- */
       S.inT=0.4; S.outT=1.6; paintIO();
       out.구간글=$("ioText").textContent;
-      const 클립=$("ioClip").onclick();          // 물어보지 않고 바로 뽑는다
+      /* 구간 내보내기는 단추 하나로 합쳤다 — 고르는 창을 거치지 않고
+         '영상으로 뽑기' 를 곧바로 부른다 */
+      const 클립=구간영상저장($("ioExport"));
       let 떴다=false;
       for(let i=0;i<300;i++){
         await 잠깐(100);
@@ -154,7 +156,7 @@ app.whenReady().then(async () => {
       out.클립알림=떴다 ? $("dlgBody").textContent.slice(0,200) : "(알림창이 뜨지 않았다)";
       out.클립진단={ 떴다, 창:$("dlg").className,
         제목:$("dlgTitle").textContent, 몸:$("dlgBody").textContent.slice(0,120),
-        진행:$("progWrap").style.display, 단추막힘:$("ioClip").disabled };
+        진행:$("progWrap").style.display, 단추막힘:$("ioExport").disabled };
       closeDlg(true);
       await 클립;
       out.클립끝난뒤={ 제목:$("dlgTitle").textContent, 창:$("dlg").className };

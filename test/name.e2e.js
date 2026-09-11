@@ -80,12 +80,22 @@ app.whenReady().then(async () => {
       out.이름속시각같음=(a===b); out.이름속시각=a;
       setTimeView("detail");
 
-      /* 설정 창 */
+      /* 이름 칸은 컷 목록 밑에 늘 떠 있다 (창을 열지 않는다) */
+      setNameRule(""); $("nameRule").value=""; paintNameBar();
+      out.예시글=($("namePrev").textContent||"").trim();
+      out.알약=[...$("nameChips").querySelectorAll(".chip")].map(b=>b.textContent);
+
+      /* 알약을 누르면 규칙에 끼워 넣는가 (비어 있을 때는 기본 이름부터 시작) */
+      $("nameChips").querySelector(".chip").click();
+      out.알약넣은뒤=$("nameRule").value;
+      await 잠깐(50);
+      out.알약예시=($("namePrev").textContent||"").trim();
+      setNameRule(""); $("nameRule").value=""; paintNameBar();
+
+      /* 시간 표시 설정 창 */
       openPref();
       await 잠깐(120);
       out.창열림=$("prefBox").classList.contains("on");
-      out.예시글=($("namePrev").textContent||"").trim();
-      out.조각수=$("nameHint").querySelectorAll("code").length;
       out.시간예시=($("timePrev").textContent||"").trim();
       $("prefClose").click();
       out.창닫힘=!$("prefBox").classList.contains("on");
@@ -99,6 +109,10 @@ app.whenReady().then(async () => {
 
     const f = [];
     const 같나 = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    /* 조각은 '외울 수 있는 만큼' 만 내놓아야 한다 —
+       열여덟 개를 늘어놓았더니 만든 사람도 못 읽겠다고 했다. */
+    const fails_push_알약 = (f, 알약) =>
+      f.push(`눌러 넣는 조각이 ${알약.length}개다 — 5~9개여야 한다 (많으면 못 읽는다)`);
 
     /* ① 기본값은 예전 그대로 */
     const 예전 = ["내영상_CUT1.png", "내영상_CUT2.png", "내영상_CUT12.png"];
@@ -141,10 +155,19 @@ app.whenReady().then(async () => {
     if (!r.이름속시각같음)
       f.push("보기 방식을 바꿨더니 파일 이름 속 시각까지 달라졌다 (예전 파일과 어긋난다)");
 
-    /* ⑥ 설정 창 */
-    if (!r.창열림 || !r.창닫힘) f.push("설정 창이 열리거나 닫히지 않는다");
-    if (!r.예시글) f.push("설정 창에 이름 예시가 비어 있다");
-    if (!(r.조각수 >= 15)) f.push(`쓸 수 있는 조각 설명이 ${r.조각수}개뿐이다`);
+    /* ⑥ 이름 칸 · 설정 창 */
+    if (!r.창열림 || !r.창닫힘) f.push("시간 표시 창이 열리거나 닫히지 않는다");
+    if (!r.예시글) f.push("이름 예시가 비어 있다");
+    if (!/\.png$/.test(r.예시글)) f.push(`이름 예시가 파일 이름 모양이 아니다 — "${r.예시글}"`);
+    const 알약 = r.알약 || [];
+    if (!(알약.length >= 5 && 알약.length <= 9))
+      fails_push_알약(f, 알약);
+    if (!알약.includes("이름") || !알약.includes("번호"))
+      f.push(`가장 많이 쓰는 조각이 알약에 없다 — ${알약.join(", ")}`);
+    /* 비어 있는 칸에서 알약을 누르면, 알약 하나만 덩그러니 남으면 안 된다 */
+    if (!/^\{이름\}_CUT\{번호\}\{구분\}/.test(r.알약넣은뒤 || ""))
+      f.push(`빈 칸에서 알약을 눌렀더니 기본 이름이 사라졌다 — "${r.알약넣은뒤}"`);
+    if (!r.알약예시) f.push("알약을 넣은 뒤 예시가 갱신되지 않는다");
     if (!/간단|자세히|타임코드/.test(r.시간예시)) f.push("시간 표시 예시가 비어 있다");
     if (!r.눌러바뀜) f.push("재생 시각을 눌러도 표시 방식이 바뀌지 않는다");
 
@@ -152,6 +175,8 @@ app.whenReady().then(async () => {
     if (화면오류.length) f.push(`화면 오류 ${화면오류.length}건 · ${화면오류[0]}`);
 
     console.log("");
+    console.log(`이름 예시   ${r.예시글}`);
+    console.log(`조각 알약   ${(r.알약 || []).join(" ")}`);
     console.log(`기본 이름   ${r.기본.join("  ")}`);
     console.log(`맞춤 이름   ${r.맞춤.join("  ")}`);
     console.log(`겹칠 때     ${r.겹침.join("  ")}`);
