@@ -191,22 +191,22 @@
      (여기 없는 조각도 적으면 그대로 동작한다 — 자주 쓰는 것만 내놓았을 뿐이다) */
   .nameBar{flex-shrink:0; margin-top:8px; padding-top:8px;
     border-top:1px solid var(--border)}
-  .nameRow{display:flex; align-items:center; gap:6px}
-  .nameLbl{font-size:11px; color:#5d6472; white-space:nowrap; flex-shrink:0}
-  #nameRule{flex:1; min-width:0; background:#0e1116; border:1px solid var(--border);
-    color:var(--fg); border-radius:7px; padding:5px 8px; font-size:11.5px;
-    font-family:inherit; outline:none}
-  #nameRule:focus{border-color:var(--accent)}
+  .nameRow{display:flex; align-items:center; gap:4px}
+  .nameLbl{font-size:11px; color:#5d6472; white-space:nowrap; flex-shrink:0;
+    margin-right:2px}
+  .nameSeg{flex:1 1 0; min-width:0; background:#0e1116; border:1px solid var(--border);
+    color:var(--fg); border-radius:7px; padding:5px 7px; font-size:11.5px;
+    font-family:inherit; outline:none; text-align:center}
+  .nameSeg:focus{border-color:var(--accent); background:#12161d}
+  .nameSeg::placeholder{color:#454b57}
+  .nameSep{font-size:11px; color:#454b57; flex-shrink:0}
+  /* 번호 칸은 적는 곳이 아니다 — 저절로 붙는다는 것을 모양으로 알린다 */
+  .nameNum{font-size:11px; color:#5d6472; flex-shrink:0; padding:5px 4px;
+    border:1px dashed var(--border); border-radius:7px; background:#0b0d11}
   #nameReset{padding:4px 8px; font-size:10.5px; flex-shrink:0}
-  .nameRow2{display:flex; align-items:center; justify-content:space-between;
-    gap:8px; margin-top:5px; flex-wrap:wrap}
-  #namePrev{font-size:11px; color:var(--accent); font-weight:600;
-    min-width:0; overflow-wrap:anywhere}
+  #namePrev{font-size:11px; color:var(--accent); font-weight:600; margin-top:5px;
+    overflow-wrap:anywhere}
   #namePrev .warn{color:#f2a8a8; font-weight:400}
-  #nameChips{display:flex; gap:3px; flex-wrap:wrap; justify-content:flex-end}
-  .chip{background:var(--panel2); border:1px solid var(--border); border-radius:5px;
-    color:#8a94a8; font-size:10px; font-family:inherit; padding:2px 6px; cursor:pointer}
-  .chip:hover{border-color:var(--accent); color:var(--accent)}
   /* 시간 표시 설정 창의 예시 줄 */
   .timePrev{font-size:12px; line-height:1.9; margin-top:8px;
     background:#0e1116; border:1px solid var(--border); border-radius:7px;
@@ -617,6 +617,17 @@
   .favVid.sel .ck{background:var(--accent); color:#1a1a1a; border-color:var(--accent)}
   #favList{position:relative; user-select:none}
   #grid{position:relative; user-select:none}
+  /* 컷이 합쳐지고 갈라지는 움직임 */
+  #grid figure.mergeAway{z-index:4; pointer-events:none;
+    animation:cutAway .26s cubic-bezier(.4,0,.2,1) forwards}
+  @keyframes cutAway{ to{ transform:translate(var(--dx),var(--dy)) scale(.5); opacity:0 } }
+  #grid figure.mergeTo{animation:cutTake .26s cubic-bezier(.4,0,.2,1)}
+  @keyframes cutTake{ 50%{transform:scale(1.07)} to{transform:scale(1)} }
+  #grid figure.pop{animation:cutPop .3s cubic-bezier(.34,1.35,.5,1)}
+  @keyframes cutPop{ from{transform:scale(.7); opacity:0} to{transform:scale(1); opacity:1} }
+  @media (prefers-reduced-motion: reduce){
+    #grid figure.mergeAway,#grid figure.mergeTo,#grid figure.pop{animation:none}
+  }
   .band{position:absolute; border:1px solid var(--accent);
     background:rgba(255,212,0,.14); pointer-events:none; z-index:5; display:none}
   .band.on{display:block}
@@ -654,6 +665,8 @@
     border-radius:8px; padding:3px 8px 3px 10px}
   .ioGroup .mini{border:0; background:transparent; padding:4px 7px}
   .ioGroup .mini:hover{background:#323846}
+  /* 내보내기는 창을 띄우지 않는다 — 그림 셋을 그 자리에 늘어놓고 바로 누른다 */
+  .ioOut .icoBtn{font-size:14px; padding:3px 8px; line-height:1.2}
   .ioLabel{font-size:11px; color:#5d6472}
   /* ---------------- 컷 정리 줄 ----------------
      구간(I/O) 줄과 같은 모양으로 한 층 아래에 둔다.
@@ -1131,8 +1144,15 @@
               <button class="mini" id="setOut" title="현재 위치를 끝점으로 (단축키 O)">아웃점 ⟧</button>
               <button class="mini" id="clrIO" title="구간 해제 (Ctrl+Shift+X)">✕</button>
             </span>
-            <button class="mini" id="ioExport"
-              title="잡은 구간을 내보냅니다&#10;프레임 · 음원 · 영상 중에서 고릅니다">⬆ 구간 내보내기</button>
+            <span class="ioGroup ioOut">
+              <span class="ioLabel">내보내기</span>
+              <button class="mini icoBtn" id="ioSeq"
+                title="연속 프레임&#10;원본 해상도 PNG 를 한 장씩 뽑아 ZIP 으로 묶습니다&#10;편집 프로그램의 이미지 시퀀스로 바로 씁니다 (소리 없음)">🎞️</button>
+              <button class="mini icoBtn" id="ioAudio"
+                title="음원만&#10;그림 없이 소리만 뽑습니다 — 대사·효과음·음악&#10;몇 초면 끝나고 파일도 가장 작습니다">🎵</button>
+              <button class="mini icoBtn" id="ioClip"
+                title="영상&#10;해상도·초당 장수·소리를 원본 그대로 둔 채&#10;잡은 구간만큼만 영상으로 뽑습니다">🎬</button>
+            </span>
           </div>
           <div class="ioBar editBar" id="editBar">
             <span class="ioGroup">
@@ -1180,15 +1200,19 @@
                이름을 정하는 일은 컷을 내려받는 일과 한 몸이기 때문이다. -->
           <div class="nameBar">
             <div class="nameRow">
-              <span class="nameLbl">파일 이름</span>
-              <input id="nameRule" type="text" spellcheck="false" autocomplete="off"
-                     placeholder="{이름}_CUT{번호}{구분}">
-              <button class="mini" id="nameReset" title="처음 이름으로 되돌립니다">기본</button>
+              <span class="nameLbl">저장 네이밍</span>
+              <input class="nameSeg" id="nameSeg0" type="text" spellcheck="false"
+                     autocomplete="off" maxlength="40">
+              <span class="nameSep">_</span>
+              <input class="nameSeg" id="nameSeg1" type="text" spellcheck="false"
+                     autocomplete="off" maxlength="40" placeholder="추가">
+              <span class="nameSep">_</span>
+              <input class="nameSeg" id="nameSeg2" type="text" spellcheck="false"
+                     autocomplete="off" maxlength="40" placeholder="추가">
+              <span class="nameNum" title="번호는 적지 않아도 저장할 때 앞에서부터 차례로 붙습니다">_01</span>
+              <button class="mini" id="nameReset" title="처음 네이밍으로 되돌립니다">기본</button>
             </div>
-            <div class="nameRow2">
-              <span id="namePrev"></span>
-              <span id="nameChips"></span>
-            </div>
+            <div id="namePrev"></div>
           </div>
         </div>
       </div>
@@ -2268,51 +2292,31 @@ $("storeClose").onclick=()=>$("storeBox").classList.remove("on");
      · 조각   — 눌러서 넣는 알약 일곱 개 (자주 쓰는 것만)
      · 예시   — 지금 규칙으로 나올 이름 딱 한 줄
    여기 없는 조각도 적으면 그대로 동작한다 (nameParts 참고). 내놓지 않았을 뿐이다. */
-const 이름조각들=[["이름","영상 이름"],["번호","1, 2, 3"],["번호3","001"],
-  ["시각","분·초·장"],["분초","분·초"],["날짜","오늘 날짜"],["구분","_START"]];
 /* 예시에 쓸 컷. 아직 뽑은 것이 없어도 감이 오도록 하나 지어 둔다 */
 function 이름예시감(){
   const shots=(S.out&&S.out.shots&&S.out.shots.length)? curShots() : null;
-  if(shots && shots.length) return {list:shots.slice(0,2), opt:{total:shots.length}};
-  return {list:[{idx:1,t:3.5,base:"예시영상"},{idx:2,t:12.28,base:"예시영상"}],
+  if(shots && shots.length) return {list:shots.slice(0,1), opt:{total:shots.length}};
+  return {list:[{idx:1,t:3.5,base:"예시영상"}],
           opt:{total:24, base:"예시영상", start:false, fps:24,
                meta:{w:1920,h:1080,fps:24}}};
 }
+/* 칸에 적은 것을 읽어 저장해 두고, 예시와 컷 이름표를 다시 적는다.
+   ★ 적는 즉시 오른쪽 컷 목록의 이름표가 그대로 바뀐다 — 저장해 보기 전에는
+     어떤 이름이 나올지 알 수 없던 것이, 눈앞에서 바뀌니 설명이 필요 없다. */
 function paintNameBar(){
-  const box=$("namePrev"), chips=$("nameChips");
-  if(!box||!chips) return;
-  const el=$("nameRule");
-  const 규칙=(el.value||"").trim() || NAME_DEFAULT;
+  const box=$("namePrev"); if(!box) return;
+  const 칸=[0,1,2].map(i=>$("nameSeg"+i)).filter(Boolean);
+  if(칸.length) setNameSegs(칸.map(el=>el.value));
   const {list,opt}=이름예시감();
-  const 이름=fillName(규칙,nameParts(list[0],opt));
+  /* 첫 칸을 비워두면 영상 이름이 들어간다 — 무엇이 들어갈지 흐린 글씨로 미리 보인다 */
+  const 영상이름=nameParts(list[0],opt)["이름"]||"영상이름";
+  if(칸[0]) 칸[0].placeholder=영상이름;
+  const 번호칸=document.querySelector(".nameNum");
+  if(번호칸) 번호칸.textContent="_"+번호글(1, opt.total);
+  const 이름=nameStem(list[0],opt);
   const 끝=(list[0].fileName||list[0].blob)? extOf(list[0]) : OUT_EXT;
-  /* ★ 이름이 겹치는지는 규칙을 뜯어보지 않고 직접 만들어 견준다 —
-     컷 둘의 이름이 같으면 그 규칙은 컷을 가릴 수 없다는 뜻이다. */
-  const 겹침 = list.length>1
-    && fillName(규칙,nameParts(list[0],opt))===fillName(규칙,nameParts(list[1],opt));
-  box.innerHTML = (이름 ? `${이름}.${끝}`.replace(/</g,"&lt;") : "")
-    + (이름 ? "" : `<span class="warn">이름이 비어 버립니다 — 기본 이름으로 저장됩니다</span>`)
-    + (겹침 ? `<span class="warn">  · 컷마다 달라지는 것이 없어 겹칩니다 (뒤에 _2, _3 이 붙습니다)</span>` : "");
-  if(!chips.childElementCount){
-    이름조각들.forEach(([k,d])=>{
-      const b=document.createElement("button");
-      b.className="chip"; b.type="button"; b.textContent=k;
-      b.title=`{${k}} — ${d}   (눌러서 넣습니다)`;
-      b.onclick=()=>조각넣기("{"+k+"}");
-      chips.appendChild(b);
-    });
-  }
-}
-/* 알약을 누르면 커서 자리에 끼워 넣는다 */
-function 조각넣기(tok){
-  const el=$("nameRule"); if(!el) return;
-  /* 비어 있으면 기본 이름에서 시작한다 — 알약 하나만 덩그러니 남지 않게 */
-  let v=el.value, a, b;
-  if(!v.trim()){ v=NAME_DEFAULT; a=b=v.length; }
-  else{ a=el.selectionStart??v.length; b=el.selectionEnd??v.length; }
-  const 새값=v.slice(0,a)+tok+v.slice(b);
-  el.value=새값; setNameRule(새값); paintNameBar();
-  try{ el.focus(); el.setSelectionRange(a+tok.length,a+tok.length); }catch(e){}
+  box.innerHTML = `${이름}.${끝}`.replace(/</g,"&lt;");
+  try{ paintCaptions(); }catch(e){}
 }
 function paintTimePref(){
   const el=$("timePrev"); if(!el) return;
@@ -3756,15 +3760,33 @@ const extOf=s=>{
    {} 안에 든 것만 바뀌고 나머지 글자는 적은 그대로 붙는다.
    모르는 이름을 적으면 바꾸지 않고 그대로 남겨 둔다 (오타를 눈에 보이게).
    ========================================================================= */
-const NAME_DEFAULT="{이름}_CUT{번호}{구분}";
-let NAMERULE=(()=>{
-  try{ const v=localStorage.getItem("cg_namerule");
-       return (v==null||v==="") ? NAME_DEFAULT : v; }
-  catch(e){ return NAME_DEFAULT; }
+/* ---------- 저장 네이밍 ----------
+   ★ 처음에는 {이름}_CUT{번호} 처럼 한 줄짜리 규칙을 적게 했다. 무엇을 적어야
+     하는지 알 수 없다는 이야기를 들었다 — 규칙을 배우게 하는 꼴이었다.
+   이제는 칸을 나눠 두고, 칸에 적은 것을 _ 로 이어 붙인다.
+     · 첫 칸이 비어 있으면 영상 이름이 들어간다 (거의 늘 맨 앞에 오므로)
+     · 빈 칸은 건너뛴다 — 밑줄이 두 번 겹치지 않는다
+     · 번호는 적지 않는다. 언제나 맨 끝에 저절로 붙는다
+   컷 목록의 이름표가 적는 대로 바뀌므로, 설명을 읽을 일이 없다. */
+const NAMESEG_N = 3;
+const NAMESEGS_DEFAULT = ["", "CUT", ""];
+let NAMESEGS = (()=>{
+  try{
+    const v = JSON.parse(localStorage.getItem("cg_namesegs")||"null");
+    if(Array.isArray(v)) return Array.from({length:NAMESEG_N},(_,i)=>String(v[i]||""));
+  }catch(e){}
+  return NAMESEGS_DEFAULT.slice();
 })();
-function setNameRule(v){
-  NAMERULE = String(v==null?"":v).trim() || NAME_DEFAULT;
-  try{ localStorage.setItem("cg_namerule",NAMERULE); }catch(e){}
+function setNameSegs(list){
+  NAMESEGS = Array.from({length:NAMESEG_N},(_,i)=>String((list&&list[i])||""));
+  try{ localStorage.setItem("cg_namesegs", JSON.stringify(NAMESEGS)); }catch(e){}
+}
+/* 번호는 컷 수에 맞춰 자리를 채운다.
+   ★ 1, 2, … 10 으로 두면 탐색기가 10 을 2 보다 앞에 세운다 (글자로 견주기 때문).
+     01, 02, … 10 으로 채워 두어야 폴더에서도 컷 순서대로 보인다. */
+function 번호글(n, total){
+  const 자리 = Math.max(2, String(Math.max(1, total||0)).length);
+  return String(n||0).padStart(자리,"0");
 }
 /* 이름에 넣을 수 있는 조각들 — 여기 있는 것만 {} 안에 쓸 수 있다.
    opt 로 다른 기록의 컷(즐겨찾기 보관함)도 제 값으로 적을 수 있게 한다. */
@@ -3817,13 +3839,21 @@ function fillName(rule, parts){
   return out.slice(0,150);
 }
 /* 예전에 뽑아둔 기록은 내용이 JPEG 다 — 확장자는 실제 파일을 보고 정한다 (extOf) */
-const fname=(s,opt)=>{
-  const parts=nameParts(s,opt);
-  const nm = fillName(NAMERULE,parts)
-          || fillName(NAME_DEFAULT,parts)
-          || `${parts["이름"]}_CUT${parts["번호"]}`;
-  return `${nm}.${extOf(s)}`;
-};
+/* 확장자를 뺀 이름. 컷 목록의 이름표와 파일 이름이 같은 곳에서 나온다 */
+function nameStem(s, opt){
+  opt = opt||{};
+  const parts = nameParts(s,opt);
+  const 조각 = [];
+  NAMESEGS.forEach((v,i)=>{
+    let t = fillName(v, parts);
+    if(i===0 && !t) t = fillName("{이름}", parts);   // 첫 칸이 비면 영상 이름
+    if(t) 조각.push(t);
+  });
+  if(parts["종류"]==="스타트") 조각.push("START");   // 두 목록을 이름으로도 가른다
+  조각.push(번호글(s.idx, opt.total));
+  return 조각.join("_");
+}
+const fname = (s, opt) => `${nameStem(s,opt)}.${extOf(s)}`;
 /* ★ 규칙에 {번호} 가 없으면 컷마다 같은 이름이 나온다. 그대로 묶으면 ZIP 안에서
    서로 덮어써 한 장만 남는다 — 겹치는 것만 뒤에 번호를 붙여 살려 둔다. */
 function 이름겹침막기(){
@@ -3855,6 +3885,63 @@ function refreshShots(){
 }
 function curShots(){
   return (S.mode==="start" && S.out && S.out.startShots) ? S.out.startShots : (S.out?S.out.shots:[]);
+}
+/* 컷 아래에 적는 이름표 — 저장할 때 붙을 이름 그대로다 (확장자만 뗀다).
+   ★ 예전에는 CUT1 · CUT2 라고만 적었다. 그래서 [저장 네이밍] 을 고쳐도
+     실제로 어떤 이름으로 나올지는 한 번 받아봐야 알 수 있었다.
+     이제 적는 즉시 여기가 바뀐다 — 설명 대신 결과를 보여준다. */
+function 캡션글(s,total){
+  const 손댐 = s.hand ? "✎ " : "";
+  try{ return 손댐 + nameStem(s,{total}); }
+  catch(e){ return 손댐 + "CUT" + (s.idx||0); }
+}
+/* ---------- 합쳐지고 갈라지는 것을 눈으로 따라가게 ----------
+   ★ 예전에는 누르는 순간 격자가 통째로 다시 그려졌다. 일곱 컷이 네 컷이 되는데
+     그 사이가 없으니 무엇이 어디로 갔는지 알 수가 없었다 — 없어졌나 싶어
+     처음부터 다시 세어보게 된다.
+   합칠 때는 뒤의 것들이 앞 컷으로 빨려 들어가고, 가를 때는 새 컷이 솟아오른다.
+   0.26초 — 눈이 따라갈 만큼만 짧게 둔다. 움직임을 꺼둔 컴퓨터에서는 건너뛴다. */
+const 움직임끔 = () => {
+  try{ return matchMedia("(prefers-reduced-motion: reduce)").matches; }
+  catch(e){ return false; }
+};
+function 합치는시늉(sel){
+  return new Promise(done=>{
+    if(움직임끔() || !sel || sel.length<2) return done();
+    const els=sel.map(i=>grid.querySelector(`figure[data-i="${i}"]`)).filter(Boolean);
+    if(els.length<2) return done();
+    const 목표=els[0].getBoundingClientRect();
+    els[0].classList.add("mergeTo");
+    els.slice(1).forEach(el=>{
+      const r=el.getBoundingClientRect();
+      el.style.setProperty("--dx",(목표.left-r.left)+"px");
+      el.style.setProperty("--dy",(목표.top-r.top)+"px");
+      el.classList.add("mergeAway");
+    });
+    setTimeout(done,270);
+  });
+}
+/* 새로 생긴(또는 달라진) 컷을 한 번 솟아오르게 한다 */
+function 튀어나오게(idxs){
+  if(움직임끔()) return;
+  (idxs||[]).forEach(i=>{
+    const el=grid.querySelector(`figure[data-i="${i}"]`);
+    if(!el) return;
+    el.classList.remove("pop");
+    void el.offsetWidth;                 // 다시 틀어야 같은 움직임이 또 돈다
+    el.classList.add("pop");
+  });
+}
+/* 격자를 통째로 다시 그리지 않고 이름표만 고친다 (스크롤이 튀지 않는다) */
+function paintCaptions(){
+  if(!S.out) return;
+  const shots=curShots();
+  [...grid.querySelectorAll("figure")].forEach(el=>{
+    const s=shots[+el.dataset.i], c=el.querySelector(".cap");
+    if(!s||!c) return;
+    c.textContent=캡션글(s,shots.length);
+    c.title=c.textContent;
+  });
 }
 function drawGrid(){
   const shots=curShots();
@@ -3907,7 +3994,8 @@ function drawGrid(){
     );
 
     const cap=document.createElement("div");
-    cap.className="cap"; cap.textContent=(s.hand?"✎ ":"")+`CUT${s.idx}`;
+    cap.className="cap"; cap.textContent=캡션글(s,shots.length);
+    cap.title=cap.textContent;
     fig.append(th,hb,ck,tools,cap);
 
     let clickTimer=null;
@@ -4853,15 +4941,15 @@ async function editReady(needVideo){
 }
 /* 이미 만들어 둔 스타트 프레임은 컷 목록에서 나온 것이라 함께 낡는다.
    조용히 버리지 않고 무엇이 사라지는지 먼저 알려준다. */
-async function warnStart(){
+/* 컷을 손보면 이미 만들어 둔 스타트 프레임은 컷 번호가 어긋난다 — 목록을 비운다.
+   ★ 예전에는 그때마다 "비워도 될까요" 하고 물었다. 그런데 대답은 언제나 예였고
+     (아니오를 고르면 손보던 일 자체가 취소된다), 다시 만드는 데는 몇 초면 된다.
+     물을 만한 일이 아니어서, 조용히 비우고 한 줄로 알려만 준다. */
+function warnStart(){
   const st=S.out.startShots;
-  if(!(st&&st.length)) return true;
-  return await appConfirm(
-    "컷을 손보면 이미 만들어 둔 <b>스타트 프레임</b> 목록은 컷 번호가 어긋납니다.\n"+
-    "그래서 목록을 비우고, 필요할 때 다시 만들도록 합니다.\n\n"+
-    "(즐겨찾기에 담아둔 것은 그대로 남습니다)\n\n계속할까요?","스타트 프레임");
+  if(st&&st.length) toast("스타트 프레임 목록을 비웠습니다 — [스타트 프레임] 에서 다시 만들 수 있습니다");
+  return true;
 }
-
 /* ---------- 지금 화면 한 장 ---------- */
 /* 원본 해상도 PNG 한 장을 만든다.
    ★ 되도록 ffmpeg 로 원본에서 직접 뽑는다. 재생 칸은 크롬이 돌리는데,
@@ -5250,28 +5338,12 @@ async function migrateFavs(j){
 async function replaceHere(){
   if(!await editReady(true)) return;
   const shots=S.out.shots, t=pv.currentTime;
-  const sel=[...S.sel].sort((a,b)=>a-b);
   const i=playingCut();
-  /* 여러 컷을 골라 두었다면 "이 구간을 한 컷으로" 라는 뜻으로 읽는다.
-     — 흔들리는 장면이 서너 컷으로 나뉘었을 때 가장 자주 하고 싶어 하는 일이다. */
-  if(sel.length>=2 && isRun(sel)){
-    const a=sel[0], b=sel[sel.length-1];
-    const 안쪽 = t>=cutStartOf(shots[a])-0.02
-              && (shots[b].outT==null || t<=shots[b].outT+0.02);
-    const opts=[{k:"merge",t:`${sel.length}개를 한 컷으로 병합하고 이 화면을 대표로`,
-        d:안쪽?`CUT${shots[a].idx}~CUT${shots[b].idx} 가 한 컷이 되고, 지금 화면(${tcs(t)})이 그 컷의 대표가 됩니다.`
-             :`지금 재생 위치(${tcs(t)})는 고른 구간 밖입니다. 그래도 이 화면을 대표로 씁니다.`}];
-    if(i>=0) opts.push({k:"one",t:`재생 중인 CUT${shots[i].idx} 하나만 교체`,
-        d:"골라둔 것은 그대로 두고, 재생 중인 컷의 대표 화면만 바꿉니다."});
-    opts.push({k:"cancel",t:"취소",d:"아무것도 하지 않습니다."});
-    const pick=await appChoice("고른 컷이 여러 개입니다",
-      `<b>CUT${shots[a].idx} ~ CUT${shots[b].idx}</b> ${sel.length}개를 골라 두셨습니다.<br>어떻게 할까요?`,
-      opts);
-    if(pick==="merge") return doMerge(sel,t);
-    if(pick!=="one") return;
-  }
+  /* ★ 여러 컷을 골라 둔 채로 눌렀을 때 "병합할까요 교체할까요" 하고 물었다.
+     묻지 않는다 — 교체는 교체다. 여러 개를 한 컷으로 묶는 것은 M(병합)이 한다.
+     둘을 한 단추에 겹쳐 두었던 것이 물어볼 일을 만들었을 뿐이다. */
   if(i<0) return toast("재생 위치가 첫 컷보다 앞에 있습니다 — 컷 안으로 옮겨주세요");
-  if(!await warnStart()) return;
+  warnStart();
   editBusy(true);
   try{
     keepOriginal();
@@ -5284,7 +5356,7 @@ async function replaceHere(){
 
 /* ---------- ② 병합 ---------- */
 async function doMerge(sel,repT){
-  if(!await warnStart()) return;
+  warnStart();
   editBusy(true);
   try{
     const shots=S.out.shots, a=sel[0], b=sel[sel.length-1];
@@ -5294,32 +5366,24 @@ async function doMerge(sel,repT){
     shots[a].outT = shots[b].outT!=null ? shots[b].outT : shots[a].outT;
     shots.splice(a+1,b-a);
     await afterEdit(a);
-    toast(`${sel.length}개 컷을 CUT${S.out.shots[a].idx} 하나로 병합했습니다`);
+    튀어나오게([a]);
+    toast(`${sel.length}개 컷을 한 컷으로 합쳤습니다 — 대표 화면은 R(교체)로 바꿀 수 있습니다`);
   }catch(err){ toast("병합 실패: "+(err.message||"오류")); }
   finally{ editBusy(false); }
 }
+/* ★ 예전에는 "합친 컷의 대표 화면을 무엇으로 할까요" 하고 창으로 물었다.
+     그런데 병합은 "이 흔들린 것들을 한 컷으로 묶자" 는 한 동작이다. 그 한가운데
+     창이 끼어들면 흐름이 끊긴다. 고른 것 중 첫 컷의 화면을 그대로 쓰고,
+     마음에 안 들면 그 자리에서 R(교체) 한 번이면 된다 — 되돌릴 길이 이미 있다. */
 async function mergeSelected(){
   if(!await editReady(false)) return;
   const sel=[...S.sel].sort((a,b)=>a-b);
   if(sel.length<2)
     return toast("병합할 컷을 2개 이상 골라주세요 — 첫 컷을 누르고 마지막 컷을 Shift+클릭");
   if(!isRun(sel)) return toast("이어져 있는 컷만 병합할 수 있습니다");
-  const shots=S.out.shots, a=sel[0], b=sel[sel.length-1], t=pv.currentTime;
-  const 안쪽 = hasVideo() && pv.videoWidth
-            && t>=cutStartOf(shots[a])-0.02
-            && (shots[b].outT==null || t<=shots[b].outT+0.02);
-  const opts=[{k:"first",t:`CUT${shots[a].idx} 의 화면 그대로`,
-      d:"고른 것 중 첫 컷의 대표 화면을 그대로 씁니다."}];
-  if(안쪽) opts.push({k:"now",t:`지금 재생 중인 화면 (${tcs(t)})`,
-      d:"원하는 장면에 세워두고 고르면 그 화면이 대표가 됩니다."});
-  opts.push({k:"cancel",t:"취소",d:"아무것도 하지 않습니다."});
-  const pick=await appChoice("컷 병합",
-    `<b>CUT${shots[a].idx} ~ CUT${shots[b].idx}</b> ${sel.length}개를 한 컷으로 병합합니다.<br>`+
-    `합친 컷의 <b>대표 화면</b>을 무엇으로 할까요?`, opts);
-  if(pick!=="first" && pick!=="now") return;
-  await doMerge(sel, pick==="now"? t : null);
+  await 합치는시늉(sel);              // 눈으로 따라갈 수 있게 먼저 보여준다
+  await doMerge(sel, null);
 }
-
 /* ---------- ③ 분할 ---------- */
 async function splitHere(){
   if(!await editReady(true)) return;
@@ -5329,7 +5393,7 @@ async function splitHere(){
   const 시작=cutStartOf(s), 끝=(s.outT!=null? s.outT : (pv.duration||t+fd));
   if(t<=시작+fd*0.5 || t>=끝-fd*0.5)
     return toast("컷 한가운데에서만 분할할 수 있습니다 — D·F 로 위치를 옮겨보세요");
-  if(!await warnStart()) return;
+  warnStart();
   editBusy(true);
   try{
     keepOriginal();
@@ -5343,7 +5407,8 @@ async function splitHere(){
     s.outT=t;
     shots.splice(i+1,0,뒤);
     await afterEdit(i+1);
-    toast(`CUT${S.out.shots[i].idx} 를 두 컷으로 분할했습니다`);
+    튀어나오게([i,i+1]);
+    toast(`한 컷을 두 컷으로 갈랐습니다`);
   }catch(err){ toast("분할 실패: "+(err.message||"오류")); }
   finally{ editBusy(false); }
 }
@@ -5592,32 +5657,13 @@ async function 구간음원저장(btn){
   finally{ progWrap.style.display="none"; btn.disabled=false; }
 }
 
-/* ---------- 구간 내보내기 (한 자리에서 고른다) ----------
-   ★ 예전에는 [연속프레임] [영상] [음원] 세 단추를 나란히 두었다. 이름이 길어
-     구간 줄이 가로로 넘쳤고, 셋 다 "잡은 구간을 내보낸다" 는 같은 일이라
-     매번 세 개를 읽고 고르는 꼴이었다.
-   이제 단추는 하나다. 무엇으로 내보낼지는 그림을 보고 고른다. */
-$("ioExport").onclick=async ()=>{
-  const btn=$("ioExport");
-  if(!hasVideo()) return toast("원본 영상을 먼저 불러와 주세요");
-  const a=S.inT??0, b=S.outT??(pv.duration||0), dur=b-a;
-  if(!(dur>0.05)) return toast("구간이 너무 짧습니다 — I(인점) · O(아웃점) 으로 잡아주세요");
-  const fps=(S.fps&&isFinite(S.fps)&&S.fps>1)?S.fps:24;
-  const 장수=Math.max(0,Math.floor(dur*fps));
-  const 전체=(S.inT==null && S.outT==null);
-  const 갈래=await appChoice("구간 내보내기",
-    `<b>${tcs(a)} ~ ${tcs(b)}</b>  (${dur.toFixed(2)}초${전체?" · 구간을 안 잡아 전체입니다":""})<br>무엇으로 내보낼까요?`,
-    [{k:"frames", icon:"🎞", t:`연속 프레임  ${장수}장`,
-      d:"원본 해상도 PNG 를 한 장씩 뽑아 ZIP 으로 묶습니다. 편집 프로그램의 이미지 시퀀스로 바로 씁니다. 소리는 들어가지 않습니다."},
-     {k:"audio",  icon:"🎵", t:"음원만",
-      d:"그림 없이 소리만 뽑습니다. 대사·효과음·음악을 챙길 때. 몇 초면 끝나고 파일도 가장 작습니다."},
-     {k:"video",  icon:"🎬", t:"영상",
-      d:"해상도·초당 장수·소리를 원본 그대로 둔 채, 잡은 구간만큼만 영상으로 뽑습니다."},
-     {k:"cancel", icon:"✕", t:"취소", d:"아무것도 하지 않습니다."}]);
-  if(갈래==="frames") return 구간프레임저장(btn);
-  if(갈래==="audio")  return 구간음원저장(btn);
-  if(갈래==="video")  return 구간영상저장(btn);
-};
+/* ---------- 구간 내보내기 ----------
+   ★ 한 번은 세 갈래를 창으로 물어보게 했다. 그런데 이 셋은 고민할 거리가 아니라
+     "지금 이걸로 뽑겠다" 는 것이라, 창이 한 번 더 끼어드는 것이 성가시기만 했다.
+   그림 셋을 구간 줄에 그대로 두고, 누르면 곧바로 뽑는다. */
+$("ioSeq").onclick   = e => 구간프레임저장(e.currentTarget);
+$("ioAudio").onclick = e => 구간음원저장(e.currentTarget);
+$("ioClip").onclick  = e => 구간영상저장(e.currentTarget);
 
 /** 지금 보고 있는 버전(분석/스타트)의 샷리스트를 만든다 */
 async function currentSheet(){
@@ -6738,18 +6784,30 @@ document.addEventListener("keydown",e=>{
     copyNow(); return;
   }
   if(!res.classList.contains("on")) return;
+  /* ★ 글자를 적는 중에는 단축키를 하나도 건드리지 않는다.
+     예전에는 컷 정리 단축키(M·R)만 비켜서고 재생기 쪽은 그대로 먹었다.
+     그래서 [저장 네이밍] 칸에 이름을 적으면
+       · 스페이스 → 영상이 재생되고, 게다가 칸에서 커서가 빠져나갔다
+       · i · o    → 인점·아웃점이 잡혔다
+       · d · f    → 장이 넘어갔다
+       · Enter    → 전체화면이 됐다
+     제대로 칠 수가 없었다. 칸 안에서는 칸이 주인이다. */
+  {
+    const ae=document.activeElement;
+    if(ae && (ae.tagName==="INPUT"||ae.tagName==="TEXTAREA"||ae.isContentEditable)){
+      if(e.key==="Escape" && ae.blur) ae.blur();   // Esc 로만 빠져나온다
+      return;
+    }
+  }
   if(e.key==="Enter"){ e.preventDefault(); toggleFull($("vPane")); return; }
   if(e.key==="Escape" && document.fullscreenElement){
     e.preventDefault(); document.exitFullscreen().catch(()=>{}); return; }
   if((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key.toLowerCase()==="x"){
     e.preventDefault(); clearIO(); toast("구간 해제"); return; }
-  /* ---------- 컷 정리 단축키 ----------
-     글자를 입력하는 중에는 손대지 않는다 (영상 주소 칸에 'r' 을 못 적으면 곤란하다) */
+  /* ---------- 컷 정리 단축키 ---------- */
   {
-    const ae=document.activeElement;
-    const 입력중 = ae && (ae.tagName==="INPUT"||ae.tagName==="TEXTAREA"||ae.isContentEditable);
     const kk=String(e.key||"").toLowerCase();
-    if(!입력중 && !e.altKey){
+    if(!e.altKey){
       if((e.ctrlKey||e.metaKey) && !e.shiftKey && kk==="s"){
         e.preventDefault(); grabStillNow(); return; }
       if(!e.ctrlKey && !e.metaKey && !e.shiftKey){
@@ -7140,15 +7198,20 @@ if(IS_EL){
     "파일 · <b>영상 길이의 1/3</b>정도 분석 시간 소요<br>"+
     "주소 · <b>내려받는 시간이 더 붙습니다</b>";
 }
-/* ---------- 이름 칸 준비 ----------
-   ★ 여기서 한다. NAME_DEFAULT · NAMERULE 은 이 아래쪽이 아니라 '한참 위' 에서
-     만들어지는 상수인데, 상수는 만들어지기 전에는 건드릴 수 없다(TDZ).
-     화면 만드는 자리에서 미리 부르면 그 한 줄에 스크립트가 통째로 멈춘다. */
-$("nameRule").value = NAMERULE===NAME_DEFAULT ? "" : NAMERULE;
-$("nameRule").oninput=()=>{ setNameRule($("nameRule").value); paintNameBar(); };
+/* ---------- 저장 네이밍 칸 준비 ----------
+   ★ 여기서 한다. NAMESEGS 는 이 아래쪽이 아니라 '한참 위' 에서 만들어지는
+     값인데, 만들어지기 전에는 건드릴 수 없다(TDZ). 화면 만드는 자리에서
+     미리 부르면 그 한 줄에 스크립트가 통째로 멈춘다. */
+[0,1,2].forEach(i=>{
+  const el=$("nameSeg"+i); if(!el) return;
+  el.value = NAMESEGS[i]||"";
+  el.oninput = paintNameBar;
+});
 $("nameReset").onclick=()=>{
-  $("nameRule").value=""; setNameRule(""); paintNameBar();
-  toast("처음 이름으로 되돌렸습니다");
+  setNameSegs(NAMESEGS_DEFAULT);
+  [0,1,2].forEach(i=>{ const el=$("nameSeg"+i); if(el) el.value=NAMESEGS[i]||""; });
+  paintNameBar();
+  toast("처음 네이밍으로 되돌렸습니다");
 };
 paintNameBar();
 

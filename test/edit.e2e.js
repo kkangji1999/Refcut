@@ -144,9 +144,8 @@ app.whenReady().then(async () => {
       /* ---------- 구간 표시 · 구간 영상 ---------- */
       S.inT=0.4; S.outT=1.6; paintIO();
       out.구간글=$("ioText").textContent;
-      /* 구간 내보내기는 단추 하나로 합쳤다 — 고르는 창을 거치지 않고
-         '영상으로 뽑기' 를 곧바로 부른다 */
-      const 클립=구간영상저장($("ioExport"));
+      /* 구간 내보내기는 창을 띄우지 않는다 — 그림 단추가 부르는 함수를 그대로 부른다 */
+      const 클립=구간영상저장($("ioClip"));
       let 떴다=false;
       for(let i=0;i<300;i++){
         await 잠깐(100);
@@ -156,7 +155,7 @@ app.whenReady().then(async () => {
       out.클립알림=떴다 ? $("dlgBody").textContent.slice(0,200) : "(알림창이 뜨지 않았다)";
       out.클립진단={ 떴다, 창:$("dlg").className,
         제목:$("dlgTitle").textContent, 몸:$("dlgBody").textContent.slice(0,120),
-        진행:$("progWrap").style.display, 단추막힘:$("ioExport").disabled };
+        진행:$("progWrap").style.display, 단추막힘:$("ioClip").disabled };
       closeDlg(true);
       await 클립;
       out.클립끝난뒤={ 제목:$("dlgTitle").textContent, 창:$("dlg").className };
@@ -186,16 +185,11 @@ app.whenReady().then(async () => {
            그래서 초기화하면 컷 칸은 뜨는데 그림만 안 보였다.
            컷을 조금만 손대는 시험으로는 파일이 지워지지 않아 영영 안 걸린다. */
       S.sel.clear(); paintSel();
-      /* ★ 이 자리는 스타트 프레임을 이미 만들어 둔 뒤다 —
-         컷을 손보면 "스타트 프레임 목록을 비웁니다" 확인창이 먼저 뜬다.
-         닫아주지 않으면 시험이 그 자리에서 영영 멈춘다. */
-      const p1=doMerge([2,3,4,5], null);
-      for(let i=0;i<50;i++){ await 잠깐(100);
-        if($("dlg").classList.contains("on")
-           && /스타트 프레임/.test($("dlgTitle").textContent)) break; }
-      closeDlg(true);
-      await p1;
+      /* 스타트 프레임을 이미 만들어 둔 뒤다 — 예전에는 여기서 "비워도 될까요"
+         확인창이 떴다. 이제는 묻지 않고 조용히 비우고 한 줄로 알려만 준다. */
+      await doMerge([2,3,4,5], null);
       await flushFolder();
+      out.창안뜸=!$("dlg").classList.contains("on");   // 창이 끼어들지 않았는가
       out.깊은병합=목록();
       /* 컷이 줄면 남는 번호의 파일이 실제로 지워졌는가 (여기서 지워져야 다음이 시험이 된다) */
       out.깊은병합사라짐=(await window.CG.filesExist(
@@ -390,6 +384,7 @@ app.whenReady().then(async () => {
       fails.push(`초기화: ${없어진시각.length}개 컷이 목록에서 사라졌다`);
 
     /* 옛 버전이 깨뜨려 놓은 기록을 열면 스스로 낫는가 */
+    if (!r.창안뜸) f.push("컷을 병합하는데 확인창이 끼어들었다 (묻지 않기로 했다)");
     if (r.일부러지움 !== 0)
       fails.push("시험이 헐겁다: 일부러 지운 그림이 실제로는 안 지워졌다");
     if (r.되살림 !== r.되살림전체)
