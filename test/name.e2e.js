@@ -102,6 +102,26 @@ app.whenReady().then(async () => {
       await 잠깐(30);
       out.되돌린칸=NAMESEGS.slice();
       out.되돌린이름표=[...grid.querySelectorAll("figure .cap")].map(c=>c.textContent);
+      /* ---- 한글 조합 중에는 화면을 휘젓지 않는가 ----
+         ★ 글자 하나가 여러 번에 걸쳐 완성되는 동안(ㄹ → 러 → 럽 → 러프)
+           컷 이름표 일곱 개를 글쇠마다 다시 쓰면 조합이 흐트러져
+           마지막 글자가 겹쳐 들어오는 일이 있다. 조합이 끝난 뒤에 한 번만 그린다. */
+      setNameSegs(NAMESEGS_DEFAULT);
+      [0,1,2].forEach(i=>{ const el=$("nameSeg"+i); if(el) el.value=NAMESEGS[i]||""; });
+      paintNameBar();
+      const 이름표 = ()=>[...grid.querySelectorAll("figure .cap")].map(c=>c.textContent);
+      out.조합전 = 이름표();
+      const el1=$("nameSeg1");
+      el1.dispatchEvent(new CompositionEvent("compositionstart"));
+      el1.value="ㄹ";   el1.oninput();
+      el1.value="러";   el1.oninput();
+      out.조합중 = 이름표();                       // 아직 그대로여야 한다
+      el1.value="러프"; el1.oninput();
+      el1.dispatchEvent(new CompositionEvent("compositionend"));
+      await 잠깐(40);
+      out.조합뒤 = 이름표();                       // 이제 반영된다
+      out.조합뒤저장 = NAMESEGS[1];
+
       S.out=null; grid.innerHTML="";
       /* 시간 표시 설정 창 */
       openPref();
@@ -175,6 +195,13 @@ app.whenReady().then(async () => {
     if (!같나(r.되돌린칸, ["", "CUT", ""])) f.push(`[기본] 이 처음으로 안 돌아간다 → ${JSON.stringify(r.되돌린칸)}`);
     if (!같나(r.되돌린이름표, r.이름표처음)) f.push("[기본] 을 눌러도 컷 이름표가 안 돌아간다");
     if (!r.창열림 || !r.창닫힘) f.push("시간 표시 창이 열리거나 닫히지 않는다");
+    /* 한글 조합 */
+    if (!같나(r.조합중, r.조합전))
+      f.push(`한글을 조합하는 중에 컷 이름표가 바뀐다 — 조합이 흐트러진다 (${(r.조합중||[])[0]})`);
+    if (!같나(r.조합뒤, ["내영상_러프_01", "내영상_러프_02", "내영상_러프_12"]))
+      f.push(`조합이 끝났는데 이름표가 반영되지 않는다 → ${(r.조합뒤||[]).join(", ")}`);
+    if (r.조합뒤저장 !== "러프") f.push(`조합이 끝난 글자가 제대로 저장되지 않는다 → "${r.조합뒤저장}"`);
+
     if (!/간단|자세히|타임코드/.test(r.시간예시)) f.push("시간 표시 예시가 비어 있다");
     if (!r.눌러바뀜) f.push("재생 시각을 눌러도 표시 방식이 바뀌지 않는다");
     /* ⑦ 화면이 조용히 죽지 않았는가 */

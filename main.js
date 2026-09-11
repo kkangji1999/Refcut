@@ -1787,7 +1787,17 @@ ipcMain.handle("ytDownload", async (e, { url, dest, jobId, height, plan, useCook
     갱신예약(5000);                 // 이제 조용하다 — 갱신할 것이 있으면 지금 한다
     if (killed) return { ok: false, aborted: true };
     if (!fs.existsSync(dest)) return { ok: false, error: "받은 파일을 찾을 수 없습니다." };
-    return { ok: true, path: dest, size: fs.statSync(dest).size };
+    /* ★ 몇 p 로 받아졌는지 실제 파일을 열어 확인한다.
+       유튜브는 좋은 통로가 막히면 마지막 안전망(android)으로 물러나는데,
+       그쪽은 360p 뿐이다. 그래도 "받아졌다" 이므로 예전에는 아무 말 없이
+       360p 를 건네주었다 — 최고 화질로 맞춰둔 사람이 한참 뒤에야 알아챘다.
+       받은 것이 바라던 것에 못 미치면 화면 쪽이 그렇게 말해줄 수 있게 알려준다. */
+    let 높이 = 0;
+    try { const q = await probeViaFfmpeg(dest); if (q && q.ok) 높이 = q.height || 0; }
+    catch (e) {}
+    return { ok: true, path: dest, size: fs.statSync(dest).size, height: 높이,
+             /* 좋은 통로들이 왜 막혔는지 — 낮은 화질로 물러났을 때 함께 보여준다 */
+             fellBack: allErrs.length ? pickError(allErrs).slice(0, 200) : "" };
   } catch (err) {
     CANCEL.delete("yt" + jobId);
     const 원문 = String(err.message || err);

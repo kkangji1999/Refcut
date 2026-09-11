@@ -1986,7 +1986,7 @@ function download(blob,name){
    같은 날 두 번째로 내보내면 26.8.1602 로 올린다.
    업데이트 확인은 마디마다 숫자로 비교하므로(verNum) 자리수가 달라도 안전하다. */
 /* 앱으로 켰으면 설치된 진짜 버전을 그대로 쓴다 (여기 숫자는 웹으로 열 때의 몫) */
-const APP_VERSION = (window.CG && window.CG.version) || "26.9.1102";
+const APP_VERSION = (window.CG && window.CG.version) || "26.9.1103";
 const APP_DATE    = "2026.09.11";
 /* 최신 index.html 이 올라가 있는 주소.
    여기에 넣어두면 [업데이트] 버튼이 새 버전을 확인합니다.
@@ -3456,6 +3456,20 @@ async function startRun(){
    받아 놓은 파일은 대기열에 그대로 남겨 둔다 — 마음이 바뀌어 [추출 시작] 을
    눌러도 다시 받지 않고 그 파일에서 바로 뽑는다. */
 let _dlBusy=false;
+/* ---------- 받은 화질이 바라던 것에 못 미쳤는가 ----------
+   ★ 유튜브는 좋은 통로가 막히면 마지막 안전망으로 물러난다. 그쪽은 360p 뿐인데,
+     그래도 "받아졌다" 이므로 예전에는 아무 말 없이 그대로 건네주었다.
+     최고 화질로 맞춰둔 사람이 한참 뒤에야 알아채고, 왜 그런지도 알 수 없었다.
+   못 미치면 그 자리에서 말해준다. 막히는 것은 대개 잠깐이라, 다시 넣으면
+   제 화질로 받아진다 — 무엇을 하면 되는지까지 함께 적는다. */
+function 화질미달(item, r){
+  const 실제 = (r && r.height) || 0;
+  const 바란 = item.height || (item.heights && item.heights[0]) || 0;
+  if(!실제 || !바란 || 실제 >= 바란*0.8) return null;
+  return { 실제, 바란 };
+}
+const 화질미달글 = m => `${m.바란}p 까지 있는 영상인데 ${m.실제}p 로만 받아졌습니다`;
+
 async function 영상만받기(item){
   if(S.running) return toast("추출이 도는 중입니다 — 끝난 뒤에 받아주세요");
   if(_dlBusy)   return toast("이미 하나를 받고 있습니다");
@@ -3518,6 +3532,13 @@ async function 영상만받기(item){
   statusEl.style.color="var(--muted)";
   prog(100,"영상을 받았습니다 — 저장 폴더 안의 [받은 영상] 에 있습니다","");
   toast("받았습니다 — 그대로 두고 [추출 시작] 을 누르면 추출까지 이어집니다");
+  const 미달=화질미달(item, r);
+  if(미달) await appAlert(
+    `<b>${화질미달글(미달)}</b>\n\n`+
+    "사이트가 좋은 화질 통로를 잠깐 막으면, 프로그램은 낮은 화질로라도 받아둡니다.\n"+
+    "빈손으로 끝내지 않으려는 것인데, 말없이 넘어가면 나중에야 알게 됩니다.\n\n"+
+    "대기열에서 빼고 주소를 다시 넣어보세요 — 대개 제 화질로 받아집니다.",
+    "화질 확인");
 }
 
 /* 취소는 표만 세운다. 실제 중단은 각 단계 안쪽에서 스스로 빠져나온다.
@@ -3576,6 +3597,9 @@ async function runOneEl(item,tag,t0){
     if(!r || !r.ok) throw new Error(r&&r.error ? r.error : "영상을 받지 못했습니다.");
     item.path=r.path; item.size=r.size||0;
     item.받기초=(performance.now()-받기시작)/1000;
+    /* 분석은 그대로 이어간다 — 여기서 창을 띄우면 대기열이 통째로 멈춘다 */
+    const 미달=화질미달(item, r);
+    if(미달) toast(화질미달글(미달)+" — 빼고 다시 넣으면 대개 제 화질로 받아집니다");
     /* 실제 파일에서 길이·해상도를 다시 읽는다 (주소 정보보다 정확하다) */
     try{ const q=await window.CG.probe(r.path);
       if(q&&q.ok){ item.duration=q.duration; item.w=q.width; item.h=q.height; item.fps=q.fps; }
@@ -7303,10 +7327,20 @@ if(IS_EL){
    ★ 여기서 한다. NAMESEGS 는 이 아래쪽이 아니라 '한참 위' 에서 만들어지는
      값인데, 만들어지기 전에는 건드릴 수 없다(TDZ). 화면 만드는 자리에서
      미리 부르면 그 한 줄에 스크립트가 통째로 멈춘다. */
+/* ★ 한글은 글자 하나가 여러 번에 걸쳐 완성된다 (ㄹ → 러 → 럽 → 러프).
+     그 조합이 끝나기 전에 화면을 휘저으면 — 컷 이름표 일곱 개를 다시 쓰는 일이
+     글쇠마다 일어난다 — 조합이 흐트러져 마지막 글자가 겹쳐 들어오는 일이 있다.
+     조합하는 동안에는 손대지 않고, 글자가 다 여물면 그때 한 번만 그린다.
+     (영어처럼 조합이 없는 글자는 예전과 똑같이 칠 때마다 바로 반영된다) */
+let _조합중 = false;
 [0,1,2].forEach(i=>{
   const el=$("nameSeg"+i); if(!el) return;
   el.value = NAMESEGS[i]||"";
-  el.oninput = paintNameBar;
+  el.oninput = () => { if(!_조합중) paintNameBar(); };
+  el.addEventListener("compositionstart", ()=>{ _조합중=true; });
+  el.addEventListener("compositionend",   ()=>{ _조합중=false; paintNameBar(); });
+  /* 조합하다 말고 딴 데를 눌러도 적어둔 것이 어긋나지 않게 한 번 더 맞춘다 */
+  el.addEventListener("blur",             ()=>{ _조합중=false; paintNameBar(); });
 });
 $("nameReset").onclick=()=>{
   setNameSegs(NAMESEGS_DEFAULT);
