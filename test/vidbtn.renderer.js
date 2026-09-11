@@ -69,7 +69,36 @@
     await folDel(id); await loadFolders();
     document.getElementById("archive").classList.remove("on");
 
-    /* ---- 5) 단추 이름 ---- */
+    /* ---- 5) 보관함에서 영상을 두 번 눌렀을 때 ----
+       ★ 예전에는 보관함을 닫고 결과 화면으로 끌고 갔다. 스틸은 그 자리에서
+         크게 보이는데 영상만 딴 데로 데려가니, 넘겨보다 갑자기 튕겨 나갔다.
+         이제는 보관함을 그대로 둔 채 여기서 크게 넘겨본다. */
+    {
+      const j0 = HIST[0];
+      const rec = await jobGet(j0.id);
+      rec.fav = true; await jobPut(rec);
+      await renderHist();
+      document.getElementById("archive").classList.add("on");
+      renderArchive();
+      const card = [...document.querySelectorAll("#arcGrid .acard")]
+        .find(el => String(el.dataset.k || "").startsWith("V|"));
+      if (card) {
+        card.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+        await new Promise(r => setTimeout(r, 400));
+      }
+      결과.영상크게 = {
+        카드있나: !!card,
+        크게열림: document.getElementById("lb").classList.contains("on"),
+        보관함남음: document.getElementById("archive").classList.contains("on"),
+        장수: (LB.list || []).length,
+        이동단추: getComputedStyle(document.getElementById("lbGo")).display,
+      };
+      closeLB();
+      document.getElementById("archive").classList.remove("on");
+      rec.fav = false; await jobPut(rec); await renderHist();
+    }
+
+    /* ---- 6) 단추 이름 ---- */
     const sv = document.getElementById("saveVid");
     결과.단추 = { 글자: sv.textContent, 설명: sv.title };
     결과.안내 = document.getElementById("speedNote").textContent;
