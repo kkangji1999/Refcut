@@ -3557,6 +3557,10 @@ async function runOneEl(item,tag,t0){
     const dest=`${outDir}/${b0}_CUTS/${b0}.mp4`;
     const jid="d"+Date.now();
     _ytJob=jid;
+    /* ★ 받는 데 걸린 시간을 따로 적어 둔다.
+       "같은 링크인데 이 컴퓨터만 느리다" 를 따질 때, 받기가 느린 것인지
+       분석이 느린 것인지부터 갈라야 한다 — 짐작이 아니라 숫자로 본다. */
+    const 받기시작=performance.now();
     prog(1, tag+"영상 받는 중...", "");
     const r=await window.CG.ytDownload(item.url, dest, jid,
       {height:item.height||0, plan:item.plan,
@@ -3571,6 +3575,7 @@ async function runOneEl(item,tag,t0){
     if(r && r.aborted) throw new Aborted();
     if(!r || !r.ok) throw new Error(r&&r.error ? r.error : "영상을 받지 못했습니다.");
     item.path=r.path; item.size=r.size||0;
+    item.받기초=(performance.now()-받기시작)/1000;
     /* 실제 파일에서 길이·해상도를 다시 읽는다 (주소 정보보다 정확하다) */
     try{ const q=await window.CG.probe(r.path);
       if(q&&q.ok){ item.duration=q.duration; item.w=q.width; item.h=q.height; item.fps=q.fps; }
@@ -3658,8 +3663,12 @@ async function runOneEl(item,tag,t0){
     S.fps=item.fps; S.playFile=item.file||null; S.jobId=job.id;
     S.meta={name:item.name,duration:item.duration,size:item.size,fps:item.fps,
             fpsSrc:item.fpsSrc||null, w:item.w,h:item.h,type:item.type};
+    const 걸린=(performance.now()-t0)/1000;
     resTitle.textContent=`✓ ${item.name} — ${shots.length}장 · `
-      +`${길이글((performance.now()-t0)/1000)} · 폴더에 저장됨`;
+      +(item.받기초!=null
+          ? `받기 ${길이글(item.받기초)} · 분석 ${길이글(걸린-item.받기초)}`
+          : 길이글(걸린))
+      +` · 폴더에 저장됨`;
     showResultEl(item);
   }
   await renderHist();

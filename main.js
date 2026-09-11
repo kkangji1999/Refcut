@@ -169,7 +169,12 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  createWindow();
+  /* 영상 받기 도구 갱신은 여기서 시작한다 — 사용자가 아직 링크를 넣기 전이다.
+     (받기 직전에 하면 그 기다림이 고스란히 사용자 몫이 된다) */
+  갱신예약(20000);
+});
 app.on("window-all-closed", () => { if (process.platform !== "darwin") app.quit(); });
 app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 
@@ -1180,6 +1185,52 @@ function 동봉본심기(name, dest) {
   } catch (e) { return false; }
 }
 
+/* =========================================================================
+   갱신은 사용자를 기다리게 하지 않는다
+   -------------------------------------------------------------------------
+   ★ 2026-09-11 사용자 보고:
+     같은 유튜브 링크인데 어떤 컴퓨터는 5초, 어떤 컴퓨터는 15초가 넘게 걸렸다.
+
+   원인은 네트워크가 아니라 이 갱신이었다. ensureYtdlp 는 링크를 읽기 직전에
+   불리는데, 그 안에서 하루 한 번 `yt-dlp -U` 를 기다리고 있었다.
+     · 이미 최신인 컴퓨터  — 1.5초 (물어보고 끝)
+     · 뒤처진 컴퓨터       — 17MB 를 받아 자기를 갈아끼운다 (십수 초)
+   오래 켜둔 컴퓨터는 그 값을 이미 치렀고, 오랜만에 켠 컴퓨터가 첫 링크에서
+   덤터기를 썼다. 사용자 눈에는 "이 컴퓨터는 느리다" 로만 보인다.
+
+   게다가 기다리는 시간에 25초 제한이 걸려 있었다. 느린 회선에서는 17MB 를
+   25초 안에 못 받아 늘 잘렸는데, 잘려도 ytUpdated 는 이미 찍혀 있어서
+   다음 날 또 25초를 치르고 또 잘렸다 — 영영 갱신되지 않으면서 매일 25초씩.
+
+   이제 갱신은 사용자가 아무것도 안 하고 있을 때 뒤에서 한다.
+     · 앱을 켜고 20초쯤 뒤 (아직 링크를 넣기 전이다)
+     · 받기가 끝난 뒤 잠시 뒤
+     · 받는 중에는 하지 않는다 — 쓰고 있는 exe 는 갈아끼울 수 없다
+   시간 제한도 넉넉히 둔다. 뒤에서 도는 일이라 오래 걸려도 아무도 기다리지 않는다.
+   ========================================================================= */
+let yt바쁨 = 0;                       // 지금 yt-dlp 가 돌고 있는가
+let yt갱신중 = false;
+async function yt갱신조용히() {
+  if (yt갱신중 || yt바쁨) return;
+  const st = readSettings();
+  if (Date.now() - (st.ytUpdated || 0) <= 86400000) return;
+  const exe = YTEXE();
+  if (파일크기(exe) < YT_최소) return;      // 없거나 반쪽이면 건드리지 않는다
+  yt갱신중 = true;
+  writeSettings({ ...readSettings(), ytUpdated: Date.now() });
+  try {
+    await new Promise((r) => {
+      const u = spawn(exe, ["-U"], { windowsHide: true });
+      const t = setTimeout(() => { try { u.kill(); } catch (e) {} r(); }, 180000);
+      u.on("close", () => { clearTimeout(t); r(); });
+      u.on("error", () => { clearTimeout(t); r(); });
+    });
+  } catch (e) {}
+  yt갱신중 = false;
+}
+/* 조용해지면 한 번 들여다본다 (받는 중이면 그냥 물러난다) */
+const 갱신예약 = (ms) => setTimeout(() => { yt갱신조용히(); }, ms);
+
 async function ensureYtdlp(send) {
   const exe = YTEXE();
   if (!fs.existsSync(exe)) {
@@ -1216,19 +1267,10 @@ async function ensureYtdlp(send) {
       return exe;
     }
   }
-  /* 하루 한 번 조용히 갱신 — 실패해도 그냥 넘어간다 */
-  const st = readSettings();
-  if (Date.now() - (st.ytUpdated || 0) > 86400000) {
-    writeSettings({ ...st, ytUpdated: Date.now() });
-    try {
-      await new Promise((r) => {
-        const u = spawn(exe, ["-U"], { windowsHide: true });
-        const t = setTimeout(() => { try { u.kill(); } catch (e) {} r(); }, 25000);
-        u.on("close", () => { clearTimeout(t); r(); });
-        u.on("error", () => { clearTimeout(t); r(); });
-      });
-    } catch (e) {}
-  }
+  /* ★ 여기서 갱신하지 않는다. 갱신은 뒤에서 조용히 한다 (yt갱신조용히 참고) —
+     예전에는 이 자리에서 하루 한 번 `-U` 를 기다렸다. 이미 최신이면 1.5초지만,
+     갱신할 것이 있으면 17MB 짜리 exe 를 통째로 받아 자기를 갈아끼운다.
+     그동안 사용자의 링크는 쳐다보지도 않는다. */
   /* ★ 쓰기 직전에 늘 확인한다.
      백신은 처음 받을 때가 아니라 한참 뒤에 검사하다 지우기도 한다.
      한 번만 확인하고 넘어가면 그때부터는 이유 없는 실패가 된다. */
@@ -1407,21 +1449,27 @@ function pickError(errs) {
 function runYt(exe, args, ms) {
   return new Promise((res, rej) => {
     let buf = "", err = "", done = false;
+    /* 도는 동안에는 갱신이 끼어들지 않게 표시해 둔다 (쓰는 exe 는 못 갈아끼운다) */
+    yt바쁨++;
+    let 놓음 = false;
+    const 놓기 = () => { if (!놓음) { 놓음 = true; yt바쁨--; } };
     const p2 = spawn(exe, args, { windowsHide: true });
     const timer = setTimeout(() => {
       if (done) return;
-      done = true;
+      done = true; 놓기();
       try { p2.kill("SIGKILL"); } catch (e) {}
       rej(new Error("시간 초과"));
     }, ms || 20000);
     p2.stdout.on("data", (d) => (buf += d));
     p2.stderr.on("data", (d) => (err += d));
     p2.on("close", (c) => {
+      놓기();
       if (done) return;
       done = true; clearTimeout(timer);
       c === 0 ? res(buf) : rej(new Error(err.slice(0, 400)));
     });
     p2.on("error", (e) => {
+      놓기();
       if (done) return;
       done = true; clearTimeout(timer); rej(실행실패(exe, e));
     });
@@ -1677,11 +1725,12 @@ ipcMain.handle("ytDownload", async (e, { url, dest, jobId, height, plan, useCook
         ...jsArgs(),                     // 유튜브 주소를 푸는 자바스크립트 실행기
         ...extra, "-o", dest, 대신 || url,
       ];
+      yt바쁨++;
       const p2 = spawn(exe, args, { windowsHide: true });
       let over = false, err = "", lastAt = Date.now();
       const finish = (fn, v) => {
         if (over) return;
-        over = true; clearInterval(watch); fn(v);
+        over = true; yt바쁨--; clearInterval(watch); fn(v);
       };
       const watch = setInterval(() => {
         if (over) return;
@@ -1735,6 +1784,7 @@ ipcMain.handle("ytDownload", async (e, { url, dest, jobId, height, plan, useCook
     }
     if (!done && !killed) throw new Error(pickError(allErrs));
     CANCEL.delete("yt" + jobId);
+    갱신예약(5000);                 // 이제 조용하다 — 갱신할 것이 있으면 지금 한다
     if (killed) return { ok: false, aborted: true };
     if (!fs.existsSync(dest)) return { ok: false, error: "받은 파일을 찾을 수 없습니다." };
     return { ok: true, path: dest, size: fs.statSync(dest).size };
