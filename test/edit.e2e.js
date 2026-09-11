@@ -153,6 +153,13 @@ app.whenReady().then(async () => {
           떴다=true; break; }
       }
       out.클립알림=떴다 ? $("dlgBody").textContent.slice(0,200) : "(알림창이 뜨지 않았다)";
+      /* 저장한 자리를 한 줄로 적고, 그 자리로 가는 단추와
+         [다시 보지 않기] 가 함께 있는가 */
+      out.완료창={
+        경로줄:(($("dlgBody").querySelector(".pv")||{}).textContent||"").trim(),
+        열기단추:!!$("dlgOpen"),
+        다시안보기:!!$("dlgAgain"),
+      };
       out.클립진단={ 떴다, 창:$("dlg").className,
         제목:$("dlgTitle").textContent, 몸:$("dlgBody").textContent.slice(0,120),
         진행:$("progWrap").style.display, 단추막힘:$("ioClip").disabled };
@@ -254,6 +261,9 @@ app.whenReady().then(async () => {
     console.log(`처음 ${r.처음.length}컷 → 병합 ${r.병합.length}컷 `
       + `→ 분할 ${r.분할.length}컷 → 초기화 ${r.초기화.length}컷`);
     console.log(`되살리기   그림 2장을 지우고 다시 열었더니 ${r.되살림}/${r.되살림전체}장이 살아났다`);
+    const 완 = r.완료창 || {};
+    console.log(`완료 알림  ${완.경로줄 || "(경로 없음)"}`
+      + `  ·  열기 ${완.열기단추 ? "O" : "X"}  ·  다시 보지 않기 ${완.다시안보기 ? "O" : "X"}`);
     console.log(`저장 폴더  분석 프레임 ${목록읽기(분석).length}장 · `
       + `미리보기 ${목록읽기(미리).length}장 · 구간 영상 ${목록읽기(구간).length}개`);
     console.log(`구간 표시  ${r.구간글}`);
@@ -385,6 +395,13 @@ app.whenReady().then(async () => {
 
     /* 옛 버전이 깨뜨려 놓은 기록을 열면 스스로 낫는가 */
     if (!r.창안뜸) f.push("컷을 병합하는데 확인창이 끼어들었다 (묻지 않기로 했다)");
+    /* 구간을 뽑고 난 알림 */
+    if (r.클립진단 && r.클립진단.떴다) {
+      if (!완.열기단추) fails.push("저장 완료 알림에 [열기] 단추가 없다 (경로를 손으로 옮겨 적어야 한다)");
+      if (!완.다시안보기) fails.push("저장 완료 알림에 [다시 보지 않기] 가 없다");
+      if (!완.경로줄) fails.push("저장 완료 알림에 저장한 자리가 적혀 있지 않다");
+    }
+
     if (r.일부러지움 !== 0)
       fails.push("시험이 헐겁다: 일부러 지운 그림이 실제로는 안 지워졌다");
     if (r.되살림 !== r.되살림전체)

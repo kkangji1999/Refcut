@@ -951,6 +951,18 @@
   .dlgBody{font-size:13px; color:var(--muted); line-height:1.8; white-space:pre-wrap;
     max-height:72vh; overflow-y:auto}
   .dlgBody b{color:var(--fg)}
+  /* 저장한 자리를 한 줄로 적고, 그 옆에 바로 가는 단추를 둔다 */
+  .donePath{display:flex; align-items:center; gap:8px; margin-top:12px;
+    white-space:normal; background:#0e1116; border:1px solid var(--border);
+    border-radius:8px; padding:7px 9px}
+  .donePath .pv{flex:1; min-width:0; font-size:11px; color:#8a94a8;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; direction:rtl;
+    text-align:left}
+  .donePath .mini{flex-shrink:0; padding:5px 9px; font-size:11px}
+  .dlgAgain{display:flex; align-items:center; gap:6px; margin-top:10px;
+    font-size:11px; color:#5d6472; cursor:pointer; white-space:normal}
+  .dlgAgain input{accent-color:var(--accent); cursor:pointer}
+  .dlgAgain:hover{color:#8a94a8}
   .dlgBtns{display:flex; gap:7px; margin-top:16px}
   .dlgBtns button{flex:1; padding:11px}
   .dlgBtns .main{background:var(--accent); color:#1a1a1a; font-weight:700; border-color:var(--accent)}
@@ -1974,8 +1986,8 @@ function download(blob,name){
    같은 날 두 번째로 내보내면 26.8.1602 로 올린다.
    업데이트 확인은 마디마다 숫자로 비교하므로(verNum) 자리수가 달라도 안전하다. */
 /* 앱으로 켰으면 설치된 진짜 버전을 그대로 쓴다 (여기 숫자는 웹으로 열 때의 몫) */
-const APP_VERSION = (window.CG && window.CG.version) || "26.8.2513";
-const APP_DATE    = "2026.08.28";
+const APP_VERSION = (window.CG && window.CG.version) || "26.9.1101";
+const APP_DATE    = "2026.09.11";
 /* 최신 index.html 이 올라가 있는 주소.
    여기에 넣어두면 [업데이트] 버튼이 새 버전을 확인합니다.
    설치 폴더의 update_url.txt 에 같은 주소를 적어두면
@@ -2015,6 +2027,53 @@ function appDlg(title,body,{ok="확인",cancel=null}={}){
 function closeDlg(v){ $("dlg").classList.remove("on");
   if(_dlgResolve){ const r=_dlgResolve; _dlgResolve=null; r(v); } }
 const appAlert=(msg,title="알림")=>appDlg(title,msg,{ok:"확인"});
+
+/* ---------- 다 뽑고 나서 보여주는 알림 ----------
+   ★ 어디에 저장됐는지 글자로만 적어 두면, 찾아가려고 그 경로를 눈으로 읽어
+     탐색기 주소창에 옮겨 적어야 한다. 단추 하나면 될 일이었다.
+   ★ 그리고 이 알림은 한 번 읽으면 그만인 종류다. 뽑을 때마다 길을 가로막으면
+     방해가 되므로 [다시 보지 않기] 를 걸어둘 수 있게 한다.
+     걸어두면 알림이 사라지는 것이 아니라 토스트로 내려온다 — 어디에 저장됐는지는
+     여전히 알려주되 손을 멈추게 하지 않는다. ([저장 공간] 에서 다시 켤 수 있다) */
+const 알림끔   = key => { try{ return localStorage.getItem("cg_noalert_"+key)==="1"; }
+                          catch(e){ return false; } };
+const 알림끄기 = (key,on) => { try{
+    if(on) localStorage.setItem("cg_noalert_"+key,"1");
+    else   localStorage.removeItem("cg_noalert_"+key);
+  }catch(e){} };
+const 꺼둔알림있나 = () => ["clip","audio"].some(알림끔);
+
+async function 저장완료알림(key, title, 본문, 파일){
+  const 역슬래시 = String.fromCharCode(92);
+  const 경로 = String(파일||"").split("/").join(역슬래시);
+  const 끝 = 경로.lastIndexOf(역슬래시);
+  const 폴더 = 끝>0 ? 경로.slice(0,끝) : 경로;
+  const 기다림 = appDlg(title,
+    본문 +
+    `<div class="donePath">` +
+      `<span class="pv"></span>` +
+      `<button class="mini" id="dlgOpen" title="탐색기에서 이 파일을 짚어 줍니다">📂 열기</button>` +
+    `</div>` +
+    `<label class="dlgAgain"><input type="checkbox" id="dlgAgain"> 이 알림 다시 보지 않기</label>`,
+    {ok:"확인"});
+  /* ★ 경로는 사람이 지은 폴더 이름이 섞여 있다 — 글로만 넣는다 */
+  const pv=$("dlgBody").querySelector(".pv");
+  if(pv){ pv.textContent=폴더; pv.title=경로; }
+  const ob=$("dlgOpen");
+  if(ob) ob.onclick=async()=>{
+    let r=null;
+    try{ r=await window.CG.revealFile(경로); }catch(e){}
+    if(r&&r.ok) return toast("탐색기에서 짚었습니다");
+    try{ r=await window.CG.revealFolder(폴더); }catch(e){}
+    toast(r&&r.ok ? "폴더를 열었습니다" : "저장한 자리를 찾지 못했습니다");
+  };
+  const cb=$("dlgAgain");
+  if(cb) cb.onchange=()=>{
+    알림끄기(key, cb.checked);
+    if(cb.checked) toast("앞으로는 토스트로만 알립니다 — [저장 공간] 에서 다시 켤 수 있습니다");
+  };
+  await 기다림;
+}
 const appConfirm=(msg,title="확인")=>appDlg(title,msg,{ok:"예",cancel:"아니오"});
 
 function toast(m){
@@ -2517,9 +2576,20 @@ $("storeBtn").onclick=async()=>{
            used>mine+52428800
              ? ` · 이 폴더에는 다른 파일도 함께 있어 전체로는 ${fmtMB(used)} 입니다`
              : ""} ·
-           폴더를 바꾸면 기록도 함께 따라갑니다.</div>
+           폴더를 바꾸면 기록도 함께 따라갑니다.</div>${
+         꺼둔알림있나()
+           ? `<div class="storeNote" style="margin-top:9px">
+                저장을 마칠 때 뜨던 <b>완료 알림</b>을 꺼 두었습니다 — 지금은 토스트로만 알립니다.
+                <button class="mini" id="alertOn"
+                        style="padding:3px 8px;font-size:10.5px;margin-left:6px">다시 켜기</button>
+              </div>`
+           : ""}
        </div>`;
     on$("openRoot","onclick",()=>window.CG.revealFolder(root));
+    on$("alertOn","onclick",()=>{
+      ["clip","audio"].forEach(k=>알림끄기(k,false));
+      toast("저장 완료 알림을 다시 켰습니다"); $("storeBtn").click();
+    });
     on$("pickDirBtn","onclick",async()=>{ await pickOutDir(); $("storeBtn").click(); });
     on$("copyPath","onclick",async()=>{
       try{ await navigator.clipboard.writeText(root); toast("경로를 복사했습니다"); }
@@ -5600,16 +5670,16 @@ async function 구간영상저장(btn){
              prog(m.percent,`구간 영상 만드는 중...  ${m.percent.toFixed(0)}%`,""); });
     if(!r||!r.ok) throw new Error((r&&r.error)||"만들지 못했습니다");
     const 이름=String(r.path).split("/").pop();
-    const 자리=String(r.path).slice(0,String(r.path).length-이름.length-1).replace(/\//g,"\\");
-    toast(`구간 영상 저장 · ${((r.size||0)/1048576).toFixed(1)} MB`);
-    await appAlert(
+    toast(`구간 영상 저장 · ${((r.size||0)/1048576).toFixed(1)} MB · ${이름}`);
+    /* 걸어두었으면 창으로 가로막지 않는다 — 토스트로 이미 알렸다 */
+    if(알림끔("clip")) return;
+    await 저장완료알림("clip","구간 영상 저장 완료",
       `<b>${이름}</b>\n\n`+
       `구간     ${tcs(a)} ~ ${tcs(b)}   (${dur.toFixed(2)}초)\n`+
       `크기     ${((r.size||0)/1048576).toFixed(1)} MB\n`+
       `화질     ${r.kind==="prores"?"ProRes 422 HQ (편집용)":"H.264 아주 높은 화질"}\n`+
-      `그대로   해상도 · 초당 장수 · 소리\n\n`+
-      `<b>저장한 곳</b>\n${자리}`,
-      "구간 영상 저장 완료");
+      `그대로   해상도 · 초당 장수 · 소리`,
+      r.path);
   }catch(err){
     await appAlert("구간 영상을 만들지 못했습니다.\n\n"+(err.message||"오류"),
       "구간 영상 저장");
@@ -5647,21 +5717,20 @@ async function 구간음원저장(btn){
              prog(m.percent,`구간 음원 만드는 중...  ${m.percent.toFixed(0)}%`,""); });
     if(!r||!r.ok) throw new Error((r&&r.error)||"만들지 못했습니다");
     const 이름=String(r.path).split("/").pop();
-    const 자리=String(r.path).slice(0,String(r.path).length-이름.length-1).replace(/\//g,"\\");
     const 소리설명 = r.channels===1 ? "모노"
                    : r.channels===2 ? "스테레오"
                    : r.channels     ? r.channels+"채널" : "";
-    toast(`구간 음원 저장 · ${((r.size||0)/1048576).toFixed(2)} MB`);
-    await appAlert(
+    toast(`구간 음원 저장 · ${((r.size||0)/1048576).toFixed(2)} MB · ${이름}`);
+    if(알림끔("audio")) return;
+    await 저장완료알림("audio","구간 음원 저장 완료",
       `<b>${이름}</b>\n\n`+
       `구간     ${tcs(a)} ~ ${tcs(b)}   (${dur.toFixed(2)}초)\n`+
       `크기     ${((r.size||0)/1048576).toFixed(2)} MB\n`+
       `형태     ${r.kind==="copy"
                  ? `원본 그대로  (담긴 ${r.codec} 를 그대로 떠냈습니다 · 손실 없음)`
                  : `${r["이름"]}  (${r.codec} 는 그대로 뜰 수 없어 바꿨습니다)`}\n`+
-      (소리설명 ? `소리     ${소리설명}${r.rate?` · ${(r.rate/1000).toFixed(1)}kHz`:""}\n` : "")+
-      `\n<b>저장한 곳</b>\n${자리}`,
-      "구간 음원 저장 완료");
+      (소리설명 ? `소리     ${소리설명}${r.rate?` · ${(r.rate/1000).toFixed(1)}kHz`:""}` : ""),
+      r.path);
   }catch(err){
     await appAlert("구간 음원을 만들지 못했습니다.\n\n"+(err.message||"오류"),
       "구간 음원 저장");
