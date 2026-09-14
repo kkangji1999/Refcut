@@ -1555,8 +1555,24 @@ function 빈자리(dest) {
 }
 ipcMain.handle("freePath", (_e, dest) => 빈자리(dest));
 
+/* ★ '읽히기는 읽혔다' 를 곧바로 믿으면 안 되는 이유.
+   유튜브는 좋은 통로가 막히면 마지막 안전망(android)으로 물러난다.
+   그 통로에도 목록은 있다 — 다만 360p 하나뿐이다.
+   예전에는 첫 성공을 그대로 받아들여서, 1080p 짜리 영상이 대기열에
+   360p 로 올라가 버렸다 (받아보기도 전에 이미 정해져 있었다).
+   그래서 읽어낸 화질이 이 기준에 못 미치면 남은 통로도 마저 보고
+   그중 가장 좋은 것을 쓴다. 처음부터 제 화질이 나오면 예전과 똑같이
+   곧바로 끝나므로 평소에는 느려지지 않는다. */
+function 제화질인가(top, want) {
+  const w = parseInt(want, 10) || 0;
+  if (w && top >= w) return true;    // 바라던 만큼 나왔다 — 더 볼 것이 없다
+  /* ★ 기준은 딱 360p 다. 더 올리면 원래 화질이 낮은 영상마다 모든 통로를
+     끝까지 돌게 되어 링크 넣기가 느려진다 (핀터레스트 핀이 그렇다 — 428p).
+     붙잡으려는 것은 '안전망으로 물러난 자국' 하나뿐이다. */
+  return top > 360;
+}
 /* 링크 정보만 먼저 읽어온다 (제목·길이) — 대기열에 보여주기 위해 */
-ipcMain.handle("ytInfo", async (_e, url, useCookies, referer) => {
+ipcMain.handle("ytInfo", async (_e, url, useCookies, referer, want) => {
   url = await 주소펴기(url);          // pin.it/XXXX → 진짜 핀 주소
   let exe, last = "";
   try { exe = await ensureYtdlp(null); }
@@ -1568,6 +1584,8 @@ ipcMain.handle("ytInfo", async (_e, url, useCookies, referer) => {
   if (isYoutube(url)) await ensureQuickjs(null);   // 유튜브일 때만, 처음 한 번만
 
   const errs = [];
+  /* 낮게 읽힌 결과를 버리지 않고 들고 다닌다 — 끝까지 더 좋은 것이 없으면 이것을 쓴다 */
+  let 최선 = null;
   const deadline = Date.now() + 45000;      // 로그인 시도까지 합쳐 60초를 넘기지 않는다
   /* ★ 시도 하나는 옵션 배열일 수도, {args,url} 일 수도 있다 (비메오는 주소를 바꿔 간다).
      여기서 배열이라고 넘겨짚으면 p.includes 가 없어 ytInfo 가 통째로 죽는다 —
@@ -1591,13 +1609,17 @@ ipcMain.handle("ytInfo", async (_e, url, useCookies, referer) => {
       const heights = [...new Set((j.formats || [])
         .filter((f) => f.vcodec && f.vcodec !== "none" && f.height)
         .map((f) => f.height))].sort((a, b) => b - a);
-      return { ok: true, title: j.title || "영상", duration: j.duration || 0,
-               ext: j.ext || "mp4", site: j.extractor_key || "",
-               thumb: pickThumb(j),    // 대기열에 띄울 대표 그림 (있으면)
-               heights,                // 고를 수 있는 화질
-               /* 성공한 방식을 기억해 두었다가 받을 때 그대로 쓴다
-                  (주소를 바꿔서 통했다면 그 주소까지 함께 들고 간다) */
-               plan: { args: extra, url: 대신 || null } };
+      const 읽은것 = { ok: true, title: j.title || "영상", duration: j.duration || 0,
+        ext: j.ext || "mp4", site: j.extractor_key || "",
+        thumb: pickThumb(j),    // 대기열에 띄울 대표 그림 (있으면)
+        heights,                // 고를 수 있는 화질
+        /* 성공한 방식을 기억해 두었다가 받을 때 그대로 쓴다
+           (주소를 바꿔서 통했다면 그 주소까지 함께 들고 간다) */
+        plan: { args: extra, url: 대신 || null } };
+      if (제화질인가(heights[0] || 0, want)) return 읽은것;
+      /* 낮게 읽혔다 — 지금까지 중 가장 좋은 것만 들고 다음 통로도 본다 */
+      if (!최선 || (heights[0] || 0) > (최선.heights[0] || 0)) 최선 = 읽은것;
+      errs.push(`${heights[0] || 0}p 까지만 읽혔습니다`);
     } catch (e) { errs.push(String(e.message || e)); }
   }
   /* 로그인이 필요해 보이는 경우에만 브라우저 로그인 정보를 빌려 한 번 시도한다.
@@ -1616,13 +1638,18 @@ ipcMain.handle("ytInfo", async (_e, url, useCookies, referer) => {
         const heights = [...new Set((j.formats || [])
           .filter((f) => f.vcodec && f.vcodec !== "none" && f.height)
           .map((f) => f.height))].sort((a, b) => b - a);
-        return { ok: true, title: j.title || "영상", duration: j.duration || 0,
-                 ext: j.ext || "mp4", site: j.extractor_key || "", heights,
-                 thumb: pickThumb(j),
-                 plan: { args: ["--cookies-from-browser", br], url: null } };
+        const 읽은것 = { ok: true, title: j.title || "영상", duration: j.duration || 0,
+          ext: j.ext || "mp4", site: j.extractor_key || "", heights,
+          thumb: pickThumb(j),
+          plan: { args: ["--cookies-from-browser", br], url: null } };
+        if (제화질인가(heights[0] || 0, want)) return 읽은것;
+        if (!최선 || (heights[0] || 0) > (최선.heights[0] || 0)) 최선 = 읽은것;
       } catch (e) { errs.push(String(e.message || e)); }
     }
   }
+  /* 어느 통로도 제 화질을 내주지 않았다 — 그래도 읽어낸 것 중 가장 좋은 것은 쓴다.
+     (화면 쪽이 "몇 p 까지만 있습니다" 라고 알려준다) */
+  if (최선) return 최선;
   /* ★ 핀터레스트는 '핀에 영상이 직접 있는 것' 과 '유튜브·비메오로 이어지기만
      하는 것' 이 섞여 있다. 뒤엣것은 yt-dlp 가 영상이 없다며 물러난다.
      그럴 때만 핀 페이지를 읽어 이어지는 영상 주소를 찾아 알려준다.

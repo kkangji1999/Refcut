@@ -229,7 +229,9 @@
   .jobSize .sz{color:var(--muted); font-variant-numeric:tabular-nums}
   #hist{display:flex; flex-direction:column; gap:8px; overflow-y:auto; flex:1}
   .job{background:var(--panel); border:1px solid var(--border); border-radius:10px;
-       padding:9px; cursor:pointer; transition:border-color .12s}
+       padding:9px; cursor:pointer; transition:border-color .12s;
+       /* Shift 로 범위를 고를 때 글자가 파랗게 끌려 나오지 않게 한다 */
+       user-select:none; -webkit-user-select:none}
   .job:hover{border-color:#4a5262}
   .job.on{border-color:var(--accent)}
   .job .top{display:flex; gap:8px; align-items:center}
@@ -245,6 +247,27 @@
   .jsub{font-size:10.5px; color:var(--muted); margin-top:6px}
   .jbtns{display:flex; gap:5px; margin-top:8px}
   .jbtns button{flex:1}
+  /* ---------- 기록 여러 개 고르기 ----------
+     ★ 하나씩 지우면 매번 묻는 창이 떠서, 열 개를 지우려면 열 번 답해야 했다.
+       탐색기와 같은 방식(Ctrl 하나씩 · Shift 범위)으로 고르고 한 번에 지운다.
+     고른 것과 '지금 열려 있는 것'(.on) 은 다른 뜻이므로 모양도 다르게 한다 —
+     열린 것은 테두리만, 고른 것은 안쪽까지 물든다. */
+  .job.sel{border-color:var(--accent); background:#2a2a1c;
+    box-shadow:inset 0 0 0 1px rgba(255,212,0,.35)}
+  .job.sel .jnoBig{background:var(--accent); color:#1a1a1a; border-color:var(--accent)}
+  .job .selMark{display:none; margin-left:auto; flex-shrink:0; font-size:12px;
+    font-weight:800; color:var(--accent)}
+  .job.sel .selMark{display:block}
+  #histBar{display:none; align-items:center; gap:5px; flex-wrap:wrap;
+    background:var(--panel2); border:1px solid var(--accent); border-radius:8px;
+    padding:6px 8px; flex-shrink:0}
+  #histBar.on{display:flex}
+  #histSelCount{font-size:11px; font-weight:700; color:var(--accent);
+    margin-right:auto; white-space:nowrap}
+  #histBar button{font-size:10.5px; padding:4px 7px}
+  /* 이런 방식이 있다는 것을 모르면 아무도 쓰지 않는다 — 제목 옆에 적어둔다.
+     (줄을 따로 내지 않으므로 목록이 짧아지지 않는다) */
+  .histHint{font-size:10px; color:#5a6070; white-space:nowrap; cursor:default}
   @keyframes dupBlink{
     0%,100%{background:var(--dupc); color:#16181d; border-color:var(--dupc)}
     50%    {background:transparent; color:var(--dupc); border-color:var(--dupc)}
@@ -518,17 +541,37 @@
     padding:9px 13px; text-align:center; line-height:1.5}
   #pvNote.on{display:block}
 
-  .ctl{display:flex; align-items:center; gap:10px; margin-top:10px; flex-shrink:0}
+  /* ---------------- 재생 줄 ----------------
+     ★ 이 줄은 '재생바가 얼마나 길게 남는가' 가 전부다.
+       창 모드에서는 영상 칸이 600px 도 안 되는데, 예전에는 단추·시각·소리
+       조절이 450px 가까이 먼저 가져가 재생바가 손가락 두 마디만큼만 남았다.
+       마우스로 짚을 자리가 없으니 조금만 움직여도 몇 초씩 건너뛰었다.
+       그래서 세 가지를 덜어냈다 —
+         · 단추를 한 치수 줄이고 사이 간격도 좁혔다
+         · 시각(초/장)은 윗줄로 뺐다 (.tRow)
+         · 소리 막대는 평소에 접어두고 마우스를 올릴 때만 펼친다
+       덜어낸 만큼은 전부 재생바가 가져간다. */
+  .ctl{display:flex; align-items:center; gap:5px; margin-top:5px; flex-shrink:0}
   .pbtn{background:var(--panel2); border:1px solid var(--border); color:var(--fg);
-    width:36px; height:32px; border-radius:7px; cursor:pointer; font-size:13px}
+    width:30px; height:28px; border-radius:7px; cursor:pointer; font-size:12px}
   .pbtn:hover{border-color:#4a5262}
   /* 재생 줄 안에 함께 두는 작은 단추들.
      ★ 예전에는 이것들이 아래에 '단축키 줄' 이라는 네 번째 줄을 따로 차지했다.
        재생과 함께 쓰는 것이니 재생 줄에 두는 편이 찾기도 쉽고 줄도 는다. */
-  .pbtn.sm{width:30px; height:30px; font-size:12px; color:var(--muted)}
+  .pbtn.sm{width:25px; height:25px; font-size:11px; color:var(--muted); padding:0}
   .pbtn.sm:hover{color:var(--fg)}
+  /* 시각을 적는 윗줄. 재생바와 떨어져 있어야 재생바가 끝까지 뻗는다. */
+  .tRow{display:flex; align-items:center; gap:8px; margin-top:7px; flex-shrink:0}
   #pTime{font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums;
-    white-space:nowrap; min-width:100px}
+    white-space:nowrap; cursor:pointer}
+  #pTime:hover{color:var(--fg)}
+  /* 소리 조절 — 평소에는 단추만, 마우스를 올리면 막대가 옆으로 펼쳐진다.
+     (글쇠로 옮겨 와도 펼쳐지게 focus-within 을 함께 둔다) */
+  #volWrap{display:flex; align-items:center; flex:0 0 auto}
+  #volWrap #pVol{width:0; margin-left:0; opacity:0; pointer-events:none;
+    transition:width .16s ease, margin-left .16s ease, opacity .16s ease}
+  #volWrap:hover #pVol, #volWrap:focus-within #pVol, #volWrap.peek #pVol{
+    width:74px; margin-left:6px; opacity:1; pointer-events:auto}
   #track{position:relative; flex:1; height:26px; cursor:pointer; touch-action:none}
   #trackBg{position:absolute; top:17px; left:0; right:0; height:5px;
     background:var(--panel2); border-radius:99px}
@@ -544,7 +587,7 @@
   #head{position:absolute; top:12px; width:14px; height:14px; border-radius:50%;
     background:#fff; transform:translateX(-7px); pointer-events:none;
     box-shadow:0 0 0 2px rgba(0,0,0,.5)}
-  #pVol{width:80px; accent-color:var(--accent)}
+  #pVol{width:80px; accent-color:var(--accent); flex:0 0 auto}
   .snapOn #trackBg{background:#3a4a3f}
 
   /* 재생바: 브라우저 기본 드래그가 끼어들어 금지 표시가 뜨는 것을 차단 */
@@ -676,6 +719,9 @@
     transform:translateY(-1px)}
   .ioOut .icoBtn:active{transform:translateY(0)}
   .ioOut .icoBtn:disabled{opacity:.45; filter:none; transform:none}
+  /* 연속 프레임 그림은 글자(이모지) 가 아니라 직접 그린 그림이다.
+     옆의 이모지 단추와 키가 맞도록 18px 로 세워둔다. */
+  .seqIco{display:block; width:18px; height:18px}
   .ioLabel{font-size:11px; color:#5d6472}
   /* ---------------- 컷 정리 줄 ----------------
      구간(I/O) 줄과 같은 모양으로 한 층 아래에 둔다.
@@ -983,6 +1029,7 @@
     border-radius:0; padding:8px 10px 10px; display:flex; flex-direction:column}
   #vPane:fullscreen .paneHead{margin-bottom:5px; flex-shrink:0}
   #vPane:fullscreen .pstage{flex:1; min-height:0}
+  #vPane:fullscreen .tRow,
   #vPane:fullscreen .ctl,
   #vPane:fullscreen .ioBar{flex-shrink:0}
   #lb:fullscreen{background:#000}
@@ -1091,6 +1138,16 @@
 
     <div class="sideHead" style="margin-top:4px">
       <div class="sideTitle">추출 기록 <b id="histCount"></b></div>
+      <span class="histHint"
+        title="Ctrl 을 누른 채 누르면 하나씩 고르고&#10;Shift 를 누른 채 누르면 거기까지 한 번에 고릅니다&#10;고른 것은 한 번만 물어보고 모두 지웁니다 (Esc 로 고름 풀기)"
+        >Ctrl · Shift 로 여러 개</span>
+    </div>
+    <!-- 여러 개를 골랐을 때만 나타나는 줄. 평소에는 자리를 차지하지 않는다. -->
+    <div id="histBar">
+      <span id="histSelCount"></span>
+      <button class="mini" id="histAll" title="보이는 기록을 모두 고릅니다">전체 선택</button>
+      <button class="mini" id="histNone" title="고른 것을 모두 풉니다 (Esc)">해제</button>
+      <button class="mini warn" id="histDel">🗑 선택 삭제</button>
     </div>
     <div id="hist"></div>
     <div class="sideFoot">
@@ -1141,11 +1198,14 @@
             <div id="pinfoBox"></div>
             <div id="pvNote"></div>
           </div>
+          <!-- 시각은 재생바에서 떼어 윗줄에 둔다 (재생바를 끝까지 쓰기 위해) -->
+          <div class="tRow">
+            <span id="pTime">0초 / 0초</span>
+          </div>
           <div class="ctl">
             <button class="pbtn" id="pPlay" title="재생 / 멈춤 (Space)">▶</button>
             <button class="pbtn sm" id="pPrev" title="한 프레임 뒤로 (D)">◀▌</button>
             <button class="pbtn sm" id="pNext" title="한 프레임 앞으로 (F)">▌▶</button>
-            <span id="pTime">0초 / 0초</span>
             <div id="track">
               <div id="trackBg"></div><div id="trackFill"></div>
               <div id="marks"></div><div id="head"></div>
@@ -1160,8 +1220,10 @@
               title="지금 화면을 복사 (Ctrl+C · 화면에서 오른쪽 클릭)">📋</button>
             <button class="pbtn sm" id="pInfo"
               title="영상 정보 · 코덱 (Tab)">ℹ</button>
-            <button class="pbtn" id="pMute">🔊</button>
-            <input id="pVol" type="range" min="0" max="1" step="0.05" value="1">
+            <div id="volWrap" title="소리 — 마우스를 올리면 막대가 펼쳐집니다 (↑ ↓)">
+              <button class="pbtn sm" id="pMute">🔊</button>
+              <input id="pVol" type="range" min="0" max="1" step="0.05" value="1">
+            </div>
           </div>
           <div class="ioBar">
             <span class="ioGroup">
@@ -1173,8 +1235,24 @@
             </span>
             <span class="ioGroup ioOut">
               <span class="ioLabel">내보내기</span>
+              <!-- ★ 필름 그림(🎞️)은 옆의 영상(🎬)과 너무 닮아서, 그림만 보고는
+                   어느 쪽이 '그림 여러 장' 인지 알 수 없었다.
+                   겹쳐 쌓인 사진 석 장으로 바꿔 한눈에 갈리게 한다. -->
               <button class="mini icoBtn" id="ioSeq"
-                title="연속 프레임&#10;원본 해상도 PNG 를 한 장씩 뽑아 ZIP 으로 묶습니다&#10;편집 프로그램의 이미지 시퀀스로 바로 씁니다 (소리 없음)">🎞️</button>
+                title="연속 프레임&#10;원본 해상도 PNG 를 한 장씩 뽑아 ZIP 으로 묶습니다&#10;편집 프로그램의 이미지 시퀀스로 바로 씁니다 (소리 없음)"><svg
+                class="seqIco" viewBox="0 0 24 24" aria-hidden="true">
+                <defs><clipPath id="seqClip">
+                  <rect x="2.5" y="8" width="15" height="12.5" rx="2.2"/></clipPath></defs>
+                <rect x="8" y="2.6" width="13.5" height="10" rx="2"
+                      fill="#20242c" stroke="#6b7385" stroke-width="1.3"/>
+                <rect x="5.2" y="5.3" width="14.3" height="11" rx="2.1"
+                      fill="#262b34" stroke="#98a0b2" stroke-width="1.35"/>
+                <rect x="2.5" y="8" width="15" height="12.5" rx="2.2"
+                      fill="#11141a" stroke="#e8eaf0" stroke-width="1.5"/>
+                <g clip-path="url(#seqClip)">
+                  <circle cx="6.4" cy="12" r="1.5" fill="#ffd400"/>
+                  <path d="M2.5 20.5 L7.3 14.6 L11 19 L13.4 16.4 L17.5 20.9 Z" fill="#6ee7b7"/>
+                </g></svg></button>
               <button class="mini icoBtn" id="ioAudio"
                 title="음원만&#10;그림 없이 소리만 뽑습니다 — 대사·효과음·음악&#10;몇 초면 끝나고 파일도 가장 작습니다">🎵</button>
               <button class="mini icoBtn" id="ioClip"
@@ -1996,7 +2074,8 @@ const APP_URL     = "";
 /* ▲▲▲ 여기까지 ▲▲▲ */
 
 const S = { queue:[], out:null, jobId:null, running:false,
-            playFile:null, playSrc:null, fps:24, meta:null, curShot:-1, mode:"smart", focusArea:"video", side:"hist", favTab:"all", inT:null, outT:null, keepView:false, sel:new Set(), anchor:null, favAnchor:null, favSel:new Set(), folder:"all" };
+            playFile:null, playSrc:null, fps:24, meta:null, curShot:-1, mode:"smart", focusArea:"video", side:"hist", favTab:"all", inT:null, outT:null, keepView:false, sel:new Set(), anchor:null, favAnchor:null, favSel:new Set(), folder:"all",
+            histSel:new Set(), histAnchor:null };
 const LB = { list:[], idx:0, mode:"shots", sheetUrl:null };
 let HIST=[], MARKS=[];
 const DUPC=["#fbbf24","#60a5fa","#f472b6","#4ade80","#a78bfa","#fb923c"];
@@ -3012,6 +3091,9 @@ async function addLink(url, referer, pageTitle, fallbackUrl){
     return toast(url ? "영상 주소 형식이 아닙니다 (http:// 로 시작해야 합니다)"
                      : "영상 주소를 붙여넣어 주세요");
   if(S.queue.some(x=>x.url===url)) return toast("이미 대기열에 있습니다");
+  /* ★ 고른 화질은 여기서 한 번 읽어 프로그램 쪽까지 함께 들고 간다.
+     그래야 "360p 밖에 안 읽혔다" 를 알아채고 다른 통로를 더 볼 수 있다. */
+  const want=parseInt(($("linkRes")||{}).value||"1080",10)||0;
   const placeholder={url, name:"주소 확인 중...", size:0, type:"", duration:0,
     w:0,h:0,fps:24, thumb:null, isLink:true, status:"wait", checking:true,
     since:Date.now()};
@@ -3039,7 +3121,7 @@ async function addLink(url, referer, pageTitle, fallbackUrl){
       throw new Error("영상 받기 기능이 연결되지 않았습니다.\n"
         +"preload.js 가 최신인지 확인하고 프로그램을 다시 켜주세요.");
     r=await Promise.race([
-      window.CG.ytInfo(url, false, referer),
+      window.CG.ytInfo(url, false, referer, want),
       new Promise((_,rej)=>setTimeout(()=>rej(new Error(
         "응답이 없어 중단했습니다 (75초).\n\n"
         +"아래 [저장 공간] 옆 진단을 눌러 상태를 확인해 보세요.")),75000))
@@ -3161,15 +3243,19 @@ async function addLink(url, referer, pageTitle, fallbackUrl){
      원본이 1080p 까지면 4K 같은 건 아예 목록에 나오지 않는다. */
   placeholder.heights=(r.heights||[]).filter(h=>h>0);
   placeholder.referer=referer||null;
-  const want=parseInt(($("linkRes")||{}).value||"1080",10)||0;
   placeholder.height=pickHeight(placeholder.heights, want);
   placeholder.checking=false;
   /* ★ 재생 창으로 잡아온 주소인데 원하는 화질에 못 미치면, 조용히 낮은 화질로
      받아버리지 않고 무엇을 하면 되는지 알려준다. */
-  if(referer && placeholder.heights.length){
-    const top=placeholder.heights[0];
-    if(top<1080 && (!want || want>top))
-      toast(`${top}p 까지만 있습니다 — 재생 창에서 화질을 올리면 그 화질로 받습니다`);
+  const 꼭대기=placeholder.heights[0]||0;
+  if(referer && 꼭대기){
+    if(꼭대기<1080 && (!want || want>꼭대기))
+      toast(`${꼭대기}p 까지만 있습니다 — 재생 창에서 화질을 올리면 그 화질로 받습니다`);
+  }else if(꼭대기 && 꼭대기<=360 && (!want || want>꼭대기)){
+    /* ★ 360p 하나만 읽혔다면 사이트가 좋은 통로를 잠깐 막았을 때의 자국이다.
+       프로그램 쪽이 다른 통로를 다 돌아본 뒤에도 이것뿐이었다는 뜻이므로,
+       (원래 그만한 영상일 수도 있으니) 막지는 않고 알려주기만 한다. */
+    toast(`${꼭대기}p 까지만 읽혔습니다 — 잠시 뒤 다시 넣으면 제 화질로 올라올 수 있습니다`);
   }
   /* ★ 주소로 넣은 것도 대기열에 그림이 뜨게 한다.
      사이트가 대표 그림을 주면 그것을 쓰고, 안 주면 (TVCF 처럼 스트림 주소를
@@ -4419,6 +4505,15 @@ $("pMute").onclick=()=>{ pv.muted=!pv.muted; paintVol(); };
 function paintVol(){
   $("pMute").textContent=pv.muted||pv.volume===0?"🔇":pv.volume<0.5?"🔉":"🔊";
   $("pVol").value=pv.muted?0:pv.volume;
+}
+/* 소리 막대는 평소 접혀 있다. 글쇠(↑ ↓)로 바꿀 때는 마우스가 그 위에 없으므로,
+   지금 값이 어디쯤인지 보이도록 잠깐만 펼쳐준다. */
+let _volPeek=0;
+function 볼륨살짝(){
+  const w=$("volWrap"); if(!w) return;
+  w.classList.add("peek");
+  clearTimeout(_volPeek);
+  _volPeek=setTimeout(()=>w.classList.remove("peek"),1400);
 }
 /* 재생바 눈금.
 
@@ -6094,7 +6189,8 @@ async function renderHist(){
   }
   LIVE.forEach((j,i)=>{
     const row=document.createElement("div");
-    row.className="job"+(j.id===S.jobId?" on":""); row.dataset.id=j.id;
+    row.className="job"+(j.id===S.jobId?" on":"")+(S.histSel.has(j.id)?" sel":"");
+    row.dataset.id=j.id;
     const top=document.createElement("div"); top.className="top";
     const no=document.createElement("div"); no.className="jnoBig"; no.textContent=LIVE.length-i;
     const th=new Image();
@@ -6102,7 +6198,9 @@ async function renderHist(){
     else{ const tu=URL.createObjectURL(j.shots[0].blob); box._urls.push(tu); th.src=tu; }
     const info=document.createElement("div");
     info.innerHTML=`<div class="jname">${j.name}</div>`;
-    top.append(no,th,info);
+    /* 골라둔 줄임을 한눈에 — 테두리 색만으로는 '열려 있는 것' 과 헷갈린다 */
+    const mark=document.createElement("div"); mark.className="selMark"; mark.textContent="✓";
+    top.append(no,th,info,mark);
     const sub=document.createElement("div"); sub.className="jsub";
     /* 여기 적히는 MB 는 '원본 영상' 의 크기다 — 캡쳐가 차지하는 공간과는 다르다.
        어느 쪽인지 적어두지 않으면 [저장 공간] 의 숫자와 달라 보여 헷갈린다. */
@@ -6135,11 +6233,92 @@ async function renderHist(){
     }
     btns.appendChild(bDel);
     row.append(top,sub,btns);
-    row.onclick=()=>loadJob(j.id);
+    row.onclick=ev=>pickHist(ev,j.id);
     box.appendChild(row);
   });
+  paintHistSel();
   showUsage(); paintOutDir(); renderQueue(); renderArchive(); paintVidFav();
 }
+/* =========================================================================
+   추출 기록 여러 개 고르기
+   -------------------------------------------------------------------------
+   ★ 예전에는 한 줄에 하나씩만 지울 수 있었다. 지울 때마다 묻는 창이 떠서
+     열 개를 정리하려면 열 번을 답해야 했다.
+   탐색기와 같은 규칙으로 고른다 — Ctrl 은 하나씩, Shift 는 거기까지 한 번에.
+   그냥 누르는 것은 예전과 똑같이 '그 기록 열기' 다. 고르지 않은 사람에게는
+   달라진 것이 없다.
+   ========================================================================= */
+const histOrder=()=>[...$("hist").querySelectorAll(".job")].map(el=>el.dataset.id);
+function pickHist(e,id){
+  const order=histOrder(), i=order.indexOf(id);
+  if(e.shiftKey && S.histAnchor!=null && order.includes(S.histAnchor)){
+    const a=order.indexOf(S.histAnchor);
+    if(!(e.ctrlKey||e.metaKey)) S.histSel.clear();
+    const [s2,t2]=[Math.min(a,i),Math.max(a,i)];
+    for(let k=s2;k<=t2;k++) S.histSel.add(order[k]);
+    return paintHistSel();
+  }
+  if(e.ctrlKey||e.metaKey){
+    S.histSel.has(id)?S.histSel.delete(id):S.histSel.add(id);
+    S.histAnchor=id;
+    return paintHistSel();
+  }
+  /* 아무 글쇠도 안 눌렀으면 예전 그대로 — 골라둔 것은 풀고 그 기록을 연다 */
+  S.histSel.clear(); S.histAnchor=id; paintHistSel();
+  loadJob(id);
+}
+function paintHistSel(){
+  /* 그 사이 지워진 기록이 고름 목록에 남아 있지 않게 한다 */
+  const 있는것=new Set(histOrder());
+  [...S.histSel].forEach(k=>{ if(!있는것.has(k)) S.histSel.delete(k); });
+  document.querySelectorAll("#hist .job").forEach(el=>
+    el.classList.toggle("sel", S.histSel.has(el.dataset.id)));
+  const n=S.histSel.size;
+  $("histBar").classList.toggle("on", n>0);
+  $("histSelCount").textContent = n ? `${n}개 선택` : "";
+}
+function clearHistSel(){ S.histSel.clear(); S.histAnchor=null; paintHistSel(); }
+/* 골라둔 기록을 한 번만 물어보고 모두 지운다 */
+async function 고른기록삭제(){
+  const jobs=[...S.histSel].map(id=>HIST.find(j=>j.id===id)).filter(Boolean);
+  if(!jobs.length) return;
+  /* 하나만 골랐으면 예전 창을 그대로 쓴다 — 묻는 말이 두 가지일 필요가 없다 */
+  if(jobs.length===1){
+    if(await askRemove(jobs[0])){
+      if(S.jobId===jobs[0].id) resetResult();
+      clearHistSel(); await renderHist();
+    }
+    return;
+  }
+  const n=jobs.reduce((a,j)=>a+favCountOf(j),0);
+  let purge=true;
+  if(n){
+    const pick=await appChoice("기록 삭제",
+      `고른 기록 <b>${jobs.length}개</b>를 지웁니다.<br><br>
+       그 안에 즐겨찾기한 항목이 <b>${n}개</b> 있습니다.<br>
+       어떻게 할지 골라주세요.`,
+      [{k:"keep", t:"즐겨찾기만 남기기",
+        d:"목록에서는 사라지지만 보관함의 즐겨찾기는 그대로 남습니다."},
+       {k:"purge",t:"완전히 삭제", warn:true,
+        d:"즐겨찾기까지 전부 지웁니다. 되돌릴 수 없습니다."},
+       {k:"cancel",t:"취소", d:"아무것도 하지 않습니다."}]);
+    if(pick!=="keep" && pick!=="purge") return;
+    purge = pick==="purge";
+  }else if(!await appConfirm(
+      `고른 기록 <b>${jobs.length}개</b>를 삭제할까요?<br><br>
+       <small>폴더에 저장된 이미지 파일은 지워지지 않습니다.</small>`)) return;
+  for(const j of jobs){
+    await removeJob(j.id, purge);
+    if(S.jobId===j.id) resetResult();
+  }
+  clearHistSel(); await renderHist();
+  toast(purge ? `${jobs.length}개를 완전히 삭제했습니다`
+              : `${jobs.length}개를 지웠습니다 — 즐겨찾기는 보관함에 남겼습니다`);
+}
+$("histDel").onclick  = ()=>고른기록삭제();
+$("histNone").onclick = ()=>clearHistSel();
+$("histAll").onclick  = ()=>{ const o=histOrder();
+  S.histSel=new Set(o); S.histAnchor=o[0]||null; paintHistSel(); };
 /* 이 기록이 어느 폴더에 저장됐는지 보여준다.
    브라우저는 보안상 폴더 전체 경로를 알려주지 않고 탐색기를 열 수도 없다.
    그래서 지정 폴더 이름 + 적어둔 위치 메모 + 하위 폴더 구조를 합쳐 보여주고,
@@ -6878,6 +7057,11 @@ document.addEventListener("keydown",e=>{
     }
     if(ctrl && kk==="v"){ e.preventDefault(); pasteFavs(); return; }
   }
+  /* 기록을 골라둔 채로 Esc — 고름만 푼다 (다른 것은 건드리지 않는다) */
+  if(e.key==="Escape" && S.histSel.size
+     && !$("lb").classList.contains("on") && !$("archive").classList.contains("on")){
+    e.preventDefault(); clearHistSel(); return;
+  }
   const lbOn=$("lb").classList.contains("on");
   if(lbOn){
     if(e.key==="Escape"){
@@ -6951,9 +7135,11 @@ document.addEventListener("keydown",e=>{
   else if(e.key==="ArrowRight"){ e.preventDefault(); pv.currentTime=Math.min(pv.duration,pv.currentTime+5); paintHead(); }
   else if(e.key==="ArrowLeft"){ e.preventDefault(); pv.currentTime=Math.max(0,pv.currentTime-5); paintHead(); }
   else if(e.key==="ArrowUp"){ e.preventDefault(); pv.muted=false;
-    pv.volume=Math.min(1,pv.volume+0.05); paintVol(); toast(`볼륨 ${Math.round(pv.volume*100)}%`); }
+    pv.volume=Math.min(1,pv.volume+0.05); paintVol(); 볼륨살짝();
+    toast(`볼륨 ${Math.round(pv.volume*100)}%`); }
   else if(e.key==="ArrowDown"){ e.preventDefault();
-    pv.volume=Math.max(0,pv.volume-0.05); paintVol(); toast(`볼륨 ${Math.round(pv.volume*100)}%`); }
+    pv.volume=Math.max(0,pv.volume-0.05); paintVol(); 볼륨살짝();
+    toast(`볼륨 ${Math.round(pv.volume*100)}%`); }
   else if(k==="d"){ e.preventDefault(); pv.pause();
     pv.currentTime=Math.max(0,pv.currentTime-1/S.fps); paintHead(); }
   else if(k==="f"){ e.preventDefault(); pv.pause();

@@ -125,8 +125,10 @@ contextBridge.exposeInMainWorld("CG", {
   installUpdate: () => ipcRenderer.invoke("installUpdate"),
 
   /* 영상 링크로 받기 */
-  ytInfo: (url, useCookies, referer) =>
-    ipcRenderer.invoke("ytInfo", url, !!useCookies, referer||null),
+  /* want = 사용자가 고른 화질(0 이면 최고 화질).
+     이것을 함께 넘겨야 "낮게 읽혔으니 다른 통로도 보자" 를 판단할 수 있다. */
+  ytInfo: (url, useCookies, referer, want) =>
+    ipcRenderer.invoke("ytInfo", url, !!useCookies, referer||null, want||0),
   ytDownload: (url, dest, jobId, opts, onProgress) => {
     const h = (_e, m) => { if (m.jobId === jobId) onProgress(m); };
     ipcRenderer.on("ytProgress", h);
