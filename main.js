@@ -710,11 +710,12 @@ function 영상속내용(file) {
       "-v", "error", "-select_streams", "v:0",
       "-show_entries", "stream=codec_name,pix_fmt", "-of", "json", file,
     ], { maxBuffer: 1 << 20, timeout: 20000 }, (err, stdout) => {
-      if (err) return resolve({});
-      try {
-        const s = (JSON.parse(stdout).streams || [])[0] || {};
-        resolve({ codec: s.codec_name, pix: s.pix_fmt });
-      } catch (e) { resolve({}); }
+      let s = null;
+      if (!err) try { s = (JSON.parse(stdout).streams || [])[0] || null; } catch (e) {}
+      if (s && s.codec_name) return resolve({ codec: s.codec_name, pix: s.pix_fmt });
+      /* ★ ffprobe 는 설치 파일에 없다 — ffmpeg 가 읽은 것으로 대신한다.
+         이것이 없으면 사용자 컴퓨터에서는 ProRes 원본도 늘 H.264 로 뽑혔다. */
+      매체속내용(file).then((m) => resolve(m ? { codec: m.vcodec, pix: m.pix } : {}));
     });
   });
 }
@@ -813,8 +814,8 @@ ipcMain.handle("clipCancel", (_e, jobId) => {
 
    화면 쪽은 언제나 "원본 그대로" 로만 부른다 — 다시 만들지 않고 떠내기만 하므로
    소리가 하나도 깎이지 않고, 가장 빠르고, 파일도 가장 작다. 고를 일이 아니다.
-     · copy — 담긴 방식(aac·mp3·flac...)에 맞는 그릇을 골라 그대로 떠낸다
-     · wav  — 그대로 뜰 수 없는 방식으로 담겨 있을 때 여기가 받아낸다 (무압축)
+     · copy — 담긴 방식(aac·mp3·wav)에 맞는 그릇을 골라 그대로 떠낸다
+     · wav  — 그대로 떠내면 아무 데서도 안 열리는 방식일 때 여기가 받아낸다 (무압축)
      · mp3  — 320k. 지금 화면에서는 쓰지 않지만 같은 통로로 열려 있다
    ========================================================================= */
 /* 소리가 어떤 방식으로 담겨 있는지 본다 (없으면 null).
@@ -857,12 +858,21 @@ function 소리속내용(file) {
   return 프로브().then((a) => a || 에프엠());
 }
 /* 담긴 방식마다 '그대로 떠낼 때' 쓸 수 있는 그릇.
-   목록에 없는 방식은 그대로 뜨지 못하므로 WAV 로 다시 만든다. */
+   ★ 예전에는 opus → .opus · vorbis → .ogg · flac → .flac 처럼 무엇이든 그대로 떴다.
+     그런데 유튜브에서 받은 영상은 소리가 대개 opus 라, 뽑은 .opus 를 윈도우 기본
+     재생기도 프리미어도 열지 못했다 — 팟플레이어 같은 것을 깔아야만 들렸다.
+     떠내기는 했는데 쓸 수가 없는 파일이었던 셈이다.
+   그래서 어디서나 바로 열리는 방식(aac · mp3 · wav)만 그대로 뜨고,
+   나머지는 WAV 로 푼다. WAV 는 무압축이라 푸는 동안 소리가 하나도 깎이지 않는다
+   (원본에 담긴 소리 그대로이고, 파일만 커진다). */
 const 소리그릇 = {
-  aac: ".m4a", alac: ".m4a", mp3: ".mp3", opus: ".opus", vorbis: ".ogg",
-  flac: ".flac", ac3: ".ac3", eac3: ".eac3", dts: ".dts", truehd: ".thd",
+  aac: ".m4a", mp3: ".mp3",
   pcm_s16le: ".wav", pcm_s24le: ".wav", pcm_s32le: ".wav", pcm_f32le: ".wav",
 };
+/* WAV 로 풀 때의 깊이. 16bit 보다 촘촘하게 담긴 무손실 원본(flac·alac 등)은
+   24bit 로 풀어야 깎이지 않는다. 손실 압축(opus·vorbis·ac3...)은 16bit 로 충분하다. */
+const 촘촘한소리 = /^(flac|alac|truehd|mlp|pcm_s24|pcm_s32|pcm_f32|pcm_f64|wavpack|tta|ape)/;
+const 풀깊이 = (codec) => 촘촘한소리.test(codec) ? "pcm_s24le" : "pcm_s16le";
 ipcMain.handle("audioRange", async (e, { src, destNoExt, start, dur, kind, jobId }) => {
   if (!(dur > 0)) return { ok: false, error: "구간이 너무 짧습니다" };
   const 속 = await 소리속내용(src);
@@ -875,7 +885,7 @@ ipcMain.handle("audioRange", async (e, { src, destNoExt, start, dur, kind, jobId
 
   const 계획 = {
     copy: { ext: 소리그릇[codec] || ".m4a", args: ["-c:a", "copy"], 이름: "원본 그대로" },
-    wav:  { ext: ".wav", args: ["-c:a", "pcm_s16le"], 이름: "WAV" },
+    wav:  { ext: ".wav", args: ["-c:a", 풀깊이(codec)], 이름: "WAV" },
     mp3:  { ext: ".mp3", args: ["-c:a", "libmp3lame", "-b:a", "320k"], 이름: "MP3 320k" },
   }[방식];
 
@@ -919,6 +929,185 @@ ipcMain.handle("audioRange", async (e, { src, destNoExt, start, dur, kind, jobId
                 codec, channels: 속.channels || 0, rate: +(속.sample_rate || 0) });
     });
   });
+});
+
+/* =========================================================================
+   프리미어에 바로 들어가는 사본 만들기
+   -------------------------------------------------------------------------
+   ★ 왜 필요한가.
+     mkv · webm 은 그릇부터 프리미어가 모른다. 그릇이 mp4 여도 속이 VP9 · AV1 ·
+     opus 면 역시 못 연다 — 유튜브에서 최고 화질로 받은 영상이 대개 이렇다
+     (4K 는 H.264 로는 아예 올라와 있지 않다). 그래서 받은 영상을 프리미어에
+     끌어다 놓으면 "지원하지 않는 형식" 이 떴고, 따로 변환 프로그램을 거쳐야 했다.
+   ★ 어떻게 옮기는가 — 되도록 다시 만들지 않는다. 그릇은 사용자가 고른다.
+     · 그릇만 문제면(mkv 속 H.264 + aac 등) 속은 그대로 두고 그릇만 바꾼다.
+       몇 초면 끝나고 화질·소리가 100% 그대로다. (mp4 · mov 어느 쪽이든)
+     · 그림을 다시 만들어야 하면
+         MOV — ProRes 422 HQ. 편집실에서 가장 흔히 주고받는 중간 형식이다.
+               장마다 따로 담겨 있어 타임라인에서 가볍고, 10bit 4:2:2 라 색을
+               깎지 않는다. 대신 크다 (1080p 1분에 약 1.3GB, 4K 는 그 네 배).
+         MP4 — H.264 아주 높은 화질(crf 15). 눈으로는 차이가 없고 파일이 작다.
+               어디서나 열리지만 한 번 더 손실 압축을 거친다.
+     · 소리가 모르는 방식(opus 등)이면
+         MOV — WAV(PCM)로 푼다. 무압축이라 깎이지 않는다.
+         MP4 — mp4 는 PCM 을 담지 못해 AAC 320k 로 만든다.
+   ★ ffprobe 는 설치 파일에 들어가지 않는다. 그래서 ffmpeg 가 뱉는 글에서 읽는다.
+   ========================================================================= */
+function 매체속내용(file) {
+  return new Promise((resolve) => {
+    execFile(ffmpegPath(), ["-hide_banner", "-i", file],
+      { maxBuffer: 1 << 22, timeout: 30000, windowsHide: true }, (err, stdout, stderr) => {
+        const txt = String(stderr || "") + String(stdout || "");
+        /* Input #0, matroska,webm, from '...':
+           Stream #0:0(eng): Video: vp9 (Profile 0), yuv420p(tv, bt709), 3840x2160, ...
+           Stream #0:1(eng): Audio: opus, 48000 Hz, stereo, fltp */
+        const im = txt.match(/Input #0,\s*(.+?),\s*from\s/);
+        const vm = txt.match(/Stream #\d+:\d+[^\n]*?:\s*Video:\s*([^\s,(]+)([^\n]*)/);
+        const am = txt.match(/Stream #\d+:\d+[^\n]*?:\s*Audio:\s*([^\s,(]+)/);
+        const dm = txt.match(/Duration:\s*(\d+):(\d\d):(\d\d(?:\.\d+)?)/);
+        if (!vm && !am) return resolve(null);
+        const pm = vm ? vm[2].match(/,\s*((?:yuv|yuvj|rgb|bgr|gbr|gray|nv|p0|ya)[a-z0-9]*)/i) : null;
+        resolve({
+          format: im ? im[1] : "",
+          vcodec: vm ? vm[1].toLowerCase() : "",
+          pix: pm ? pm[1].toLowerCase() : "",
+          acodec: am ? am[1].toLowerCase() : "",
+          duration: dm ? (+dm[1]) * 3600 + (+dm[2]) * 60 + parseFloat(dm[3]) : 0,
+        });
+      });
+  });
+}
+/* 프리미어가 그대로 여는 것들 */
+const 프리미어그림 = /^(h264|hevc|prores|dnxhd|cfhd|mpeg2video|mpeg1video|mpeg4|mjpeg|dvvideo|wmv3|vc1|v210|qtrle|png)$/;
+const 프리미어소리 = /^(aac|mp3|mp2|pcm_[a-z0-9]+|wmav2|wmapro)$/;
+const 프리미어못여는그릇 = /\.(mkv|webm|flv|f4v|ogv|ogg|rm|rmvb|divx|y4m|3g2)$/i;
+
+function 프리미어진단(file, 속) {
+  const 까닭 = [];
+  if (프리미어못여는그릇.test(file))
+    까닭.push(path.extname(file).slice(1).toLowerCase() + " 그릇");
+  if (속.vcodec && !프리미어그림.test(속.vcodec)) 까닭.push("그림 " + 속.vcodec);
+  if (속.acodec && !프리미어소리.test(속.acodec)) 까닭.push("소리 " + 속.acodec);
+  return 까닭;
+}
+
+/* mp4 그릇에 그대로 담을 수 있는 것 (ProRes · PCM 등은 mov 에만 담긴다) */
+const mp4그림 = /^(h264|hevc|mpeg4|mpeg2video|mpeg1video)$/;
+const mp4소리 = /^(aac|mp3)$/;
+/* 고른 그릇(mp4 · mov)으로 옮길 때 무엇을 그대로 두고 무엇을 다시 만드는가 */
+function 변환계획(속, 그릇) {
+  const v = 속.vcodec, a = 속.acodec;
+  if (그릇 === "mp4") {
+    const 그림그대로 = mp4그림.test(v), 소리그대로 = !a || mp4소리.test(a);
+    return {
+      ext: ".mp4", remux: 그림그대로 && 소리그대로,
+      그림: 그림그대로
+        ? ["-c:v", "copy", ...(v === "hevc" ? ["-tag:v", "hvc1"] : [])]
+        : ["-c:v", "libx264", "-preset", "fast", "-crf", "15", "-pix_fmt", "yuv420p"],
+      소리: !a ? [] : 소리그대로 ? ["-c:a", "copy"] : ["-c:a", "aac", "-b:a", "320k"],
+      video: 그림그대로 ? "그대로" : "H.264 (아주 높은 화질)",
+      audio: !a ? "" : 소리그대로 ? "그대로" : "AAC 320k",
+    };
+  }
+  const 그림그대로 = 프리미어그림.test(v), 소리그대로 = !a || 프리미어소리.test(a);
+  return {
+    ext: ".mov", remux: 그림그대로 && 소리그대로,
+    그림: 그림그대로
+      ? ["-c:v", "copy", ...(v === "hevc" ? ["-tag:v", "hvc1"] : [])]
+      : ["-c:v", "prores_ks", "-profile:v", "3", "-vendor", "apl0", "-pix_fmt", "yuv422p10le"],
+    소리: !a ? [] : 소리그대로 ? ["-c:a", "copy"] : ["-c:a", 풀깊이(a)],
+    video: 그림그대로 ? "그대로" : "ProRes 422 HQ",
+    audio: !a ? "" : 소리그대로 ? "그대로" : "WAV (무압축)",
+  };
+}
+/* 전에 만들어 둔 사본인가 (원본보다 나중에 만든 것만) */
+function 만들어둔것(dest, src) {
+  try {
+    const d = fs.statSync(dest), s = fs.statSync(src);
+    return d.size > 4096 && d.mtimeMs >= s.mtimeMs;
+  } catch (x) { return false; }
+}
+
+ipcMain.handle("premiereCheck", async (_e, src, destNoExt) => {
+  const 속 = await 매체속내용(src);
+  if (!속 || !속.vcodec) return { ok: false };
+  const 까닭 = 프리미어진단(src, 속);
+  /* 그릇마다 무엇이 바뀌는지와, 전에 만들어 둔 것이 있는지 */
+  const plans = {};
+  for (const 그릇 of ["mp4", "mov"]) {
+    const p = 변환계획(속, 그릇);
+    plans[그릇] = { remux: p.remux, video: p.video, audio: p.audio,
+                    existing: destNoExt && 만들어둔것(destNoExt + p.ext, src) ? destNoExt + p.ext : "" };
+  }
+  return { ok: true, need: 까닭.length > 0, reasons: 까닭, plans,
+           duration: 속.duration, vcodec: 속.vcodec, acodec: 속.acodec };
+});
+
+const PREMIERE = new Map();
+ipcMain.handle("premiereMake", async (e, { src, destNoExt, jobId, format }) => {
+  const 속 = await 매체속내용(src);
+  if (!속 || !속.vcodec) return { ok: false, error: "영상 정보를 읽지 못했습니다" };
+
+  const 계획 = 변환계획(속, format === "mp4" ? "mp4" : "mov");
+  const { ext, 그림, 소리 } = 계획;
+
+  /* 이미 만들어 둔 것이 있으면 그대로 쓴다 */
+  const dest = destNoExt + ext;
+  if (만들어둔것(dest, src)) {
+    let size = 0;
+    try { size = fs.statSync(dest).size; } catch (x) {}
+    return { ok: true, path: dest, size, reused: true, remux: 계획.remux };
+  }
+
+  try { fs.mkdirSync(path.dirname(dest), { recursive: true }); } catch (x) {}
+  const tmp = destNoExt + ".만드는중" + ext;
+  const dur = 속.duration || 0;
+  return await new Promise((resolve) => {
+    const ff = spawn(ffmpegPath(), [
+      "-v", "info", "-hide_banner", "-y",
+      "-i", src,
+      "-map", "0:v:0", "-map", "0:a:0?",
+      ...그림, ...소리,
+      "-map_metadata", "0", "-movflags", "+faststart",
+      tmp,
+    ], { windowsHide: true });
+    let err = "", killed = false;
+    PREMIERE.set(jobId, () => { killed = true; try { ff.kill("SIGKILL"); } catch (x) {} });
+    ff.stderr.on("data", (d) => {
+      const t = d.toString();
+      const ts = t.match(/time=(\d+):(\d\d):(\d\d(?:\.\d+)?)/g);
+      if (ts && dur > 0) {
+        const l = ts[ts.length - 1].match(/time=(\d+):(\d\d):(\d\d(?:\.\d+)?)/);
+        const at = (+l[1]) * 3600 + (+l[2]) * 60 + parseFloat(l[3]);
+        e.sender.send("premiereProgress",
+          { jobId, percent: Math.max(0, Math.min(100, at / dur * 100)) });
+      }
+      if (err.length < 4000) err += t;
+    });
+    ff.on("error", (x) => {
+      PREMIERE.delete(jobId);
+      resolve({ ok: false, error: "ffmpeg 를 실행하지 못했습니다: " + x.message });
+    });
+    ff.on("close", (code) => {
+      PREMIERE.delete(jobId);
+      if (killed || code !== 0) {
+        try { fs.rmSync(tmp, { force: true }); } catch (x) {}
+        return resolve(killed ? { ok: false, aborted: true }
+                              : { ok: false, error: readErr(err, null) });
+      }
+      try { fs.rmSync(dest, { force: true }); fs.renameSync(tmp, dest); }
+      catch (x) { return resolve({ ok: false, error: String(x.message || x) }); }
+      let size = 0;
+      try { size = fs.statSync(dest).size; } catch (x) {}
+      resolve({ ok: true, path: dest, size, remux: 계획.remux,
+                video: 계획.video, audio: 계획.audio });
+    });
+  });
+});
+ipcMain.handle("premiereCancel", (_e, jobId) => {
+  const fn = PREMIERE.get(jobId);
+  if (fn) fn();
+  return { ok: true };
 });
 
 /* =========================================================================
@@ -2131,6 +2320,173 @@ ipcMain.handle("ytDiag", async () => {
   } catch (e) { out.error = String(e.message || e); }
   return out;
 });
+/* =========================================================================
+   유튜브에서 같은 영상 찾기
+   -------------------------------------------------------------------------
+   ★ TVCF 에서 받은 영상에는 TVCF 워터마크가 박혀 있고, 기업 계정이 아니면
+     720p 가 한계다. 그런데 광고는 대개 광고주가 유튜브에도 올려 두었다 —
+     그쪽은 워터마크가 없고 1080p · 4K 까지 있다.
+   페이지 제목으로 유튜브를 찾아 후보를 돌려준다. 고르는 것은 화면 쪽이 한다.
+   (--flat-playlist 는 목록만 읽으므로 몇 초면 끝난다)
+   ========================================================================= */
+async function 유튜브검색(exe, q, n) {
+  const out = await runYt(exe, [
+    "--no-warnings", "--flat-playlist", "-J", `ytsearch${n}:${q}`,
+  ], 30000);
+  const j = JSON.parse(out);
+  return (j.entries || [])
+    .filter((x) => x && x.id && x.live_status !== "is_live")
+    .map((x) => ({
+      url: "https://www.youtube.com/watch?v=" + x.id,
+      id: x.id,
+      title: String(x.title || ""),
+      channel: String(x.channel || x.uploader || ""),
+      duration: +x.duration || 0,
+      thumb: `https://i.ytimg.com/vi/${x.id}/mqdefault.jpg`,
+    }));
+}
+ipcMain.handle("ytSearch", async (_e, { query, count }) => {
+  const q = String(query || "").trim();
+  if (!q) return { ok: false, error: "찾을 제목이 없습니다" };
+  let exe;
+  try { exe = await ensureYtdlp(null); }
+  catch (e) { return { ok: false, error: friendlyYtError(String(e.message || e)) }; }
+  try { return { ok: true, list: await 유튜브검색(exe, q, Math.max(1, Math.min(20, count || 10))) }; }
+  catch (e) { return { ok: false, error: friendlyYtError(String(e.message || e)) }; }
+  finally { 갱신예약(5000); }
+});
+
+/* ---------- 화면으로 대조하기 ----------
+   ★ 제목과 길이만으로는 모자랐다. 세리안 브랜드필름(30초)을 넣었더니
+     같은 광고주가 올린 다른 브랜드필름이 골라졌다. 게다가 유튜브에는
+     30초짜리 '다른 편집본' 과 31초짜리 '같은 영상' 이 나란히 올라와 있었다 —
+     제목도 같고 길이도 거의 같아서 글자로는 가려낼 수가 없다.
+   그래서 두 영상을 실제로 틀어 화면을 맞대 본다.
+     · 초당 4장씩, 32×18 흑백으로 아주 작게 줄여 읽는다 (워터마크·화질 차이는 묻힌다)
+     · 밝기·대비를 맞춘 뒤 장마다 얼마나 닮았는지 재고, 평균을 낸다
+     · 유튜브 쪽은 앞뒤에 로고 화면이 붙어 있을 수 있어서 ±8초 밀어 가며 가장 맞는 자리를 찾는다
+   같은 영상이면 0.9 를 넘고, 다른 편집본은 0.4 안팎에 머문다.
+   유튜브 쪽은 가장 낮은 화질로 읽으므로 한 후보에 몇 초면 끝난다. */
+const 지문W = 32, 지문H = 18, 지문FPS = 4;
+function 영상지문(src, referer) {
+  return new Promise((resolve) => {
+    const head = referer
+      ? ["-headers", "Referer: " + referer + "\r\nUser-Agent: " + UA + "\r\n"]
+      : ["-user_agent", UA];
+    const ff = spawn(ffmpegPath(), ["-v", "error", ...head, "-i", src, "-t", "150", "-an",
+      "-vf", `fps=${지문FPS},scale=${지문W}:${지문H}:flags=area,format=gray`,
+      "-f", "rawvideo", "-"], { windowsHide: true });
+    const 조각 = [];
+    const t = setTimeout(() => { try { ff.kill("SIGKILL"); } catch (x) {} }, 60000);
+    ff.stdout.on("data", (d) => 조각.push(d));
+    ff.on("error", () => { clearTimeout(t); resolve([]); });
+    ff.on("close", () => {
+      clearTimeout(t);
+      const b = Buffer.concat(조각), N = 지문W * 지문H, n = Math.floor(b.length / N), out = [];
+      for (let i = 0; i < n; i++) {
+        const v = new Float32Array(N); let m = 0;
+        for (let k = 0; k < N; k++) { v[k] = b[i * N + k]; m += v[k]; }
+        m /= N; let s = 0;
+        for (let k = 0; k < N; k++) { v[k] -= m; s += v[k] * v[k]; }
+        s = Math.sqrt(s / N);
+        /* 거의 한 빛깔인 장(검은 화면 등)은 무엇과도 닮을 수 있어 빼고 잰다 */
+        if (s > 4) { for (let k = 0; k < N; k++) v[k] /= s; out.push(v); }
+        else out.push(null);
+      }
+      resolve(out);
+    });
+  });
+}
+function 지문대조(a, b) {
+  const N = 지문W * 지문H, 쓸장 = a.filter(Boolean).length;
+  let 최선 = { score: 0, offset: 0, cover: 0 };
+  if (!쓸장) return 최선;
+  for (let off = -8 * 지문FPS; off <= 8 * 지문FPS; off++) {
+    let sum = 0, n = 0;
+    for (let i = 0; i < a.length; i++) {
+      const j = i + off;
+      if (j < 0 || j >= b.length || !a[i] || !b[j]) continue;
+      let c = 0;
+      for (let k = 0; k < N; k++) c += a[i][k] * b[j][k];
+      sum += c / N; n++;
+    }
+    const cover = n / 쓸장;
+    if (cover >= 0.6 && sum / n > 최선.score)
+      최선 = { score: sum / n, offset: off / 지문FPS, cover };
+  }
+  return 최선;
+}
+/* 제목이 얼마나 겹치는가 (0~1) — 화면 대조에 넘길 순서를 정하는 데만 쓴다 */
+const 낱말모음 = (t) => new Set(String(t || "").toLowerCase()
+  .replace(/[^0-9a-z가-힣]+/g, " ").split(" ").filter((w) => w.length >= 2));
+function 제목겹침(q, c) {
+  const a = 낱말모음(q), b = [...낱말모음(c.title + " " + c.channel)];
+  if (!a.size) return 0;
+  let hit = 0;
+  a.forEach((w) => {
+    if (b.includes(w)) hit += 1;
+    else if (b.some((x) => x.includes(w) || w.includes(x))) hit += 0.5;
+  });
+  return hit / a.size;
+}
+/* ---------- 유튜브 짝 찾기 (한 번에) ----------
+   ★ 처음에는 [정보 읽기 → 찾기 → 후보 하나씩 대조] 를 차례로 해서 20초가 걸렸다.
+     그 사이 사용자는 알림을 보기도 전에 [추출 시작] 을 눌러 버린다.
+   이제는 재생 창이 닫히는 순간 시작하고, 기다릴 것 없는 일은 모두 함께 돌린다.
+     · TVCF 영상 읽기(지문 · 길이)  ∥  유튜브 찾기
+     · 길이가 맞는 후보 셋까지를 동시에 대조
+   (유튜브 쪽 끝에 로고 화면이 붙는 만큼 — 2초 짧거나 10초 길기까지 — 는 봐준다) */
+ipcMain.handle("ytTwin", async (_e, { query, src, referer }) => {
+  const q = String(query || "").trim();
+  if (!q || !src) return { ok: false, error: "찾을 제목이 없습니다" };
+  let exe;
+  try { exe = await ensureYtdlp(null); await ensureQuickjs(null); }
+  catch (e) { return { ok: false, error: friendlyYtError(String(e.message || e)) }; }
+  try {
+    const [원본, 찾음] = await Promise.all([
+      영상지문(src, referer),
+      유튜브검색(exe, q, 15).catch(() => []),
+    ]);
+    if (원본.filter(Boolean).length < 4) return { ok: false, error: "TVCF 영상을 읽지 못했습니다" };
+    const 길이 = 원본.length / 지문FPS;
+    const 길이맞음 = (c) => !c.duration || (c.duration >= 길이 - 2 && c.duration <= 길이 + 10);
+    let 후보 = 찾음.filter(길이맞음);
+    /* 긴 제목으로 못 찾으면 광고주 이름만으로 한 번 더 */
+    const 첫말 = q.split(/\s+/)[0];
+    if (!후보.length && 첫말 && 첫말 !== q)
+      후보 = (await 유튜브검색(exe, 첫말, 15).catch(() => [])).filter(길이맞음);
+    후보 = 후보.map((c) => ({ ...c, 겹침: 제목겹침(q, c) }))
+      .sort((x, y) => y.겹침 - x.겹침).slice(0, 3);
+    const 대조 = await Promise.all(후보.map(async (c) => {
+      try {
+        const 주소 = String(await runYt(exe, ["--no-warnings", ...jsArgs(), "-g",
+          "-f", "wv*[height>=144]/bv*[height<=360]/worst", c.url], 30000)).trim().split(/\r?\n/)[0];
+        return { ...c, ...지문대조(원본, await 영상지문(주소, null)) };
+      } catch (e) { return { ...c, score: 0, cover: 0 }; }
+    }));
+    /* 같은 영상이면 0.9 를 넘고 다른 편집본은 0.4 안팎이다 — 0.8 로 가른다 */
+    const list = 대조.filter((c) => c.score >= 0.8 && c.cover >= 0.8)
+      .sort((x, y) => y.score - x.score);
+    return { ok: true, duration: 길이, checked: 대조.length, list };
+  } catch (e) {
+    return { ok: false, error: friendlyYtError(String(e.message || e)) };
+  } finally { 갱신예약(5000); }
+});
+/* 재생 창에 떠 있는 페이지에서 광고 제목을 읽는다.
+   ★ TVCF 는 창 제목이 "세리안 | TVCF" 처럼 광고주 이름뿐이다. 그것으로 찾으면
+     그 광고주의 영상이 전부 걸려 나온다. 본문에는 "세리안 / : SERIAN Brand Film / 편"
+     처럼 광고 제목이 따로 적혀 있어서 그것을 함께 읽어 둔다. */
+ipcMain.handle("sniffPageInfo", async () => {
+  if (!sniffWin || sniffWin.isDestroyed()) return { ok: false };
+  try {
+    const title = sniffWin.webContents.getTitle() || "";
+    const txt = String(await sniffWin.webContents.executeJavaScript(
+      "document.body ? document.body.innerText.slice(0, 3000) : ''", true) || "");
+    const m = txt.match(/(?:^|\n)([^\n]{1,40})\n\s*:\s*([^\n]{1,120})\n\s*편\s*(?:\n|$)/);
+    return { ok: true, title, brand: m ? m[1].trim() : "", adTitle: m ? m[2].trim() : "" };
+  } catch (e) { return { ok: false }; }
+});
+
 ipcMain.handle("ytCancel", (_e, jobId) => {
   const fn = CANCEL.get("yt" + jobId); if (fn) fn(); return { ok: true };
 });

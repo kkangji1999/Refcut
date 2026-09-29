@@ -908,6 +908,7 @@
   /* 재생바 눈금 표시 켜고 끄기 */
   #markView{min-width:88px; text-align:center}
   #markView.off{color:#5d6472; border-style:dashed}
+  #prVid.off{color:#5d6472}
   #ioText{display:inline-flex; align-items:center; gap:5px; white-space:nowrap;
     font-size:11.5px; font-variant-numeric:tabular-nums;
     min-width:150px; justify-content:center}
@@ -1631,6 +1632,9 @@
               title="지금 재생 중인 화면 한 장을 원본 해상도 PNG 로 내려받습니다 (Ctrl+S)&#10;캡쳐된 컷 목록에는 넣지 않습니다.">⬇ 현재 화면 저장</button>
             <button class="mini" id="markView">⋮ 눈금 보기</button>
             <span id="editHint"></span>
+            <!-- 자주 쓰지 않는 것이라 맨 아래 오른쪽 구석에 작게 둔다 -->
+            <button class="mini" id="prVid" style="display:none"
+              title="프리미어용 변환 — 프리미어에 바로 임포트되지 않는 영상(mkv · webm, VP9 · AV1, opus 등)을&#10;MP4 · MOV 로 바꿔 줍니다">⇄ 프리미어용 변환</button>
           </div>
         </div>
 
@@ -2463,8 +2467,8 @@ function download(blob,name){
    같은 날 두 번째로 내보내면 26.8.1602 로 올린다.
    업데이트 확인은 마디마다 숫자로 비교하므로(verNum) 자리수가 달라도 안전하다. */
 /* 앱으로 켰으면 설치된 진짜 버전을 그대로 쓴다 (여기 숫자는 웹으로 열 때의 몫) */
-const APP_VERSION = (window.CG && window.CG.version) || "26.9.1105";
-const APP_DATE    = "2026.09.24";
+const APP_VERSION = (window.CG && window.CG.version) || "26.9.1106";
+const APP_DATE    = "2026.09.29";
 /* 최신 index.html 이 올라가 있는 주소.
    여기에 넣어두면 [업데이트] 버튼이 새 버전을 확인합니다.
    설치 폴더의 update_url.txt 에 같은 주소를 적어두면
@@ -3481,12 +3485,22 @@ function openSniff(page){
     }, ()=>finishSniff(_sniffBest));
   });
 }
-function finishSniff(best){
+async function finishSniff(best){
   clearTimeout(_sniffTimer);
   $("sniffBox").classList.remove("on");
-  try{ window.CG.sniffClose(); }catch(e){}
   const r=_sniffResolve; _sniffResolve=null; _sniffBest=null;
-  if(r) r(best ? {...best, pageTitle:_sniffPageTitle||best.pageTitle||""} : null);
+  /* ★ 창을 닫기 전에 본문에서 광고 제목을 읽어 둔다.
+     TVCF 는 창 제목이 "세리안 | TVCF" 처럼 광고주 이름뿐이라, 그것만으로는
+     파일 이름도 유튜브 찾기도 엉뚱해진다 → "세리안 SERIAN Brand Film" */
+  let info=null;
+  if(r && best && window.CG.sniffPageInfo){
+    try{ info=await Promise.race([window.CG.sniffPageInfo(),
+                                  new Promise(ok=>setTimeout(()=>ok(null),1500))]); }catch(e){}
+  }
+  try{ window.CG.sniffClose(); }catch(e){}
+  const 본문제목 = info && info.adTitle
+    ? `${info.brand||""} ${info.adTitle}`.trim() : "";
+  if(r) r(best ? {...best, pageTitle:본문제목||_sniffPageTitle||best.pageTitle||""} : null);
 }
 
 /* 원하는 화질과 실제 있는 화질을 맞춰 고른다.
@@ -3569,6 +3583,10 @@ async function addLink(url, referer, pageTitle, fallbackUrl){
   }catch(err){ hardErr=err; }
   clearInterval(tick);
   if(!S.queue.includes(placeholder)) return;      // 그 사이 사용자가 지웠으면 끝
+  /* 기다리는 사이 [유튜브 것으로 받기] 를 골랐으면 TVCF 줄은 넣지 않는다 */
+  if(referer && TWIN.get(referer) && TWIN.get(referer).choice==="yt"){
+    S.queue=S.queue.filter(x=>x!==placeholder); renderQueue(); return;
+  }
   if(hardErr){
     S.queue=S.queue.filter(x=>x!==placeholder); renderQueue();
     /* 응답 자체가 없었던 경우는 도구에 문제가 있을 확률이 높다.
@@ -3623,6 +3641,8 @@ async function addLink(url, referer, pageTitle, fallbackUrl){
       S.queue=S.queue.filter(x=>x!==placeholder); renderQueue();
       return toast("취소했습니다");
     }
+    /* ★ 영상 정보를 읽는 것과 나란히 곧바로 시작한다 — 끝까지 기다렸다 찾으면 늦다 */
+    if(isTVCF(url)) 유튜브짝시작(url, best.url, best.pageTitle||"");
     /* ★ 재생 창에서 잡히는 주소는 '그때 재생되던 화질' 하나뿐이다.
        플레이어가 720p 로 시작하면 1080p 가 있는 영상도 720p 로 받아졌다
        (TVCF 에서 최고 화질을 골라도 720p 로 나오던 것이 이것이다).
@@ -3717,6 +3737,86 @@ async function addLink(url, referer, pageTitle, fallbackUrl){
   }else{
     toast("대기열에 넣었습니다 — [추출 시작] 또는 [⬇ 영상다운] 을 눌러주세요");
   }
+}
+
+/* ---------- TVCF 영상의 유튜브 짝 찾기 ----------
+   ★ TVCF 에서 받은 영상에는 워터마크가 박혀 있고, 기업 계정이 아니면 720p 가
+     한계다. 그런데 광고는 대개 광고주가 유튜브에도 올려 둔다 — 그쪽은 워터마크가
+     없고 1080p · 4K 까지 있다. 그걸 손으로 찾아 다시 넣는 일이 매번 반복됐다.
+   ★ 제목과 길이만으로는 모자랐다. 세리안 브랜드필름(30초)에 같은 광고주의
+     6초짜리가 골라졌고, 유튜브에는 30초짜리 '다른 편집본' 과 31초짜리 '같은 영상' 이
+     나란히 있었다. 그래서 길이로 거른 뒤 실제로 화면을 맞대 보고(main.js ytTwin),
+     같다고 판명된 것만 권한다.
+   ★ 그리고 곧바로 묻는다. 처음에는 대기열에 다 넣은 뒤 조용히 찾느라 20초쯤
+     걸렸고, 그 사이 사용자는 알림을 보기도 전에 [추출 시작] 을 눌러 버렸다.
+     이제는 재생 창이 닫히는 순간 창을 띄워 "찾는 중" 을 보여주고,
+     결과가 나오면 그 창에서 곧바로 [유튜브 것으로 받기] · [TVCF 그대로] 를 고르게 한다.
+     기다리기 싫으면 [기다리지 않고 TVCF 로 받기] 로 바로 넘어간다.
+     같은 것이 없으면 창은 스스로 닫히고 TVCF 영상 그대로 간다. */
+const TWIN=new Map();    // TVCF 페이지 주소 → {choice:null | "yt" | "tvcf"}
+function 유튜브검색어(t){
+  let s=cleanSiteTitle(t)||String(t||"");
+  s=s.replace(/TVCF/ig," ")
+     .replace(/\(?\s*\d+\s*(초|s|sec)\s*\)?/gi," ")        // (15초) · 30s 같은 길이 표기
+     .replace(/[\[\](){}<>"'“”‘’|_#·]/g," ")
+     .replace(/\s+/g," ").trim();
+  return s.slice(0,80);
+}
+async function 유튜브짝시작(page, stream, pageTitle){
+  if(!window.CG.ytTwin) return;
+  const q=유튜브검색어(pageTitle);
+  if(!q) return;
+  const 짝={choice:null};
+  TWIN.set(page, 짝);
+  let 단계="찾는중", 고른=0, 맞는것=[];
+  const 창=appDlg("유튜브에서 같은 영상을 찾는 중",
+    `TVCF 영상에는 워터마크가 있고 720p 가 한계입니다. `+
+    `유튜브에 워터마크 없는 같은 영상이 있는지 찾아서 화면을 맞대 보는 중입니다...`+
+    `<div style="font-size:11px;color:#6b7385;margin-top:6px">${escHtml(q)} · 보통 10초 안팎</div>`,
+    {ok:"기다리지 않고 TVCF 로 받기"});
+  /* ★ 기다리는 사이 다른 알림이 이 창을 차지했으면 건드리지 않는다 */
+  const 내창=_dlgResolve;
+  const 열려있나=()=>!!내창 && _dlgResolve===내창;
+  window.CG.ytTwin(q, stream, page).catch(()=>null).then(m=>{
+    if(!열려있나() || 짝.choice) return;
+    맞는것=(m&&m.ok&&m.list)||[];
+    if(!맞는것.length){
+      짝.choice="tvcf";
+      closeDlg(false);
+      toast(m&&m.ok ? "유튜브에 똑같은 영상은 없습니다 — TVCF 영상으로 받습니다"
+                    : "유튜브와 대조하지 못했습니다 — TVCF 영상으로 받습니다");
+      return;
+    }
+    단계="고르기";
+    const 줄=맞는것.map((c,i)=>
+      `<label style="display:flex;gap:10px;align-items:center;padding:7px;border-radius:8px;cursor:pointer;border:1px solid var(--border);margin-top:6px">`+
+        `<input type="radio" name="ytPick" value="${i}"${i===0?" checked":""}>`+
+        `<img src="${escHtml(c.thumb)}" style="width:112px;height:63px;object-fit:cover;border-radius:5px;flex:0 0 auto;background:#000">`+
+        `<span style="min-width:0;font-size:11.5px;line-height:1.55">`+
+          `<b style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(c.title)}</b>`+
+          `<span style="color:#6b7385">${escHtml(c.channel)}${c.duration?` · ${길이글(c.duration)}`:""}</span>`+
+          `<span style="display:block;color:#6ee7b7">화면 일치 ${Math.round(c.score*100)}%</span>`+
+        `</span></label>`).join("");
+    $("dlgTitle").textContent="유튜브에 같은 영상이 있습니다";
+    $("dlgBody").innerHTML=
+      `TVCF 영상과 화면을 맞대 보니 똑같은 영상입니다. `+
+      `유튜브 것은 워터마크가 없고 화질도 더 높을 수 있습니다.`+
+      `<div style="font-size:11px;color:#6b7385;margin-top:4px">TVCF · ${escHtml(q)}`+
+      (m.duration?` · ${길이글(m.duration)}`:"")+`</div>`+
+      `<div id="ytPicks">${줄}</div>`;
+    $("dlgYes").textContent="유튜브 것으로 받기";
+    $("dlgNo").textContent="TVCF 그대로"; $("dlgNo").style.display="";
+    document.querySelectorAll('#ytPicks input[name="ytPick"]')
+      .forEach(el=>el.onchange=()=>{ 고른=+el.value; });
+  });
+  const 답=await 창;
+  if(짝.choice) return;                       // 같은 것이 없어 이미 TVCF 로 정해졌다
+  const c=맞는것[고른];
+  if(단계!=="고르기" || !답 || !c){ 짝.choice="tvcf"; return; }
+  짝.choice="yt";
+  /* TVCF 줄이 벌써 대기열에 있으면 뺀다 (아직 읽는 중이면 addLink 가 스스로 빠진다) */
+  S.queue=S.queue.filter(x=>!(x.referer===page && x.status==="wait")); renderQueue();
+  addLink(c.url, null, "", null);
 }
 if(IS_EL){
   /* ★ on$ 는 이 아래에서 정의되므로 여기서 쓰면 스크립트가 통째로 멈춘다.
@@ -4257,7 +4357,148 @@ function attachVideoPath(p,name){
   };
   pv.onerror=()=>미리보기만들기(p);
   pv.src=fileURL(p);
+  프리미어살피기(p);
 }
+/* ---------- 프리미어용 변환 ----------
+   ★ 유튜브에서 최고 화질로 받은 영상은 속이 VP9 · AV1 · opus 인 때가 많고,
+     mkv · webm 은 그릇부터 프리미어가 모른다. 끌어다 놓으면 "지원하지 않는 형식".
+     그때마다 따로 변환 프로그램을 거쳐야 했다.
+   영상을 열 때 프리미어가 그대로 여는지만 본다(순식간이다). 누르면 MP4 · MOV 중
+   고르게 하고, 고른 그릇으로 사본을 만든다.
+     · 그릇만 바꾸면 되는 것은 몇 초면 끝난다 (화질·소리 100% 그대로)
+     · 그림을 다시 만들어야 하면 MOV 는 ProRes 422 HQ, MP4 는 H.264 아주 높은 화질
+   ★ 처음에는 못 여는 영상이면 알아서 만들었다. 그런데 유튜브에서 받은 영상은
+     거의 다 '그림을 다시 만들어야 하는' 쪽이라, 추출이 끝날 때마다 무거운 변환이
+     뒤에서 돌며 다음 영상의 추출·미리보기와 컴퓨터를 나눠 썼다.
+     필요한 사람만 쓰는 것이라 누를 때만 만든다. 자리도 맨 아래 구석이다.
+   ★ 이름에 '변환' 을 넣는다. "Pr ✓ 사본" 같은 글로는 무엇을 하는 단추인지 알 수 없었다.
+   만든 사본은 결과 폴더의 [프리미어용] 에 둔다. 한 번 만들면 다음부터는 그대로 쓴다.
+   ★ 한 번에 하나만 만든다. 다른 영상으로 넘어가도 멈추지 않고 이어서 만든다. */
+const PR=new Map();   // 원본 경로 → {state, plans, paths, fmt, percent, error, destNoExt, jobId}
+let _prBusy=null;
+const 프리미어칸=()=>`${폴더칸()}/프리미어용`;
+const 변환설명=
+  "프리미어용 변환\n"+
+  "프리미어에 바로 임포트되지 않는 영상을 프리미어에서 바로 쓸 수 있게 바꿔 줍니다.\n"+
+  "  · 그릇(컨테이너) — mkv · webm · flv 등\n"+
+  "  · 영상 코덱 — VP9 · AV1 등 (유튜브 고화질 영상이 대개 이렇습니다)\n"+
+  "  · 오디오 코덱 — opus · vorbis 등\n"+
+  "누르면 MP4 · MOV 중에 골라 뽑습니다.";
+async function 프리미어살피기(src){
+  if(!IS_EL || !window.CG.premiereCheck) return 프리미어단추();
+  if(!(S.out&&S.out.outDir&&S.out.base)) return 프리미어단추();
+  let j=PR.get(src);
+  if(j && j.state!=="fail") return 프리미어단추();
+  j={state:"checking", paths:{}, destNoExt:`${프리미어칸()}/${S.out.base}_프리미어용`};
+  PR.set(src,j); 프리미어단추();
+  let r=null; try{ r=await window.CG.premiereCheck(src, j.destNoExt); }catch(e){}
+  if(!r||!r.ok){ PR.delete(src); return 프리미어단추(); }
+  j.reasons=r.reasons||[]; j.plans=r.plans||{};
+  j.codec=[r.vcodec, r.acodec].filter(Boolean).join(" + ");
+  for(const k of ["mp4","mov"]) if(j.plans[k]&&j.plans[k].existing) j.paths[k]=j.plans[k].existing;
+  j.state = !r.need ? "ok" : Object.keys(j.paths).length ? "done" : "ask";
+  프리미어단추();
+}
+async function 프리미어다음(){
+  if(_prBusy) return;
+  const hit=[...PR.entries()].find(([,j])=>j.state==="wait");
+  if(!hit) return;
+  const [src,j]=hit;
+  _prBusy=src; j.state="making"; j.percent=0; j.jobId="pr"+Date.now();
+  프리미어단추();
+  let r=null;
+  try{
+    r=await window.CG.premiereMake({src, destNoExt:j.destNoExt, jobId:j.jobId, format:j.fmt}, m=>{
+      if(typeof m.percent==="number"){ j.percent=m.percent; 프리미어단추(); }
+    });
+  }catch(e){ r={ok:false, error:e.message}; }
+  _prBusy=null;
+  const 뒤=()=>Object.keys(j.paths).length ? "done" : "ask";
+  if(r&&r.ok){
+    j.paths[j.fmt]=r.path; j.state="done";
+    if(!r.reused){
+      const 이름=String(r.path).split("/").pop();
+      toast(`프리미어용 변환 완료 · ${((r.size||0)/1048576).toFixed(1)} MB · ${이름}`);
+    }
+  }else if(r&&r.aborted){ j.state=뒤(); }
+  else { j.state="fail"; j.error=(r&&r.error)||"만들지 못했습니다"; }
+  프리미어단추();
+  프리미어다음();
+}
+function 프리미어단추(){
+  const b=$("prVid"); if(!b) return;
+  const src=S.playSrc;
+  const j=src && PR.get(src);
+  if(!IS_EL || !j){ b.style.display="none"; return; }
+  b.style.display="";
+  const 까닭=(j.reasons||[]).join(" · ");
+  const 만든것=Object.keys(j.paths||{}).map(k=>k.toUpperCase()).join(" · ");
+  const [글,지금]={
+    checking:["⇄ 변환 확인 중…","프리미어가 그대로 여는 형식인지 보는 중입니다."],
+    ok:["⇄ 변환 불필요",`이 영상(${j.codec||""})은 변환 없이 그대로 프리미어에 올라갑니다.`],
+    ask:["⇄ 프리미어용 변환",`이 영상은 프리미어가 못 엽니다 — ${까닭}\n눌러서 변환하세요.`],
+    wait:["⇄ 변환 대기","다른 영상의 변환이 끝나면 이어서 만듭니다."],
+    making:[`⇄ 변환 중 ${(j.percent||0).toFixed(0)}%`,`${(j.fmt||"").toUpperCase()} 로 변환하는 중입니다 — 누르면 그만둡니다.`],
+    done:["⇄ 변환 완료",`${만든것} 로 변환해 두었습니다 (${까닭}).\n눌러서 파일 위치를 열거나 다른 형식으로 더 뽑을 수 있습니다.`],
+    fail:["⇄ 변환 실패","변환하지 못했습니다 — 눌러서 자세히 보기"],
+  }[j.state]||["⇄ 프리미어용 변환",""];
+  b.textContent=글;
+  b.title=변환설명+"\n\n지금 이 영상: "+지금;
+  b.classList.toggle("off", j.state==="ok"||j.state==="checking");
+}
+/* MP4 · MOV 중 고르게 한다. 이 영상에서 각각 무엇이 바뀌는지를 함께 보여준다. */
+async function 변환형식고르기(j){
+  const 줄=(k,이름,풀이)=>{
+    const p=(j.plans&&j.plans[k])||{};
+    const 있음=!!j.paths[k];
+    const 내용 = p.remux
+      ? "그릇만 바꿉니다 — 화질·소리 100% 그대로, 몇 초면 끝"
+      : `영상 ${p.video||"-"}${p.audio?` · 소리 ${p.audio}`:""}`;
+    return `<label style="display:flex;gap:10px;align-items:flex-start;padding:9px 10px;border-radius:8px;cursor:pointer;border:1px solid var(--border);margin-top:8px">`+
+      `<input type="radio" name="prFmt" value="${k}" style="margin-top:3px"${k==="mov"?" checked":""}>`+
+      `<span style="font-size:11.5px;line-height:1.6"><b>${이름}</b>`+
+      (있음?` <span style="color:#6ee7b7">✓ 만들어 둠</span>`:"")+
+      `<span style="display:block;color:#8a94a8">${풀이}</span>`+
+      `<span style="display:block;color:#6b7385">${escHtml(내용)}</span></span></label>`;
+  };
+  let 고른="mov";
+  const 기다림=appDlg("프리미어용 변환",
+    `어떤 형식으로 뽑을까요?`+
+    (j.reasons&&j.reasons.length?`<div style="font-size:11px;color:#6b7385;margin-top:4px">프리미어가 못 여는 까닭 · ${escHtml(j.reasons.join(" · "))}</div>`:"")+
+    줄("mov","MOV — 편집용 (ProRes 422 HQ)","실무에서 가장 많이 쓰는 편집용 형식. 손실이 사실상 없고 타임라인이 가볍습니다. 파일이 큽니다 (1080p 1분 ≈ 1.3GB).")+
+    줄("mp4","MP4 — 가볍게 (H.264)","파일이 작고 어디서나 열립니다. 눈으로는 차이가 없지만 한 번 더 압축합니다."),
+    {ok:"변환", cancel:"취소"});
+  const 단추=()=>{ $("dlgYes").textContent = j.paths[고른] ? "파일 위치 열기" : "변환"; };
+  document.querySelectorAll('input[name="prFmt"]').forEach(el=>el.onchange=()=>{ 고른=el.value; 단추(); });
+  단추();
+  return (await 기다림) ? 고른 : null;
+}
+$("prVid").onclick=async()=>{
+  const src=S.playSrc; const j=src&&PR.get(src); if(!j) return;
+  if(j.state==="checking") return;
+  if(j.state==="ok") return toast("이 영상은 변환 없이 그대로 프리미어에 올라갑니다");
+  if(j.state==="wait") return toast("다른 영상의 변환이 끝나면 이어서 만듭니다");
+  if(j.state==="making"){
+    if(await appConfirm("변환을 그만둘까요?","프리미어용 변환"))
+      window.CG.premiereCancel(j.jobId);
+    return;
+  }
+  if(j.state==="fail"){
+    if(!await appDlg("프리미어용 변환",
+        "변환하지 못했습니다.<br><br>"+escHtml(j.error||""),
+        {ok:"다시 고르기", cancel:"닫기"})) return;
+    j.state=Object.keys(j.paths).length ? "done" : "ask"; 프리미어단추();
+  }
+  const 고른=await 변환형식고르기(j);
+  if(!고른) return;
+  if(j.paths[고른]){
+    const r=await window.CG.revealFile(String(j.paths[고른]).replace(/\//g,"\\"));
+    return toast(r&&r.ok?"탐색기에서 짚었습니다":"파일을 찾지 못했습니다");
+  }
+  j.fmt=고른; j.state="wait"; 프리미어단추(); 프리미어다음();
+  if(_prBusy&&_prBusy!==src) toast("다른 영상의 변환이 끝나면 이어서 만듭니다");
+};
+
 /* 재생 칸 위에 한 줄 안내를 띄운다 (없애려면 null) */
 function 재생메모(txt){
   const box=$("pvNote"); if(!box) return;
@@ -4826,7 +5067,7 @@ function detachVideo(){
   _pvUrl=null;
   pv.style.display="none"; $("noVid").style.display="flex";
   $("vName").textContent=""; $("marks").innerHTML="";
-  hideTip(); paintEditBar();
+  hideTip(); paintEditBar(); 프리미어단추();
   $("trackFill").style.width="0%"; $("head").style.left="0%";
 }
 const hasVideo=()=>!!_pvUrl;
@@ -5562,10 +5803,10 @@ function paintEditBar(){
     hint.textContent=`${S.sel.size}개 선택됨 — [병합] 으로 한 컷으로 묶습니다`; return; }
   if(!hasVideo()){
     hint.textContent="원본 영상을 불러오면 교체·분할도 쓸 수 있습니다"; return; }
-  const s=S.out.shots[playingCut()];
-  hint.textContent = s
-    ? `재생 중 CUT${s.idx}${고쳤다?" · 손본 목록":""} — 목록에서 컷을 골라 합칠 수 있습니다`
-    : "재생 위치가 첫 컷보다 앞입니다";
+  /* ★ 예전에는 평소에 "재생 중 CUT n — ..." 을 띄웠다. 재생할 때마다 글이
+     쉴 새 없이 바뀌는데, 칸이 좁아 뒤가 잘려 보이기만 했다. 지금 컷은 목록에
+     이미 불이 들어와 있으므로, 평소에는 비워 두고 알릴 것이 있을 때만 쓴다. */
+  hint.textContent="";
 }
 function editBusy(on){
   _editing=on;
@@ -6264,7 +6505,8 @@ async function 구간영상저장(btn){
      한때 원본 그대로 · WAV · MP3 셋 중에 고르게 했다. 그런데 고를 일이 아니었다 —
      원본 그대로는 다시 만들지 않고 떠내기만 하므로 소리가 하나도 깎이지 않고,
      가장 빠르고, 파일도 가장 작다. 나머지 둘은 그보다 나은 구석이 없다.
-     (그대로 못 뜨는 방식으로 담긴 영상만 프로그램 쪽이 알아서 WAV 로 돌린다) */
+     (그대로 뜨면 기본 재생기·프리미어가 못 여는 방식 — 유튜브의 opus 등 — 은
+      프로그램 쪽이 알아서 WAV 로 푼다. 무압축이라 이때도 소리는 깎이지 않는다) */
 async function 구간음원저장(btn){
   if(!IS_EL) return toast("앱에서만 쓸 수 있습니다");
   if(!(S.out&&S.out.srcPath&&S.out.outDir))
@@ -6296,7 +6538,7 @@ async function 구간음원저장(btn){
       `크기     ${((r.size||0)/1048576).toFixed(2)} MB\n`+
       `형태     ${r.kind==="copy"
                  ? `원본 그대로  (담긴 ${r.codec} 를 그대로 떠냈습니다 · 손실 없음)`
-                 : `${r["이름"]}  (${r.codec} 는 그대로 뜰 수 없어 바꿨습니다)`}\n`+
+                 : `${r["이름"]}  (담긴 ${r.codec} 는 기본 재생기·프리미어가 못 열어 WAV 로 풀었습니다 · 손실 없음)`}\n`+
       (소리설명 ? `소리     ${소리설명}${r.rate?` · ${(r.rate/1000).toFixed(1)}kHz`:""}` : ""),
       r.path);
   }catch(err){

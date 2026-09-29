@@ -101,6 +101,16 @@ contextBridge.exposeInMainWorld("CG", {
       .finally(() => ipcRenderer.removeListener("clipProgress", h));
   },
 
+  /* 프리미어에 그대로 들어가는가 · 안 들어가면 들어가는 사본을 만든다 */
+  premiereCheck: (src, destNoExt) => ipcRenderer.invoke("premiereCheck", src, destNoExt),
+  premiereMake: (o, onProgress) => {
+    const h = (_e, m) => { if (m.jobId === o.jobId) onProgress && onProgress(m); };
+    ipcRenderer.on("premiereProgress", h);
+    return ipcRenderer.invoke("premiereMake", o)
+      .finally(() => ipcRenderer.removeListener("premiereProgress", h));
+  },
+  premiereCancel: (jobId) => ipcRenderer.invoke("premiereCancel", jobId),
+
   /* 정보창에서만 쓰는 자세한 속내용 (코덱·프로파일·색 형식·소리) */
   probeFull: (filePath) => ipcRenderer.invoke("probeFull", filePath),
 
@@ -141,6 +151,14 @@ contextBridge.exposeInMainWorld("CG", {
       .finally(() => ipcRenderer.removeListener("ytProgress", h));
   },
   ytCancel: (jobId) => ipcRenderer.invoke("ytCancel", jobId),
+  /* 유튜브에서 제목으로 찾기 (TVCF 영상의 워터마크 없는 짝을 찾을 때) */
+  ytSearch: (query, count) => ipcRenderer.invoke("ytSearch", { query, count }),
+  /* TVCF 영상의 유튜브 짝 — 찾기 · 길이 거르기 · 화면 대조를 한 번에
+     (list 에는 화면까지 같다고 판명된 것만, score 0~1) */
+  ytTwin: (query, src, referer) =>
+    ipcRenderer.invoke("ytTwin", { query, src, referer }),
+  /* 재생 창 본문에서 광고 제목 읽기 (TVCF 창 제목에는 광고주 이름뿐이다) */
+  sniffPageInfo: () => ipcRenderer.invoke("sniffPageInfo"),
   /* 같은 이름이 이미 있으면 번호를 붙여 비어 있는 자리를 알려준다 */
   freePath: (dest) => ipcRenderer.invoke("freePath", dest),
   ytDiag: () => ipcRenderer.invoke("ytDiag"),
