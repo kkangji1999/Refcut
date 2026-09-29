@@ -2225,12 +2225,57 @@ ipcMain.handle("sniffOpen", async (e, pageUrl) => {
       pageTitle,
     });
   };
-  /* 조각 파일은 후보가 아니다 (수십 개가 흘러와 창이 닫히지 않게 된다) */
+  /* 조각 파일은 후보가 아니다 (수십 개가 흘러와 창이 닫히지 않게 된다)
+     ★ 비메오는 조각도 끝이 .mp4 다 — 대신 /range/ 길과 range=986-77040 같은
+       바이트 구간이 붙는다. 이것을 영상으로 잡아 77KB 짜리 조각 하나를 받았고,
+       ffmpeg 가 "could not find corresponding trex" 같은 영어를 뱉으며 넘어졌다. */
   const isSegment = (u) =>
-    /\.(ts|m4s)(\?|$)/i.test(u) || /seg[-_]?\d|chunk|frag[-_]?\d/i.test(u);
+    /\.(ts|m4s)(\?|$)/i.test(u) || /seg[-_]?\d|chunk|frag[-_]?\d/i.test(u) ||
+    /\/range\/|[?&](range|bytes)=\d/i.test(u);
 
+  /* ★ 비메오: 영상 페이지도, 심는 주소도 막힌 영상이 있다 (로그인 요구 · 퍼가기 제한).
+       그래도 브라우저에서는 재생된다 — 페이지가 먼저 player.vimeo.com/video/번호/config
+       로 설정을 받고, 거기 적힌 목록으로 조각을 받아 튼다.
+     그래서 페이지가 설정을 부르는 순간, 같은 페이지 안에서 한 번 더 읽어
+     온전한 HLS 목록(1080p · 음성 포함)을 넘긴다. 목록 주소에는 서명이 들어 있어
+     쿠키 없이도 받아진다. (배경에 깔린 홍보 영상 background=1 은 뺀다) */
+  const 비메오설정본것 = new Set();
+  const 비메오설정 = async (u, frame) => {
+    if (비메오설정본것.has(u) || /[?&]background=1/i.test(u)) return;
+    비메오설정본것.add(u);
+    try {
+      const f = frame || (sniffWin && !sniffWin.isDestroyed() && sniffWin.webContents.mainFrame);
+      if (!f) return;
+      const t = await f.executeJavaScript(
+        "fetch(" + JSON.stringify(u) + ",{credentials:'include'}).then(r=>r.text())", true);
+      const j = JSON.parse(t);
+      const h = ((j.request || {}).files || {}).hls || {};
+      const cdn = (h.cdns || {})[h.default_cdn] || Object.values(h.cdns || {})[0] || {};
+      if (!cdn.url || found.has(cdn.url.split("?")[0])) return;
+      found.set(cdn.url.split("?")[0], cdn.url);
+      e.sender.send("sniffFound", { url: cdn.url, kind: "HLS", height: 0, master: true,
+        name: "", pageTitle: String((j.video || {}).title || "") });
+    } catch (x) {}
+  };
+
+  /* ★ TVCF 해외 광고는 TVCF 가 영상을 내주지 않고 유튜브 영상을 그대로 끼워
+       넣어(embed) 저절로 튼다. 유튜브는 잘게 쪼갠 조각으로만 보내서 여기서 잡을
+       주소가 없고, 창은 재생만 하다 끝났다. 끼워진 유튜브 창이 열리는 순간
+       그 영상의 유튜브 주소를 넘긴다 — 워터마크 없는 원본이다. */
+  const 유튜브끼움 = (u) => {
+    const m = /^https?:\/\/(?:www\.)?youtube(?:-nocookie)?\.com\/embed\/([\w-]{11})/i.exec(u);
+    return m ? "https://www.youtube.com/watch?v=" + m[1] : "";
+  };
   part.webRequest.onBeforeRequest({ urls: ["<all_urls>"] }, (details, cb) => {
     const u = details.url;
+    const yt = details.resourceType === "subFrame" ? 유튜브끼움(u) : "";
+    if (yt && !found.has(yt)) {
+      found.set(yt, yt);
+      e.sender.send("sniffFound", { url: yt, kind: "YT", height: 0, master: false,
+        name: "", pageTitle: "" });
+    }
+    if (/^https:\/\/player\.vimeo\.com\/video\/\d+\/config/i.test(u))
+      setTimeout(() => 비메오설정(u, details.frame), 0);   // 응답을 막지 않게 한 박자 뒤에
     if (/\.(m3u8|mpd)(\?|$)/i.test(u) ||
         (/\.mp4(\?|$)/i.test(u) && !/thumb|poster|preview/i.test(u) && !isSegment(u)))
       report(u, "");
@@ -2253,7 +2298,7 @@ ipcMain.handle("sniffOpen", async (e, pageUrl) => {
 
   sniffWin = new BrowserWindow({
     width: 1100, height: 780,
-    title: "재생 버튼을 눌러주세요 — 주소를 찾으면 닫히고 추출이 시작됩니다",
+    title: "영상을 찾는 중 — 찾으면 창이 저절로 닫힙니다 (재생이 안 되면 재생 버튼을 눌러주세요)",
     autoHideMenuBar: true, backgroundColor: "#101216",
     webPreferences: { session: part, nodeIntegration: false, contextIsolation: true },
   });
@@ -2434,8 +2479,13 @@ function 제목겹침(q, c) {
      그 사이 사용자는 알림을 보기도 전에 [추출 시작] 을 눌러 버린다.
    이제는 재생 창이 닫히는 순간 시작하고, 기다릴 것 없는 일은 모두 함께 돌린다.
      · TVCF 영상 읽기(지문 · 길이)  ∥  유튜브 찾기
-     · 길이가 맞는 후보 셋까지를 동시에 대조
-   (유튜브 쪽 끝에 로고 화면이 붙는 만큼 — 2초 짧거나 10초 길기까지 — 는 봐준다) */
+     · 길이가 맞는 후보 넷까지를 동시에 대조
+   (유튜브 쪽 끝에 로고 화면이 붙는 만큼 — 2초 짧거나 22초 길기까지 — 는 봐준다)
+   ★ 넷플릭스 10주년(TVCF 47초)이 유튜브에서는 58초였다. 영상은 똑같은데 끝에
+     10초 남짓 마지막 장면을 멈춰 둔다 — 유튜브가 그 위에 추천 영상 · 구독 단추를
+     띄우는 '최종 화면' 자리다. 최종 화면은 20초까지 둘 수 있고, 목록에 적힌 길이는
+     1초쯤 어긋나기도 해서(58초가 59초로 적혔다) 22초까지 본다.
+     덧붙은 꼬리는 대조를 흐리지 않는다 — 일치율은 TVCF 쪽 장면을 기준으로 잰다. */
 ipcMain.handle("ytTwin", async (_e, { query, src, referer }) => {
   const q = String(query || "").trim();
   if (!q || !src) return { ok: false, error: "찾을 제목이 없습니다" };
@@ -2449,14 +2499,14 @@ ipcMain.handle("ytTwin", async (_e, { query, src, referer }) => {
     ]);
     if (원본.filter(Boolean).length < 4) return { ok: false, error: "TVCF 영상을 읽지 못했습니다" };
     const 길이 = 원본.length / 지문FPS;
-    const 길이맞음 = (c) => !c.duration || (c.duration >= 길이 - 2 && c.duration <= 길이 + 10);
+    const 길이맞음 = (c) => !c.duration || (c.duration >= 길이 - 2 && c.duration <= 길이 + 22);
     let 후보 = 찾음.filter(길이맞음);
     /* 긴 제목으로 못 찾으면 광고주 이름만으로 한 번 더 */
     const 첫말 = q.split(/\s+/)[0];
     if (!후보.length && 첫말 && 첫말 !== q)
       후보 = (await 유튜브검색(exe, 첫말, 15).catch(() => [])).filter(길이맞음);
     후보 = 후보.map((c) => ({ ...c, 겹침: 제목겹침(q, c) }))
-      .sort((x, y) => y.겹침 - x.겹침).slice(0, 3);
+      .sort((x, y) => y.겹침 - x.겹침).slice(0, 4);
     const 대조 = await Promise.all(후보.map(async (c) => {
       try {
         const 주소 = String(await runYt(exe, ["--no-warnings", ...jsArgs(), "-g",

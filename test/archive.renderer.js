@@ -3,6 +3,19 @@
   const 결과 = { err: null };
   const 잠깐 = ms => new Promise(r => setTimeout(r, ms));
   const $$ = s => [...document.querySelectorAll(s)];
+  /* [🗑 삭제] 를 누르고, 지운 뒤 창이 다시 그려질 때까지 기다린다 */
+  const 저장창에서지우기대기 = async (물음읽기) => {
+    const 옛 = document.getElementById("storeRows");
+    document.getElementById("storeDel").click();
+    for (let i = 0; i < 30 && !document.getElementById("dlg").classList.contains("on"); i++) await 잠깐(50);
+    물음읽기();
+    document.getElementById("dlgYes").click();
+    for (let i = 0; i < 60; i++) {
+      await 잠깐(100);
+      const 새 = document.getElementById("storeRows");
+      if (새 && 새 !== 옛) return;
+    }
+  };
   const 열수 = el => getComputedStyle(el).gridTemplateColumns.split(" ").filter(Boolean).length;
   try {
     const 영상 = __영상__;
@@ -228,29 +241,93 @@
     }
     document.getElementById("archive").classList.remove("on");
 
-    /* ---- 10) 저장 위치: 지우지 않는다 — 번호와 미리보기로 알아보게만 한다 ---- */
+    /* ---- 10) 저장 위치: 보고 · 고르고 · 지운다 ---- */
+    try { localStorage.removeItem("cg_storesort"); } catch (e) {}
+    저장창.sort = "size"; 저장창.desc = true;
     await document.getElementById("storeBtn").onclick();
     await 잠깐(500);
-    const 기록줄 = $$("#storeBody .jobSize.go");
+    const 줄들 = () => $$("#storeRows .jobSize.go");
+    const 번호들 = () => 줄들().map(el => +el.querySelector(".jno").textContent);
+    const 기록줄 = 줄들();
     const 왼쪽 = {};
     $$("#hist .job").forEach(el => {
       왼쪽[el.querySelector(".jname").textContent] = el.querySelector(".jnoBig").textContent;
     });
     결과.저장공간 = {
       줄: 기록줄.length,
-      번호: 기록줄.map(el => el.querySelector(".jno").textContent),
+      번호: 번호들(),
       어긋난것: 기록줄.filter(el =>
         왼쪽[el.querySelector(".nm").textContent] !== el.querySelector(".jno").textContent).length,
       미리보기: 기록줄.filter(el => { const im = el.querySelector("img.th");
                                     return !!(im && im.getAttribute("src")); }).length,
-      고름칸: $$("#storeBody .jck").length,
-      삭제단추: $$("#storeBody [data-del]").length,
+      고름칸: $$("#storeRows .jck").length,
+      삭제단추: !!document.getElementById("storeDel"),
+      하트: $$("#storeRows .favBadge").length,
+      결과보기단추: $$("#hist .job button").filter(b => b.textContent.includes("결과 보기")).length,
     };
-    if (기록줄.length) {
-      const 이름 = 기록줄[0].querySelector(".nm").textContent;
-      기록줄[0].click();
+    const S2 = 결과.저장공간;
+    /* 번호순 → 한 번 더 누르면 거꾸로 */
+    const 정렬단추 = k => document.querySelector(`#storeTools [data-sort="${k}"]`);
+    정렬단추("no").click(); await 잠깐(100); S2.번호순 = 번호들();
+    정렬단추("no").click(); await 잠깐(100); S2.번호순거꾸로 = 번호들();
+    S2.정렬기억 = (() => { try { return JSON.parse(localStorage.getItem("cg_storesort")); }
+                           catch (e) { return null; } })();
+    정렬단추("no").click(); await 잠깐(100);           // 다시 큰 번호부터
+    /* 미리보기에 올리면 크게 */
+    {
+      const im = 줄들()[0].querySelector("img.th");
+      im.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+      await 잠깐(100);
+      const pk = document.getElementById("storePeek");
+      S2.크게보기 = { 떴나: !!(pk && pk.classList.contains("on")),
+                     너비: pk ? Math.round(pk.getBoundingClientRect().width) : 0,
+                     그림: pk ? pk.querySelectorAll("img").length : 0 };
+      im.dispatchEvent(new MouseEvent("mouseout", { bubbles: true }));
+      await 잠깐(50);
+      S2.크게보기.닫혔나 = !(pk && pk.classList.contains("on"));
+    }
+    /* 첫 줄 네모 칸을 누른 채 셋째 줄로 끌면 가운데 줄까지 쭉 */
+    {
+      const 칸 = 줄들()[0].querySelector(".jck");
+      칸.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 }));
+      줄들()[2].querySelector(".nm").dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+      document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+      await 잠깐(50);
+      S2.끌어고름 = $$("#storeRows .jobSize.sel").length;
+      S2.고른글 = document.getElementById("storeSelInfo").textContent;
+      /* 끌기가 끝났으면 마우스가 지나가도 더 골라지지 않는다 */
+      줄들()[3].querySelector(".nm").dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+      S2.놓은뒤 = $$("#storeRows .jobSize.sel").length;
+      /* 고른 칸에서 다시 끌면 푼다 */
+      줄들()[0].querySelector(".jck").dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 }));
+      줄들()[1].querySelector(".nm").dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+      document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+      S2.끌어풂 = $$("#storeRows .jobSize.sel").length;
+    }
+    /* 고른 것 하나를 지운다 — 즐겨찾기는 묻지 않고 보관함에 남는다 */
+    {
+      document.getElementById("storeNone").click();
+      const 줄 = 줄들()[0], id = 줄.dataset.open, 이름 = 줄.querySelector(".nm").textContent;
+      const 하트전 = allFavs().length;
+      줄.querySelector(".jck").dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 }));
+      document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+      let 물음 = "";
+      await 저장창에서지우기대기(() => { 물음 = document.getElementById("dlgBody").textContent; });
       await 잠깐(600);
-      결과.저장공간.눌러서열기 = {
+      const rec = await jobGet(id);
+      S2.지우기 = { 이름, 물음,
+        목록에서빠짐: !줄들().some(el => el.dataset.open === id),
+        보관본: !!(rec && rec.archived),
+        하트전, 하트후: allFavs().length,
+        창열림: document.getElementById("storeBox").classList.contains("on") };
+    }
+    /* 줄을 누르면 그 기록이 열린다 (네모 칸이 아닌 곳) */
+    if (줄들().length) {
+      const 줄 = 줄들()[0], 이름 = 줄.querySelector(".nm").textContent;
+      줄.querySelector(".nm").dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 }));
+      줄.querySelector(".nm").click();
+      await 잠깐(600);
+      S2.눌러서열기 = {
         창닫힘: !document.getElementById("storeBox").classList.contains("on"),
         연것: (HIST.find(j => j.id === S.jobId) || {}).name || "",
         바란것: 이름 };

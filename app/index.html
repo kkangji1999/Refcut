@@ -287,6 +287,40 @@
     border-radius:4px; background:#0d0f14}
   .jobSize .nm{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   .jobSize .sz{color:var(--muted); font-variant-numeric:tabular-nums}
+  /* [저장 공간] 에서 고르고 지우기 */
+  .jobSize .jck{flex-shrink:0; width:17px; height:17px; border-radius:4px;
+    border:1.5px solid #4a5262; color:transparent; font-size:11px; font-weight:800;
+    display:flex; align-items:center; justify-content:center; cursor:pointer}
+  .jobSize .jck:hover{border-color:var(--accent)}
+  .jobSize.sel{background:rgba(255,212,0,.08)}
+  .jobSize.sel .jck{background:var(--accent); border-color:var(--accent); color:#1a1a1a}
+  #storeRows{user-select:none}
+  #storeRows .jobSize .th{width:64px; height:36px; cursor:zoom-in}
+  .favBadge{flex-shrink:0; color:#f871a0; font-size:11px; font-weight:700}
+  .storeTools{position:sticky; top:-20px; z-index:2; display:flex; align-items:center;
+    gap:5px; flex-wrap:wrap; padding:8px 0; margin-bottom:4px; background:var(--panel);
+    border-bottom:1px solid var(--border)}
+  .storeSort{display:flex; margin-right:4px}
+  .storeSort button{background:transparent; border:1px solid var(--border); color:var(--muted);
+    font-size:11px; padding:4px 9px; cursor:pointer; font-family:inherit}
+  .storeSort button:first-child{border-radius:7px 0 0 7px}
+  .storeSort button:last-child{border-radius:0 7px 7px 0; border-left:0}
+  .storeSort button.on{background:var(--panel2); color:var(--fg); border-color:#4a5262}
+  #storeSelInfo{flex:1; font-size:11.5px; color:var(--muted); min-width:90px}
+  #storeSelInfo b{color:var(--accent)}
+  .storeTools #storeDel{opacity:.35; pointer-events:none}
+  .storeTools.on #storeDel{opacity:1; pointer-events:auto}
+  #storePeek{display:none; position:fixed; z-index:5; width:380px; padding:8px;
+    background:#0e1015; border:1px solid #4a5262; border-radius:10px;
+    box-shadow:0 12px 40px rgba(0,0,0,.6); pointer-events:none}
+  #storePeek.on{display:block}
+  #storePeek .big{width:100%; aspect-ratio:16/9; object-fit:contain; background:#000;
+    border-radius:6px; display:block}
+  #storePeek .more{display:grid; grid-template-columns:repeat(4,1fr); gap:4px; margin-top:4px}
+  #storePeek .more img{width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:4px; background:#000}
+  #storePeek .cap{font-size:12px; margin-top:7px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  #storePeek .cap b{color:var(--accent); margin-right:4px}
+  #storePeek .sub{font-size:11px; color:var(--muted); margin-top:2px}
   #hist{display:flex; flex-direction:column; gap:8px; overflow-y:auto; flex:1}
   .job{background:var(--panel); border:1px solid var(--border); border-radius:10px;
        padding:9px; cursor:pointer; transition:border-color .12s;
@@ -1634,7 +1668,7 @@
             <span id="editHint"></span>
             <!-- 자주 쓰지 않는 것이라 맨 아래 오른쪽 구석에 작게 둔다 -->
             <button class="mini" id="prVid" style="display:none"
-              title="프리미어용 변환 — 프리미어에 바로 임포트되지 않는 영상(mkv · webm, VP9 · AV1, opus 등)을&#10;MP4 · MOV 로 바꿔 줍니다">⇄ 프리미어용 변환</button>
+              title="코덱 변환 (프리미어용) — 프리미어에 바로 임포트되지 않는 영상(mkv · webm, VP9 · AV1, opus 등)을&#10;MP4 · MOV 로 바꿔 줍니다">⇄ 코덱 변환</button>
           </div>
         </div>
 
@@ -2467,7 +2501,7 @@ function download(blob,name){
    같은 날 두 번째로 내보내면 26.8.1602 로 올린다.
    업데이트 확인은 마디마다 숫자로 비교하므로(verNum) 자리수가 달라도 안전하다. */
 /* 앱으로 켰으면 설치된 진짜 버전을 그대로 쓴다 (여기 숫자는 웹으로 열 때의 몫) */
-const APP_VERSION = (window.CG && window.CG.version) || "26.9.1106";
+const APP_VERSION = (window.CG && window.CG.version) || "26.9.1107";
 const APP_DATE    = "2026.09.29";
 /* 최신 index.html 이 올라가 있는 주소.
    여기에 넣어두면 [업데이트] 버튼이 새 버전을 확인합니다.
@@ -2866,6 +2900,11 @@ async function jobSizes(list){
   catch(e){ return list.map(jobBytes); }
 }
 $("storeClose").onclick=()=>$("storeBox").classList.remove("on");
+/* 창이 닫히면 크게 보기도 걷고, 고른 것도 푼다 (다음에 열었을 때 남아 있으면 헷갈린다) */
+new MutationObserver(()=>{
+  if($("storeBox").classList.contains("on")) return;
+  피크닫기(); 저장창.sel.clear(); 저장창.anchor=null; 저장창.drag=null;
+}).observe($("storeBox"),{attributes:true, attributeFilter:["class"]});
 
 /* ======================= 파일 이름 · 시간 표시 =======================
    ★ 처음에는 규칙을 적는 칸을 따로 창에 넣고, 쓸 수 있는 조각 열여덟 개를
@@ -3044,7 +3083,7 @@ $("storeBtn").onclick=async()=>{
   const KEPT=HIST.filter(j=>j.archived);    // 즐겨찾기만 남긴 보관본
   const sizes=await jobSizes([...LIVE,...KEPT]);   // 실제로 차지하는 공간
   const keptSize=new Map(KEPT.map((j,i)=>[j.id, sizes[LIVE.length+i]||0]));
-  const rows=LIVE.map((j,i)=>({j,b:sizes[i]||0})).sort((a,b)=>b.b-a.b);
+  const rows=LIVE.map((j,i)=>({j,b:sizes[i]||0}));
   /* 왼쪽 [추출 기록] 과 똑같은 번호 (목록은 새것부터, 번호는 오래된 것이 1번) */
   const 번호=new Map(LIVE.map((j,i)=>[j.id, LIVE.length-i]));
   const keptBytes=KEPT.reduce((n,j)=>n+(keptSize.get(j.id)||0),0);
@@ -3169,22 +3208,27 @@ $("storeBtn").onclick=async()=>{
          이미 저장된 이미지는 사라지지 않습니다.</div>
        <div class="storeLine"><b>기록별 사용량</b></div>
      </div>`)+
-    /* ★ 여기는 '무엇이 자리를 차지하고 있는가' 를 보는 자리다. 지우는 일은
-         왼쪽 [추출 기록] 한 곳에서만 한다 — 같은 일을 두 군데서 하면
-         어느 쪽이 진짜인지 헷갈리고, 번호도 서로 어긋나 보인다.
-       대신 왼쪽 목록과 '같은 번호' 와 '그 기록의 첫 장' 을 붙여,
-       어느 기록이 얼마나 먹고 있는지 한눈에 맞춰볼 수 있게 한다. */
+    /* ★ 예전(9/23)에는 '보기만 하는 자리' 로 두고 지우는 일은 왼쪽 [추출 기록] 에서만
+         하게 했다. 그런데 무엇이 자리를 먹는지 보는 바로 이 자리에서 정리하고 싶다는
+         이야기가 나왔다 — 여기서 보고, 골라, 곧바로 지운다.
+       번호는 왼쪽 목록과 같다. 용량순 · 번호순으로 바꿔 볼 수 있다.
+       ♥ 가 붙은 기록은 지워도 즐겨찾기한 것이 보관함에 남는다. */
     (rows.length?
-      `<div class="storeNote" style="margin:2px 0 6px">
+      `<div class="storeTools" id="storeTools">
+         <span class="storeSort">
+           <button data-sort="size">용량순</button><button data-sort="no">번호순</button>
+         </span>
+         <span id="storeSelInfo"></span>
+         <button class="mini" id="storeAll">전체</button>
+         <button class="mini" id="storeNone">해제</button>
+         <button class="mini warn" id="storeDel">🗑 삭제</button>
+       </div>
+       <div class="storeNote" style="margin:0 0 6px">
          번호는 왼쪽 <b>추출 기록</b>의 번호와 같습니다 · 줄을 누르면 그 기록이 열립니다
-         <br>지우는 것은 왼쪽 <b>추출 기록</b>에서 합니다 (여러 개는 Ctrl·Shift 로 골라 한 번에)
-       </div>`+
-      rows.map(r=>
-      `<div class="jobSize go" data-open="${r.j.id}" title="이 기록 열기">`+
-      `<span class="jno">${번호.get(r.j.id)||""}</span>`+
-      `<img class="th" src="${(r.j.shots[0]||{}).url||""}" alt="">`+
-      `<span class="nm">${r.j.name}</span>`+
-      `<span class="sz">${fmtMB(r.b)}</span></div>`).join("")
+         <br>네모 칸을 누른 채 위아래로 끌면 쭉 골라집니다 · 미리보기에 마우스를 올리면 크게 보입니다
+         <br><span class="favBadge">♥</span> 즐겨찾기가 있는 기록 — 지워도 즐겨찾기한 것은 보관함에 남습니다
+       </div>
+       <div id="storeRows"></div>`
       :`<div class="storeLine">아직 없습니다.</div>`)+
     (KEPT.length
       ? `<div class="storeLine" style="margin-top:14px"><b>즐겨찾기만 남긴 보관본</b>
@@ -3197,13 +3241,7 @@ $("storeBtn").onclick=async()=>{
         `<button class="mini warn" data-purge="${j.id}">완전 삭제</button></div>`).join("")
       : "");
 
-  /* 줄을 누르면 그 기록을 연다 (지우는 일은 왼쪽 목록에서) */
-  box.querySelectorAll("[data-open]").forEach(el=>{
-    el.onclick=()=>{
-      $("storeBox").classList.remove("on");
-      loadJob(el.dataset.open);
-    };
-  });
+  if(rows.length) 저장공간목록(rows, 번호);
   box.querySelectorAll("[data-purge]").forEach(b=>{
     b.onclick=async()=>{
       const j=HIST.find(x=>x.id===b.dataset.purge); if(!j) return;
@@ -3214,6 +3252,148 @@ $("storeBtn").onclick=async()=>{
   });
   $("storeBox").classList.add("on");
 };
+
+/* ---------- [저장 공간] 의 기록 목록 ----------
+   정렬만 바꿀 때는 크기를 다시 재지 않고 줄만 다시 그린다.
+   고른 것은 창을 닫을 때까지 기억한다 (정렬을 바꿔도 풀리지 않게). */
+const 저장창={sort:"size", desc:true, sel:new Set(), anchor:null, drag:null, 방금칸:false};
+try{ const v=JSON.parse(localStorage.getItem("cg_storesort")||"null");
+     if(v && (v.sort==="size"||v.sort==="no")){ 저장창.sort=v.sort; 저장창.desc=v.desc!==false; } }catch(e){}
+document.addEventListener("mouseup",()=>{ 저장창.drag=null; },true);   // 목록 밖에서 놓아도 끝난다
+function 저장공간목록(rows, 번호){
+  const 있는것=new Set(rows.map(r=>r.j.id));
+  [...저장창.sel].forEach(id=>{ if(!있는것.has(id)) 저장창.sel.delete(id); });
+  const box=$("storeRows");
+  const 줄들=()=>[...box.querySelectorAll(".jobSize")];
+  const 고르기=(id,on)=>{ on?저장창.sel.add(id):저장창.sel.delete(id); };
+  const 칠하기=()=>{
+    줄들().forEach(el=>el.classList.toggle("sel",저장창.sel.has(el.dataset.open)));
+    const 고른=rows.filter(r=>저장창.sel.has(r.j.id));
+    const 합=고른.reduce((a,r)=>a+r.b,0), 하트=고른.reduce((a,r)=>a+favCountOf(r.j),0);
+    $("storeSelInfo").innerHTML = 고른.length
+      ? `<b>${고른.length}개</b> · ${fmtMB(합)}`+(하트?` · <span class="favBadge">♥ ${하트}</span> 남김`:"")
+      : `<span style="color:#5d6472">고른 것 없음</span>`;
+    $("storeTools").classList.toggle("on", 고른.length>0);
+  };
+  const 그리기=()=>{
+    const k=저장창.sort==="size" ? (r=>r.b) : (r=>번호.get(r.j.id)||0);
+    const list=[...rows].sort((a,b)=>저장창.desc ? k(b)-k(a) : k(a)-k(b));
+    box.innerHTML=list.map(r=>{
+      const n=favCountOf(r.j);
+      return `<div class="jobSize go" data-open="${r.j.id}" title="이 기록 열기">`+
+        `<span class="jck" data-ck="${r.j.id}" title="고르기 — 누른 채 위아래로 끌면 쭉 골라집니다">✓</span>`+
+        `<span class="jno">${번호.get(r.j.id)||""}</span>`+
+        `<img class="th" data-peek="${r.j.id}" src="${(r.j.shots[0]||{}).url||""}" alt="">`+
+        `<span class="nm">${r.j.name}</span>`+
+        (n?`<span class="favBadge" title="즐겨찾기 ${n}개 — 지워도 보관함에 남습니다">♥ ${n}</span>`:"")+
+        `<span class="sz">${fmtMB(r.b)}</span></div>`;
+    }).join("");
+    document.querySelectorAll("#storeTools [data-sort]").forEach(b=>{
+      const on=b.dataset.sort===저장창.sort;
+      b.classList.toggle("on",on);
+      b.textContent=(b.dataset.sort==="size"?"용량순":"번호순")+(on?(저장창.desc?" ↓":" ↑"):"");
+    });
+    칠하기();
+  };
+
+  /* 같은 것을 다시 누르면 순서를 뒤집는다 */
+  document.querySelectorAll("#storeTools [data-sort]").forEach(b=>{
+    b.onclick=()=>{
+      if(저장창.sort===b.dataset.sort) 저장창.desc=!저장창.desc;
+      else{ 저장창.sort=b.dataset.sort; 저장창.desc=true; }
+      try{ localStorage.setItem("cg_storesort",JSON.stringify({sort:저장창.sort,desc:저장창.desc})); }catch(e){}
+      그리기();
+    };
+  });
+  $("storeAll").onclick=()=>{ rows.forEach(r=>저장창.sel.add(r.j.id)); 칠하기(); };
+  $("storeNone").onclick=()=>{ 저장창.sel.clear(); 저장창.anchor=null; 칠하기(); };
+  $("storeDel").onclick=()=>저장공간에서지우기(rows);
+
+  /* ★ 네모 칸을 누른 채 끌면 지나가는 줄이 모두 같은 상태가 된다.
+     마우스를 빨리 움직이면 몇 줄을 건너뛰고 이벤트가 오므로,
+     마지막 줄과 지금 줄 사이를 한꺼번에 채운다. Shift 는 거기까지 한 번에. */
+  box.onmousedown=e=>{
+    const ck=e.target.closest(".jck");
+    저장창.방금칸=!!ck;
+    if(!ck || e.button!==0) return;
+    e.preventDefault(); 피크닫기();
+    const order=줄들().map(el=>el.dataset.open), id=ck.dataset.ck, i=order.indexOf(id);
+    const on=!저장창.sel.has(id);
+    if(e.shiftKey && 저장창.anchor && order.includes(저장창.anchor)){
+      const a=order.indexOf(저장창.anchor);
+      for(let k=Math.min(a,i);k<=Math.max(a,i);k++) 고르기(order[k],true);
+    }else 고르기(id,on);
+    저장창.anchor=id;
+    저장창.drag={on, last:i, order};
+    칠하기();
+  };
+  box.onmouseover=e=>{
+    const d=저장창.drag;
+    if(d){
+      const row=e.target.closest(".jobSize"); if(!row) return;
+      const i=d.order.indexOf(row.dataset.open); if(i<0 || i===d.last) return;
+      for(let k=Math.min(d.last,i);k<=Math.max(d.last,i);k++) 고르기(d.order[k],d.on);
+      d.last=i; 저장창.anchor=row.dataset.open;
+      return 칠하기();
+    }
+    /* 미리보기에 올리면 크게 — 첫 장을 크게, 그 뒤 몇 장을 작게 */
+    const im=e.target.closest("img[data-peek]"); if(!im) return;
+    const r=rows.find(x=>x.j.id===im.dataset.peek);
+    if(r) 피크열기(r, 번호.get(r.j.id), im);
+  };
+  box.onmouseout=e=>{ if(e.target.closest("img[data-peek]")) 피크닫기(); };
+  /* 줄을 누르면 그 기록을 연다 — 네모 칸에서 시작한 누름은 고르기일 뿐이다 */
+  box.onclick=e=>{
+    if(저장창.방금칸 || e.target.closest(".jck")){ 저장창.방금칸=false; return; }
+    const row=e.target.closest(".jobSize"); if(!row) return;
+    $("storeBox").classList.remove("on");
+    loadJob(row.dataset.open);
+  };
+  그리기();
+}
+function 피크열기(r, no, anchorEl){
+  let pk=$("storePeek");
+  if(!pk){ pk=document.createElement("div"); pk.id="storePeek"; $("storeBox").appendChild(pk); }
+  const shots=(r.j.shots||[]).filter(x=>x && x.url);
+  const 더=shots.slice(1,9), n=favCountOf(r.j);
+  pk.innerHTML=
+    `<img class="big" src="${(shots[0]||{}).url||""}" alt="">`+
+    (더.length?`<div class="more">${더.map(x=>`<img src="${x.url}" alt="">`).join("")}</div>`:"")+
+    `<div class="cap"><b>${no||""}</b>${r.j.name}</div>`+
+    `<div class="sub">${(r.j.shots||[]).length}장 · ${fmtMB(r.b)}`+
+      (n?` · <span class="favBadge">♥ ${n}</span>`:"")+`</div>`;
+  /* 목록을 가리지 않게 창 옆 빈자리에 — 자리가 없으면 미리보기 곁에 */
+  const inner=$("storeBox").querySelector(".storeInner").getBoundingClientRect();
+  const a=anchorEl.getBoundingClientRect(), W=380, gap=14;
+  const left = inner.right+gap+W<=innerWidth ? inner.right+gap
+             : inner.left-gap-W>=0 ? inner.left-gap-W
+             : Math.min(a.right+gap, innerWidth-W-8);
+  pk.style.left=Math.max(8,left)+"px";
+  pk.style.top="0px"; pk.classList.add("on");
+  const h=pk.offsetHeight;
+  pk.style.top=Math.max(8, Math.min(a.top+a.height/2-h/2, innerHeight-h-8))+"px";
+}
+function 피크닫기(){ const pk=$("storePeek"); if(pk) pk.classList.remove("on"); }
+/* 고른 기록을 지운다 — ♥ 즐겨찾기한 것은 따로 묻지 않고 보관함에 남긴다.
+   (즐겨찾기까지 지우려면 아래 '즐겨찾기만 남긴 보관본' 의 [완전 삭제]) */
+async function 저장공간에서지우기(rows){
+  const 고른=rows.filter(r=>저장창.sel.has(r.j.id));
+  if(!고른.length) return toast("지울 기록을 먼저 골라주세요");
+  const 합=고른.reduce((a,r)=>a+r.b,0), 하트=고른.reduce((a,r)=>a+favCountOf(r.j),0);
+  if(!await appConfirm(
+      `고른 기록 <b>${고른.length}개</b>를 삭제할까요? (${fmtMB(합)})`+
+      (하트?`<br><br><span class="favBadge">♥</span> 즐겨찾기한 <b>${하트}개</b>는 보관함에 남깁니다.`:""))) return;
+  피크닫기();
+  for(const r of 고른){
+    await removeJob(r.j.id,false);
+    if(S.jobId===r.j.id) resetResult();
+  }
+  저장창.sel.clear(); 저장창.anchor=null;
+  toast(하트 ? `${고른.length}개를 지웠습니다 — 즐겨찾기 ${하트}개는 보관함에 남겼습니다`
+             : `${고른.length}개를 지웠습니다`);
+  await renderHist();
+  $("storeBtn").click();
+}
 
 /* ★ 저장 폴더는 [저장 공간] 안에서 전체 경로까지 보여준다.
    목록 위에 따로 한 줄을 두면 기록을 밀어내기만 해서, 그 버튼 옆에
@@ -3400,7 +3580,7 @@ const isVideoURL=t=>/^https?:\/\/\S+$/i.test(String(t||"").trim());
 /* ---------- 사이트가 막을 때 자동으로 우회 ----------
    사용자는 '추가' 하나만 누른다.
      ① 조용히 일반 방식으로 시도
-     ② 막히면 브라우저 창을 열고 "재생해 주세요" 한 줄만 안내
+     ② 막히면 브라우저 창을 열어 영상을 틀게 한다 (대개 저절로 재생된다)
      ③ 영상 주소가 잡히면 가장 좋은 것을 스스로 골라 창을 닫고 대기열로
    후보를 늘어놓고 고르게 하지 않는다. */
 let _sniffTimer=null, _sniffBest=null, _sniffResolve=null, _sniffPageTitle="";
@@ -3441,17 +3621,20 @@ function showLinkNotice(u){
   $("sniffDone").style.display="none";      // 아직 창이 열리기 전이라 그만둘 것이 없다
   /* ★ '무엇을 하는지' 만 적혀 있으면 사용자는 왜 이런 번거로운 일을 시키는지
      알 수 없다. 이유부터 적고, 그 다음에 할 일과 그 뒤에 벌어질 일을 적는다. */
+  /* ★ 예전에는 "재생 버튼만 눌러주세요" 라고 했지만, 재생 창은 대개 저절로
+       재생된다. 누를 것이 없는데 누르라고 하면, 영상이 이미 돌고 있는 창에서
+       무엇을 더 해야 하는지 헤맨다. 그냥 두면 된다는 것을 먼저 말한다. */
   if(kind==="sniff"){
-    $("sniffTitle").textContent="재생 창이 열립니다";
+    $("sniffTitle").textContent="재생 창이 열립니다 — 그냥 두세요";
     $("sniffTip").innerHTML=
-      "<b>재생 버튼만 눌러주세요.</b> 로그인은 필요 없습니다."
-      +"<br><span style='color:#5d6472'>찾는 즉시 창이 닫히고 대기열에 들어갑니다"
+      "영상이 <b>저절로 재생</b>되고, 영상을 찾으면 창이 스스로 닫혀 대기열에 들어갑니다."
+      +"<br><span style='color:#5d6472'>재생이 시작되지 않을 때만 재생 버튼을 눌러주세요 · 로그인은 필요 없습니다"
       +(isTVCF(u)?"<br>"+TVCF_CAP:"")+"</span>";
   }else{
     $("sniffTitle").textContent="재생 창이 열릴 수 있습니다";
     $("sniffTip").innerHTML=
-      "막히면 재생 창이 열립니다. <b>재생 버튼만 눌러주세요.</b>"
-      +"<br><span style='color:#5d6472'>찾는 즉시 창이 닫히고 대기열에 들어갑니다</span>";
+      "바로 받지 못하면 재생 창이 열립니다 — 영상이 재생되면 스스로 닫혀 대기열에 들어갑니다."
+      +"<br><span style='color:#5d6472'>재생이 시작되지 않을 때만 재생 버튼을 눌러주세요</span>";
   }
   box.classList.add("on");
 }
@@ -3464,13 +3647,16 @@ function openSniff(page){
   return new Promise(resolve=>{
     _sniffBest=null; _sniffResolve=resolve; _sniffPageTitle="";
     $("sniffDone").style.display="";        // 이제는 그만둘 수 있다
-    $("sniffTitle").textContent="열린 창에서 재생 버튼을 눌러주세요";
+    $("sniffTitle").textContent="재생 창에서 영상을 찾는 중입니다";
     $("sniffTip").innerHTML=
-      "열린 창에서 <b>재생 버튼</b>을 눌러주세요. 로그인은 필요 없습니다."
-      +"<br><span style='color:#5d6472'>찾는 즉시 창이 닫히고 대기열에 들어갑니다"
+      "영상이 재생되면 곧 창이 스스로 닫히고 대기열에 들어갑니다."
+      +"<br><span style='color:#5d6472'>재생이 시작되지 않으면 그 창의 재생 버튼을 눌러주세요 · "
+      +"재생되는데도 창이 닫히지 않으면 가져올 수 없는 영상입니다 — [그만두기]"
       +(isTVCF(page)?"<br>"+TVCF_CAP:"")+"</span>";
     $("sniffBox").classList.add("on");
     window.CG.sniffOpen(page, m=>{
+      /* 유튜브를 끼워 둔 페이지 — 유튜브 원본이 가장 좋다. 더 기다릴 것이 없다 */
+      if(m && m.kind==="YT"){ _sniffBest=m; return finishSniff(m); }
       if(m && m.pageTitle) _sniffPageTitle=m.pageTitle;
       const better = !_sniffBest || sniffScore(m)>sniffScore(_sniffBest);
       if(better) _sniffBest=m;
@@ -3493,14 +3679,16 @@ async function finishSniff(best){
      TVCF 는 창 제목이 "세리안 | TVCF" 처럼 광고주 이름뿐이라, 그것만으로는
      파일 이름도 유튜브 찾기도 엉뚱해진다 → "세리안 SERIAN Brand Film" */
   let info=null;
-  if(r && best && window.CG.sniffPageInfo){
+  if(r && best && best.kind!=="YT" && window.CG.sniffPageInfo){
     try{ info=await Promise.race([window.CG.sniffPageInfo(),
                                   new Promise(ok=>setTimeout(()=>ok(null),1500))]); }catch(e){}
   }
   try{ window.CG.sniffClose(); }catch(e){}
   const 본문제목 = info && info.adTitle
     ? `${info.brand||""} ${info.adTitle}`.trim() : "";
-  if(r) r(best ? {...best, pageTitle:본문제목||_sniffPageTitle||best.pageTitle||""} : null);
+  /* 고른 주소에 딸려 온 제목을 앞세운다 — 비메오는 설정에 적힌 진짜 제목이 온다
+     (창 제목은 "… | Vimeo의 동영상 및 영화" 처럼 꼬리가 붙는다) */
+  if(r) r(best ? {...best, pageTitle:본문제목||best.pageTitle||_sniffPageTitle||""} : null);
 }
 
 /* 원하는 화질과 실제 있는 화질을 맞춰 고른다.
@@ -3634,12 +3822,19 @@ async function addLink(url, referer, pageTitle, fallbackUrl){
      브라우저를 열어 재생하게 하고, 잡힌 주소로 조용히 이어서 진행한다.
      (이미 우회로 들어온 주소면 다시 시도하지 않는다) */
   if((!r||!r.ok) && !referer && window.CG.sniffOpen){
-    placeholder.name="브라우저에서 재생해 주세요";
+    placeholder.name="재생 창에서 영상을 찾는 중...";
     renderQueue();
     const best=await openSniff(url);
     if(!best){
       S.queue=S.queue.filter(x=>x!==placeholder); renderQueue();
       return toast("취소했습니다");
+    }
+    /* 페이지가 유튜브 영상을 끼워 두었을 뿐이면(TVCF 해외 광고) 그 유튜브 원본으로.
+       워터마크도 없고 화질도 온전하니 유튜브 짝을 찾을 까닭도 없다. */
+    if(best.kind==="YT"){
+      S.queue=S.queue.filter(x=>x!==placeholder); renderQueue();
+      toast("이 페이지는 유튜브 영상을 띄우고 있어 유튜브 원본으로 받습니다 — 워터마크 없음");
+      return addLink(best.url, null, "", null);
     }
     /* ★ 영상 정보를 읽는 것과 나란히 곧바로 시작한다 — 끝까지 기다렸다 찾으면 늦다 */
     if(isTVCF(url)) 유튜브짝시작(url, best.url, best.pageTitle||"");
@@ -4378,7 +4573,7 @@ const PR=new Map();   // 원본 경로 → {state, plans, paths, fmt, percent, e
 let _prBusy=null;
 const 프리미어칸=()=>`${폴더칸()}/프리미어용`;
 const 변환설명=
-  "프리미어용 변환\n"+
+  "코덱 변환 (프리미어용)\n"+
   "프리미어에 바로 임포트되지 않는 영상을 프리미어에서 바로 쓸 수 있게 바꿔 줍니다.\n"+
   "  · 그릇(컨테이너) — mkv · webm · flv 등\n"+
   "  · 영상 코덱 — VP9 · AV1 등 (유튜브 고화질 영상이 대개 이렇습니다)\n"+
@@ -4418,7 +4613,7 @@ async function 프리미어다음(){
     j.paths[j.fmt]=r.path; j.state="done";
     if(!r.reused){
       const 이름=String(r.path).split("/").pop();
-      toast(`프리미어용 변환 완료 · ${((r.size||0)/1048576).toFixed(1)} MB · ${이름}`);
+      toast(`코덱 변환 완료 · ${((r.size||0)/1048576).toFixed(1)} MB · ${이름}`);
     }
   }else if(r&&r.aborted){ j.state=뒤(); }
   else { j.state="fail"; j.error=(r&&r.error)||"만들지 못했습니다"; }
@@ -4436,12 +4631,12 @@ function 프리미어단추(){
   const [글,지금]={
     checking:["⇄ 변환 확인 중…","프리미어가 그대로 여는 형식인지 보는 중입니다."],
     ok:["⇄ 변환 불필요",`이 영상(${j.codec||""})은 변환 없이 그대로 프리미어에 올라갑니다.`],
-    ask:["⇄ 프리미어용 변환",`이 영상은 프리미어가 못 엽니다 — ${까닭}\n눌러서 변환하세요.`],
+    ask:["⇄ 코덱 변환",`이 영상은 프리미어가 못 엽니다 — ${까닭}\n눌러서 변환하세요.`],
     wait:["⇄ 변환 대기","다른 영상의 변환이 끝나면 이어서 만듭니다."],
     making:[`⇄ 변환 중 ${(j.percent||0).toFixed(0)}%`,`${(j.fmt||"").toUpperCase()} 로 변환하는 중입니다 — 누르면 그만둡니다.`],
     done:["⇄ 변환 완료",`${만든것} 로 변환해 두었습니다 (${까닭}).\n눌러서 파일 위치를 열거나 다른 형식으로 더 뽑을 수 있습니다.`],
     fail:["⇄ 변환 실패","변환하지 못했습니다 — 눌러서 자세히 보기"],
-  }[j.state]||["⇄ 프리미어용 변환",""];
+  }[j.state]||["⇄ 코덱 변환",""];
   b.textContent=글;
   b.title=변환설명+"\n\n지금 이 영상: "+지금;
   b.classList.toggle("off", j.state==="ok"||j.state==="checking");
@@ -4462,7 +4657,7 @@ async function 변환형식고르기(j){
       `<span style="display:block;color:#6b7385">${escHtml(내용)}</span></span></label>`;
   };
   let 고른="mov";
-  const 기다림=appDlg("프리미어용 변환",
+  const 기다림=appDlg("코덱 변환",
     `어떤 형식으로 뽑을까요?`+
     (j.reasons&&j.reasons.length?`<div style="font-size:11px;color:#6b7385;margin-top:4px">프리미어가 못 여는 까닭 · ${escHtml(j.reasons.join(" · "))}</div>`:"")+
     줄("mov","MOV — 편집용 (ProRes 422 HQ)","실무에서 가장 많이 쓰는 편집용 형식. 손실이 사실상 없고 타임라인이 가볍습니다. 파일이 큽니다 (1080p 1분 ≈ 1.3GB).")+
@@ -4479,12 +4674,12 @@ $("prVid").onclick=async()=>{
   if(j.state==="ok") return toast("이 영상은 변환 없이 그대로 프리미어에 올라갑니다");
   if(j.state==="wait") return toast("다른 영상의 변환이 끝나면 이어서 만듭니다");
   if(j.state==="making"){
-    if(await appConfirm("변환을 그만둘까요?","프리미어용 변환"))
+    if(await appConfirm("변환을 그만둘까요?","코덱 변환"))
       window.CG.premiereCancel(j.jobId);
     return;
   }
   if(j.state==="fail"){
-    if(!await appDlg("프리미어용 변환",
+    if(!await appDlg("코덱 변환",
         "변환하지 못했습니다.<br><br>"+escHtml(j.error||""),
         {ok:"다시 고르기", cancel:"닫기"})) return;
     j.state=Object.keys(j.paths).length ? "done" : "ask"; 프리미어단추();
@@ -6088,7 +6283,11 @@ async function folderSync(){
     /* ④ 그림 파일이 바뀌었으니 화면이 옛 그림을 붙들지 않게 표를 하나 올린다 */
     S.out.rev=(S.out.rev||0)+1;
     S.out.maxFiles=shots.length;
-    shots.forEach(s=>{ s.url=s.file? fileURL(s.thumb||s.file)+`?r=${S.out.rev}` : ""; });
+    /* ★ 번호만으로는 모자란다. 같은 영상을 지우고 다시 뽑으면 파일 이름도 같고
+         번호도 0부터 다시 세어 "CUT5.jpg?r=5" 가 예전 그림과 겹친다 — 브라우저는
+         그 주소로 읽어 둔 옛 그림을 내놓는다. 시각을 덧붙여 매번 새 주소로 만든다. */
+    const 표=`${S.out.rev}-${Date.now()}`;
+    shots.forEach(s=>{ s.url=s.file? fileURL(s.thumb||s.file)+`?r=${표}` : ""; });
     if(못구한.length)
       toast(`CUT${못구한.slice(0,5).join(", CUT")}${못구한.length>5?" 외":""} 는 `
         +(S.out.srcPath?"원본 영상에서 그림을 뽑지 못했습니다":"원본 영상이 없어 그림을 되살리지 못했습니다"));
@@ -6350,7 +6549,11 @@ async function resetCuts(){
         n.file  = (짝&&짝.file)  || null;
         n.thumb = (짝&&짝.thumb) || null;
         n.thumbOnly=true; delete n.blob;
-        n.url = n.file ? fileURL(n.thumb||n.file)+`?r=${(S.out.rev||0)+1}` : "";
+        /* ★ 여기서 다음 번호(?r=rev+1)를 미리 붙이면 안 된다. 곧이어 자리 맞추기가
+             파일 이름을 한 칸씩 옮기고 바로 그 번호를 '다른 그림' 에 또 붙인다.
+             주소가 같으니 브라우저는 먼저 읽은 그림을 그대로 보여줘서, 파일은
+             맞는데 화면만 엉뚱한 컷 그림이 떴다. 이 잠깐 동안만 쓸 표를 따로 붙인다. */
+        n.url = n.file ? fileURL(n.thumb||n.file)+`?r=${S.out.rev||0}-${Date.now()}` : "";
       }else{
         if(!n.blob && 짝) n.blob=짝.blob;
         n.url = n.blob ? URL.createObjectURL(n.blob) : "";
@@ -7074,15 +7277,13 @@ async function renderHist(){
       cur.fav=!cur.fav; await jobPut(cur);
       toast(cur.fav?"즐겨찾기에 담았습니다":"즐겨찾기에서 뺐습니다");
       renderHist(); };
-    const bOpen=document.createElement("button");
-    bOpen.className="mini"; bOpen.textContent="결과 보기";
-    bOpen.onclick=ev=>{ ev.stopPropagation(); loadJob(j.id); };
     const bDel=document.createElement("button");
     bDel.className="mini warn"; bDel.textContent="🗑 삭제";
     bDel.onclick=async ev=>{ ev.stopPropagation();
       if(!await askRemove(j)) return;
       if(S.jobId===j.id) resetResult(); renderHist(); };
-    btns.append(hb,bOpen);
+    /* ★ [결과 보기] 단추는 뺐다 — 칸 어디를 눌러도 똑같이 열린다 */
+    btns.append(hb);
     /* 폴더에 저장된 기록은 어디에 있는지 바로 확인할 수 있게 한다 */
     if(j.onDisk){
       const bDir=document.createElement("button");

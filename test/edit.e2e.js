@@ -106,6 +106,22 @@ app.whenReady().then(async () => {
       for(let i=0;i<60 && !pv.videoWidth;i++) await 잠깐(100);
       if(!pv.videoWidth) return {error:"재생 칸이 영상을 읽지 못했습니다"};
 
+      /* 격자가 그려질 때마다 '그 그림 주소 → 그 칸의 컷 시각' 을 적는다 */
+      window.__주소장부=(()=>{
+        const 장부=new Map(), 겹친=[];
+        const 적기=()=>[...grid.querySelectorAll("figure")].forEach((fg,i)=>{
+          const im=fg.querySelector("img"), u=im&&im.getAttribute("src");
+          const sh=(curShots()||[])[i]; if(!u||!sh||S.mode!=="smart") return;
+          const t=(+sh.t).toFixed(3), 전=장부.get(u);
+          if(전!=null && 전!==t) 겹친.push(u.split("/").pop()+" : "+전+"초 → "+t+"초");
+          장부.set(u,t);
+        });
+        /* 격자를 그리는 바로 그 순간에 적는다 — 그때는 목록과 칸이 반드시 맞다 */
+        const 원래그리기=drawGrid;
+        drawGrid=function(){ const r=원래그리기.apply(this,arguments); 적기(); return r; };
+        적기();
+        return { stop:()=>{ drawGrid=원래그리기; }, 겹침:()=>({ 본것:장부.size, 겹친 }) };
+      })();
       const out={ 처음:목록(), base:S.out.base, outDir:S.out.outDir, 처음눈금:눈금() };
       out.처음그림=await 그림표(S.out.shots);
 
@@ -203,6 +219,10 @@ app.whenReady().then(async () => {
         out.처음.map(x=>x.file))).filter(v=>!v).length;
 
       /* ---------- ④ 초기화 ---------- */
+      const 옮김기록=[]; const 원래옮김=window.CG.arrangeFiles;
+      window.CG.arrangeFiles=async(m,r,c)=>{ 옮김기록.push(Date.now()%100000+" 옮김"+(m||[]).length
+        +" "+(m||[]).map(x=>x.from.split("/").pop()+">"+x.to.split("/").pop()).join(",")); return 원래옮김(m,r,c); };
+      const 원래새로=refreshShots;
       const p2=resetCuts();
       for(let i=0;i<50;i++){ await 잠깐(100);
         if($("dlg").classList.contains("on") && /초기화/.test($("dlgTitle").textContent)) break; }
@@ -213,6 +233,14 @@ app.whenReady().then(async () => {
       out.수정표시=$("editedTag").classList.contains("on");
       out.초기화즐겨=내즐겨(); out.초기화즐겨기록=await 기록();
       out.초기화그림=await 그림표(S.out.shots);
+      /* ★ 파일은 맞는데 '화면' 만 엉뚱한 그림이던 일이 있었다 (2026-09-29).
+         초기화가 되돌린 목록을 먼저 띄우며 그림 주소에 다음 번호(CUT3.jpg?r=5)를
+         미리 붙였고, 곧이어 폴더를 맞추며 이름이 밀린 '다른 컷' 의 그림에 같은
+         주소를 또 붙였다. 주소가 같으면 브라우저는 먼저 읽은 그림을 내놓는다.
+         그래서 격자에 붙는 주소를 처음부터 끝까지 모두 적어 두고,
+         한 주소가 서로 다른 컷(시각)에 쓰인 적이 있는지 센다. */
+      window.__주소장부.stop();
+      out.화면주소=window.__주소장부.겹침();
 
       /* ---------- 옛 기록 되살리기 ----------
          ★ 고친 뒤에 새로 뽑은 것만 멀쩡하면 반쪽짜리 수리다. 옛 버전이 이미
@@ -389,6 +417,11 @@ app.whenReady().then(async () => {
       .filter((k) => 초기화그림[k] !== undefined && 초기화그림[k] !== 처음그림[k]);
     if (딴그림.length)
       fails.push(`초기화: ${딴그림.length}개 컷의 그림이 처음과 다르다 (${딴그림.slice(0, 3).join("초, ")}초)`);
+    const 화 = r.화면주소 || { 본것: 0, 겹친: [] };
+    console.log(`화면 주소    격자에 붙은 그림 주소 ${화.본것}개 · 다른 컷에 다시 쓰인 것 ${화.겹친.length}개`);
+    if (!화.본것) fails.push("시험이 헐겁다: 격자에 붙는 그림 주소를 하나도 못 봤다");
+    if (화.겹친.length)
+      fails.push(`화면: 같은 그림 주소가 다른 컷에 다시 쓰였다 — 옛 그림이 뜬다 (${화.겹친.slice(0, 2).join(" · ")})`);
     const 없어진시각 = Object.keys(처음그림).filter((k) => 초기화그림[k] === undefined);
     if (없어진시각.length)
       fails.push(`초기화: ${없어진시각.length}개 컷이 목록에서 사라졌다`);
