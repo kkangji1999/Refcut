@@ -415,24 +415,49 @@ function madeOk(f) {
   try { return fs.existsSync(f) && fs.statSync(f).size > 0; } catch (e) { return false; }
 }
 
+/* ---------- 한 장씩 뽑는 길의 공통 틀 ----------
+   ★ 예전에는 한 장씩 차례로 뽑았고, 그동안 화면에는 아무 소식이 없었다.
+     4K 영상에서는 한 장에 1초 남짓 걸려서, 컷이 176개면 3분 가까이
+     진행바가 66% 에 선 채로 멈춰 있었다 — "추출이 안 되는구나" 하고
+     포기하기 딱 좋은 모습이었다.
+   이제 몇 장을 한꺼번에 뽑고(재어 보니 4개일 때 2.3배 빠르다),
+   한 장 끝날 때마다 몇 장째인지 알린다.
+   ★ 한꺼번에 몇 개를 띄울지는 메모리를 보고 정한다.
+     4K AV1 은 ffmpeg 하나가 900 MB 가까이 쓴다 — 동료 컴퓨터에서 4개를
+     그냥 띄우면 오히려 느려지거나 멈출 수 있다. */
+function grabWorkers() {
+  const cpu = Math.max(1, Math.floor((os.cpus() || []).length / 2));
+  const mem = Math.max(1, Math.floor(os.freemem() / (1.2 * 1024 * 1024 * 1024)));
+  return Math.max(1, Math.min(4, cpu, mem));
+}
+function grabEach(times, argsOf, ctl) {
+  let next = 0;
+  const one = async () => {
+    while (next < times.length && !ctl.killed) {
+      const i = next++;
+      await new Promise((res) => {
+        const ff = spawn(ffmpegPath(), argsOf(i), { windowsHide: true });
+        ctl.procs.add(ff);
+        const fin = () => { ctl.procs.delete(ff); res(); };
+        ff.on("close", fin);
+        ff.on("error", fin);
+      });
+      ctl.tick();
+    }
+  };
+  return Promise.all(Array.from({ length: Math.min(grabWorkers(), times.length) }, one));
+}
+
 /* 빠른 길: 시각마다 -ss 를 입력 앞에 두어 키프레임 단위로 건너뛴 뒤 정확히 맞춘다.
    긴 영상에서 가장 빠르다 — mp4·mov·mkv·avi 는 이 길로 간다. */
-function grabBySeek(filePath, times, out) {
-  return (async () => {
-    for (let i = 0; i < times.length; i++) {
-      await new Promise((res) => {
-        const ff = spawn(ffmpegPath(), [
-          "-v", "error",
-          "-ss", String(times[i]),
-          "-i", filePath,
-          "-frames:v", "1",
-          "-y", out[i],
-        ], { windowsHide: true });
-        ff.on("close", () => res());
-        ff.on("error", () => res());
-      });
-    }
-  })();
+function grabBySeek(filePath, times, out, ctl) {
+  return grabEach(times, (i) => [
+    "-v", "error",
+    "-ss", String(times[i]),
+    "-i", filePath,
+    "-frames:v", "1",
+    "-y", out[i],
+  ], ctl);
 }
 
 /* 한 번에 훑는 길.
@@ -442,7 +467,7 @@ function grabBySeek(filePath, times, out) {
      (한 장도 안 나오면 예전에는 샷리스트를 만들다 영영 멈춰 있었다)
    그래서 그런 그릇은 처음부터 한 번 훑으면서 원하는 시각의 장만 골라낸다.
    훑기는 한 번뿐이므로 컷이 많을수록 오히려 이쪽이 빠르다. */
-function grabByScan(filePath, times, out, fps) {
+function grabByScan(filePath, times, out, fps, ctl) {
   return new Promise((resolve) => {
     const w = 0.9 / (fps > 1 && isFinite(fps) ? fps : 24);   // 한 장 만큼의 창
     const tmp = path.join(os.tmpdir(),
@@ -460,7 +485,18 @@ function grabByScan(filePath, times, out, fps) {
       "-vf", "select=" + expr,
       "-vsync", "0", "-y", path.join(tmp, "%d.png"),
     ], { windowsHide: true });
+    ctl.procs.add(ff);
+    /* 한 번에 훑는 길은 ffmpeg 하나가 전부 쓰므로, 몇 장이 생겼는지 폴더를 들여다본다 */
+    let 본수 = 0;
+    const 엿보기 = setInterval(() => {
+      let n = 0;
+      try { n = fs.readdirSync(tmp).length; } catch (e) {}
+      for (; 본수 < Math.min(n, times.length); 본수++) ctl.tick();
+    }, 500);
     const done = () => {
+      clearInterval(엿보기);
+      ctl.procs.delete(ff);
+      for (; 본수 < times.length; 본수++) ctl.tick();
       /* ★ 뽑힌 개수가 요청한 개수와 같을 때만 자리를 맞춘다.
          하나라도 더 뽑혔으면 그 뒤가 통째로 한 칸씩 밀려 엉뚱한 장이 된다 —
          그럴 때는 아무것도 옮기지 않고, 부르는 쪽이 느리지만 확실한 길로 간다. */
@@ -483,51 +519,68 @@ function grabByScan(filePath, times, out, fps) {
 
 /* 느리지만 언제나 맞는 길: -ss 를 입력 뒤에 두면 처음부터 풀어가며 정확히 맞춘다.
    앞의 두 길이 모두 실패한 자리에만 쓴다 (한 장마다 처음부터 풀므로 느리다). */
-function grabByDecode(filePath, times, out) {
-  return (async () => {
-    for (let i = 0; i < times.length; i++) {
-      await new Promise((res) => {
-        const ff = spawn(ffmpegPath(), [
-          "-v", "error", "-i", filePath,
-          "-ss", String(times[i]), "-frames:v", "1", "-y", out[i],
-        ], { windowsHide: true });
-        ff.on("close", () => res());
-        ff.on("error", () => res());
-      });
-    }
-  })();
+function grabByDecode(filePath, times, out, ctl) {
+  return grabEach(times, (i) => [
+    "-v", "error", "-i", filePath,
+    "-ss", String(times[i]), "-frames:v", "1", "-y", out[i],
+  ], ctl);
 }
 
-/* 지정한 시각들의 원본 해상도 프레임을 PNG 로 저장한다. */
-ipcMain.handle("grabPNGs", async (_e, { filePath, times, outDir, prefix }) => {
+/* 지정한 시각들의 원본 해상도 프레임을 PNG 로 저장한다.
+   jobId 를 주면 한 장마다 grabProgress 로 알리고, cancelScan 으로 멈출 수 있다. */
+ipcMain.handle("grabPNGs", async (e, { filePath, times, outDir, prefix, jobId }) => {
   fs.mkdirSync(outDir, { recursive: true });
   const out = times.map((_, i) => path.join(outDir, `${prefix}_CUT${i + 1}.png`));
   for (const f of out) { try { fs.rmSync(f, { force: true }); } catch (e) {} }
 
-  const info = await probeViaFfmpeg(filePath);
-  const fps = (info && info.fps) || 24;
-  const 늦게시작 = !!(info && Math.abs(info.start || 0) > 0.001);
+  /* 진행 알림 — 다시 뽑기(retry)는 '빠진 것 채우는 중' 으로 따로 센다 */
+  let 단계 = "", 몇째 = 0, 전체 = 0, 알린때 = 0;
+  const ctl = { killed: false, procs: new Set(), tick: () => {
+    몇째++;
+    const now = Date.now();
+    if (!jobId || (now - 알린때 < 150 && 몇째 < 전체)) return;
+    알린때 = now;
+    try { e.sender.send("grabProgress", { jobId, stage: 단계, done: 몇째, total: 전체 }); }
+    catch (x) {}
+  } };
+  const 시작 = (s, n) => { 단계 = s; 몇째 = 0; 전체 = n; 알린때 = 0; };
+  if (jobId) CANCEL.set(jobId, () => {
+    ctl.killed = true;
+    for (const p of ctl.procs) { try { p.kill("SIGKILL"); } catch (x) {} }
+  });
 
-  if (늦게시작) await grabByScan(filePath, times, out, fps);
-  else await grabBySeek(filePath, times, out);
+  try {
+    const info = await probeViaFfmpeg(filePath);
+    const fps = (info && info.fps) || 24;
+    const 늦게시작 = !!(info && Math.abs(info.start || 0) > 0.001);
 
-  /* 빠진 자리가 있으면 다음 길로 넘어간다.
-     ★ 늦게 시작하는 그릇에서 앞쪽 -ss 로 되돌아가면 '다른 장' 이 나온다.
-       없는 것보다 나쁘므로, 그쪽은 느리지만 확실한 길로만 다시 시도한다. */
-  const 빠진자리 = () => out.map((f, i) => (madeOk(f) ? -1 : i)).filter((i) => i >= 0);
-  let missing = 빠진자리();
-  if (missing.length && !늦게시작) {
-    await grabByScan(filePath, missing.map((i) => times[i]),
-                     missing.map((i) => out[i]), fps);
-    missing = 빠진자리();
+    시작("save", times.length);
+    if (늦게시작) await grabByScan(filePath, times, out, fps, ctl);
+    else await grabBySeek(filePath, times, out, ctl);
+
+    /* 빠진 자리가 있으면 다음 길로 넘어간다.
+       ★ 늦게 시작하는 그릇에서 앞쪽 -ss 로 되돌아가면 '다른 장' 이 나온다.
+         없는 것보다 나쁘므로, 그쪽은 느리지만 확실한 길로만 다시 시도한다. */
+    const 빠진자리 = () => out.map((f, i) => (madeOk(f) ? -1 : i)).filter((i) => i >= 0);
+    let missing = 빠진자리();
+    if (missing.length && !늦게시작 && !ctl.killed) {
+      시작("retry", missing.length);
+      await grabByScan(filePath, missing.map((i) => times[i]),
+                       missing.map((i) => out[i]), fps, ctl);
+      missing = 빠진자리();
+    }
+    if (missing.length && !ctl.killed) {
+      시작("retry", missing.length);
+      await grabByDecode(filePath, missing.map((i) => times[i]),
+                         missing.map((i) => out[i]), ctl);
+      missing = 빠진자리();
+    }
+    if (ctl.killed) return { ok: false, aborted: true };
+    /* 끝내 못 뽑은 자리는 숨기지 않고 알려준다 — 화면 쪽이 그 컷을 건너뛴다 */
+    return { ok: missing.length < out.length, files: out, missing };
+  } finally {
+    if (jobId) CANCEL.delete(jobId);
   }
-  if (missing.length) {
-    await grabByDecode(filePath, missing.map((i) => times[i]),
-                       missing.map((i) => out[i]));
-    missing = 빠진자리();
-  }
-  /* 끝내 못 뽑은 자리는 숨기지 않고 알려준다 — 화면 쪽이 그 컷을 건너뛴다 */
-  return { ok: missing.length < out.length, files: out, missing };
 });
 
 /* 취소 */
@@ -1936,7 +1989,14 @@ ipcMain.handle("ytDownload", async (e, { url, dest, jobId, height, plan, useCook
       const { args: extra, url: 대신 } = 시도풀기(계획);
       const args = [
         "--no-warnings", "--no-playlist", "--no-part", "--newline",
-        "-f", fmtSel || fmt, "--merge-output-format", "mp4",
+        "-f", fmtSel || fmt,
+        /* ★ 같은 화질이면 AV1 보다 VP9·H.264 를 고른다.
+           yt-dlp 는 기본으로 AV1 을 가장 앞에 두는데, 우리 ffmpeg 는 AV1 을
+           느린 방법으로만 풀 수 있다. 4분 40초짜리 4K 에서 분석이 77초 걸렸고,
+           같은 영상을 VP9 로 받으면 1분 분량이 14초 → 6초로 줄었다.
+           화질(해상도)이 먼저이고 코덱은 그다음이라 낮은 화질로 물러나지는 않는다. */
+        "-S", "res,fps,vcodec:vp9",
+        "--merge-output-format", "mp4",
         ...ffmpegLocArgs(),              // ffmpeg 위치를 알려준다 (없으면 합치기가 실패한다)
         ...jsArgs(),                     // 유튜브 주소를 푸는 자바스크립트 실행기
         ...extra, "-o", dest, 대신 || url,
@@ -1958,12 +2018,33 @@ ipcMain.handle("ytDownload", async (e, { url, dest, jobId, height, plan, useCook
       CANCEL.set("yt" + jobId, () => {
         killed = true; try { p2.kill("SIGKILL"); } catch (x) {}
       });
+      /* ★ 영상과 소리를 따로 받는 경우 yt-dlp 는 0→100% 를 두 번 알린다.
+           그대로 쓰면 영상을 다 받은 순간 진행바가 맨 앞으로 되돌아가서
+           '처음부터 다시 받나?' 싶었다. 몇 조각인지 읽어서 하나의 흐름으로 잇는다.
+           (소리는 영상보다 훨씬 작으므로 영상 90 · 소리 10 으로 나눈다) */
+      let 조각수 = 1, 조각 = -1, 남은줄 = "";
       p2.stdout.on("data", (d) => {
         lastAt = Date.now();
-        const s2 = d.toString();
-        const m = s2.match(/\[download\]\s+([\d.]+)%/);
-        if (m) send({ percent: parseFloat(m[1]) });
-        if (s2.includes("[Merger]")) send({ text: "영상과 소리를 합치는 중..." });
+        const lines = (남은줄 + d.toString()).split("\n");
+        남은줄 = lines.pop();                // 잘려 온 마지막 줄은 다음 번에 잇는다
+        let 알림 = null;
+        for (const s2 of lines) {
+          const f = s2.match(/Downloading \d+ format\(s\):\s*(\S+)/);
+          if (f) 조각수 = f[1].split("+").length;
+          if (/\[download\] Destination:/.test(s2)) 조각++;
+          const m = s2.match(/\[download\]\s+([\d.]+)%(?:.*?at\s+(\S+\/s))?(?:.*?ETA\s+(\S+))?/);
+          if (m) {
+            const p = parseFloat(m[1]);
+            const k = Math.max(0, 조각);
+            const 합 = 조각수 < 2 ? p : k === 0 ? p * 0.9 : 90 + p * 0.1;
+            알림 = { percent: Math.min(100, 합), speed: m[2] || "", eta: m[3] || "" };
+          }
+          if (s2.includes("[Merger]")) {
+            if (알림) { send(알림); 알림 = null; }   // 합치기 안내가 숫자에 덮이지 않게
+            send({ text: "영상과 소리를 합치는 중..." });
+          }
+        }
+        if (알림) send(알림);                 // 한 번에 여러 줄이 와도 마지막 것만 알린다
       });
       p2.stderr.on("data", (d) => { lastAt = Date.now(); err += d; });
       p2.on("close", (c) => (c === 0 ? finish(res) : finish(rej, new Error(err.slice(0, 400)))));

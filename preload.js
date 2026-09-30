@@ -73,9 +73,15 @@ contextBridge.exposeInMainWorld("CG", {
   },
   cancelPreview: (jobId) => ipcRenderer.invoke("cancelPreview", jobId),
 
-  /* 원본 해상도 PNG 저장 */
-  grabPNGs: (filePath, times, outDir, prefix) =>
-    ipcRenderer.invoke("grabPNGs", { filePath, times, outDir, prefix }),
+  /* 원본 해상도 PNG 저장
+     jobId·onProgress 를 주면 한 장마다 onProgress({stage, done, total}) 가 불리고,
+     cancelScan(jobId) 로 멈출 수 있다 (둘 다 없어도 된다). */
+  grabPNGs: (filePath, times, outDir, prefix, jobId, onProgress) => {
+    const h = (_e, m) => { if (jobId && m.jobId === jobId) onProgress && onProgress(m); };
+    ipcRenderer.on("grabProgress", h);
+    return ipcRenderer.invoke("grabPNGs", { filePath, times, outDir, prefix, jobId: jobId || null })
+      .finally(() => ipcRenderer.removeListener("grabProgress", h));
+  },
 
   /* 컷을 손보고 나서 저장 폴더의 CUT 번호를 목록과 다시 맞춘다.
      그림을 새로 뽑지 않고 이름만 바꾸므로 컷이 많아도 순식간이다. */

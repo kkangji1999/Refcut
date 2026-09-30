@@ -2074,8 +2074,28 @@ const grabAt=(t,fps)=>Math.max(0, t-0.25/((fps&&isFinite(fps)&&fps>1)?fps:24));
 
 async function captureEl(item,picks,base,outDir,tag){
   const dir=`${outDir}/${base}_CUTS/분석 프레임`;
-  prog(66,`${tag||""}원본 프레임 저장 중...`,"");
-  const r=await window.CG.grabPNGs(item.path, picks.map(p=>grabAt(p.t,item.fps)), dir, base);
+  prog(66,`${tag||""}원본 프레임 저장 중...  0 / ${picks.length}`,"");
+  /* ★ 컷이 많고 영상이 크면(4K) 여기서 몇 분이 걸린다.
+     예전에는 이 동안 진행바가 66% 에 멈춰 있어서 멈춘 줄 알았다 —
+     이제 한 장마다 몇 장째인지, 얼마나 남았는지 보여준다. */
+  const jobId="g"+Date.now()+Math.random().toString(36).slice(2,6);
+  _elScanId=jobId;
+  const g0=performance.now();
+  let r;
+  try{
+    r=await window.CG.grabPNGs(item.path, picks.map(p=>grabAt(p.t,item.fps)), dir, base, jobId, m=>{
+      if(ABORT||!m.total) return;
+      const p=m.done/m.total, el=(performance.now()-g0)/1000;
+      if(m.stage==="retry"){
+        prog(84, `${tag||""}빠진 프레임 다시 뽑는 중...  ${m.done} / ${m.total}`, "");
+        return;
+      }
+      const left=m.done>=3 ? Math.max(0, el/p-el) : 0;
+      prog(66+p*18, `${tag||""}원본 프레임 저장 중...  ${m.done} / ${m.total}`,
+           left>0 ? fmtLeft(left) : "");
+    });
+  }finally{ _elScanId=null; }
+  if(r && r.aborted) throw new Aborted();
   if(!r||!r.ok) throw new Error("프레임을 저장하지 못했습니다");
   /* 끝내 못 뽑은 자리가 있으면 그 컷만 건너뛴다.
      없는 파일을 목록에 넣으면 샷리스트를 만들다 멈춘다. */
@@ -2100,7 +2120,7 @@ async function captureEl(item,picks,base,outDir,tag){
     }catch(e){ thumb=null; }
     shots.push({...picks[i], file:full, thumb, thumbOnly:true,
                 url: thumb? fileURL(thumb) : url});
-    prog(66+(i+1)/picks.length*26,
+    prog(84+(i+1)/picks.length*8,
       `${tag||""}프레임 정리 중...  ${i+1} / ${picks.length}`,"");
   }
   return shots;
@@ -2501,8 +2521,8 @@ function download(blob,name){
    같은 날 두 번째로 내보내면 26.8.1602 로 올린다.
    업데이트 확인은 마디마다 숫자로 비교하므로(verNum) 자리수가 달라도 안전하다. */
 /* 앱으로 켰으면 설치된 진짜 버전을 그대로 쓴다 (여기 숫자는 웹으로 열 때의 몫) */
-const APP_VERSION = (window.CG && window.CG.version) || "26.9.1107";
-const APP_DATE    = "2026.09.29";
+const APP_VERSION = (window.CG && window.CG.version) || "26.9.1108";
+const APP_DATE    = "2026.09.30";
 /* 최신 index.html 이 올라가 있는 주소.
    여기에 넣어두면 [업데이트] 버튼이 새 버전을 확인합니다.
    설치 폴더의 update_url.txt 에 같은 주소를 적어두면
@@ -4291,6 +4311,18 @@ function 화질미달(item, r){
 }
 const 화질미달글 = m => `${m.바란}p 까지 있는 영상인데 ${m.실제}p 로만 받아졌습니다`;
 
+/* 받는 속도와 남은 시간 — 숫자가 움직이면 멈춘 게 아니라는 것을 알 수 있다.
+   yt-dlp 가 알려주는 값(12.3MiB/s · 00:14)을 그대로 읽어 보기 좋게 바꾼다. */
+const 받기속도=m=>{
+  const k=/^([\d.]+)(K|M|G)iB\/s$/.exec(m.speed||"");
+  if(!k) return "";
+  const mb=parseFloat(k[1])*({K:1/1024,M:1,G:1024})[k[2]];
+  return mb>=1 ? `  ·  ${mb.toFixed(1)} MB/s` : `  ·  ${Math.round(mb*1024)} KB/s`;
+};
+const 받기남음=m=>{
+  const t=/^(?:(\d+):)?(\d+):(\d+)$/.exec(m.eta||"");
+  return t ? fmtLeft((+(t[1]||0))*3600+(+t[2])*60+(+t[3])) : "";
+};
 async function 영상만받기(item){
   if(S.running) return toast("추출이 도는 중입니다 — 끝난 뒤에 받아주세요");
   if(_dlBusy)   return toast("이미 하나를 받고 있습니다");
@@ -4315,7 +4347,7 @@ async function 영상만받기(item){
         if(ABORT) return;
         if(m.text){ prog(null, m.text, ""); return; }
         if(typeof m.percent==="number")
-          prog(m.percent, `영상 받는 중...  ${m.percent.toFixed(0)}%`, "");
+          prog(m.percent, `영상 받는 중...  ${m.percent.toFixed(0)}%${받기속도(m)}`, 받기남음(m));
       });
   }catch(e){ r={ok:false, error:String(e&&e.message||e)}; }
   _ytJob=null; _dlBusy=false; ABORT=false;
@@ -4369,6 +4401,9 @@ $("cancel").onclick=()=>{
   if((!S.running && !_dlBusy) || ABORT) return;
   ABORT=true;
   if(_ytJob){ try{ window.CG.ytCancel(_ytJob); }catch(e){} }
+  /* 분석(ffmpeg 훑기)·원본 프레임 저장 중이면 그 ffmpeg 도 바로 끊는다 —
+     안 그러면 몇 분짜리 저장이 다 끝날 때까지 '멈추는 중...' 에 서 있다 */
+  if(_elScanId){ try{ window.CG.cancelScan(_elScanId); }catch(e){} }
   $("cancel").disabled=true; $("cancel").textContent="멈추는 중...";
   prog(null,"취소하는 중...","");
 };
@@ -4411,7 +4446,7 @@ async function runOneEl(item,tag,t0){
       if(m.text){ prog(null, tag+m.text, ""); return; }
       if(m.stage==="setup"){ prog(1, tag+m.text, ""); return; }
       if(typeof m.percent==="number")
-        prog(1+m.percent*0.34, `${tag}영상 받는 중...  ${m.percent.toFixed(0)}%`, "");
+        prog(1+m.percent*0.34, `${tag}영상 받는 중...  ${m.percent.toFixed(0)}%${받기속도(m)}`, 받기남음(m));
     });
     _ytJob=null;
     if(r && r.aborted) throw new Aborted();
@@ -5759,7 +5794,13 @@ async function buildStartShotsEl(){
        ffmpeg 에게 적어주는 시각만 4분의 1장 앞으로 민다 (grabAt 설명 참고) */
     const at=shots.map(s=> s.sT!=null ? s.sT : s.t);
     const times=at.map(t=>grabAt(t,S.fps));
-    const r=await window.CG.grabPNGs(src,times,dir,S.out.base+"_START");
+    const r=await window.CG.grabPNGs(src,times,dir,S.out.base+"_START",
+      "st"+Date.now(), m=>{
+        if(!m.total) return;
+        prog(m.stage==="retry" ? 68 : 8+m.done/m.total*60,
+          m.stage==="retry" ? `빠진 프레임 다시 뽑는 중...  ${m.done} / ${m.total}`
+                            : `스타트 프레임 만드는 중...  ${m.done} / ${m.total}`, "");
+      });
     if(!r||!r.ok) throw new Error("프레임을 저장하지 못했습니다");
     const 빠짐=new Set(r.missing||[]);        // 못 뽑은 자리는 건너뛴다
     if(빠짐.size) toast(`${빠짐.size}개 컷은 프레임을 뽑지 못해 건너뜁니다`);
@@ -5780,7 +5821,7 @@ async function buildStartShotsEl(){
       out.push({idx:shots[i].idx, t:at[i], inT:shots[i].inT, outT:shots[i].outT,
         sT:shots[i].sT, base:S.out.base, file:full, thumb, thumbOnly:true,
         url: thumb? fileURL(thumb):fileURL(full), fav:false});
-      prog(8+(i+1)/shots.length*88,`스타트 프레임 만드는 중...  ${i+1} / ${shots.length}`,"");
+      prog(68+(i+1)/shots.length*28,`스타트 프레임 정리 중...  ${i+1} / ${shots.length}`,"");
     }
     if(S.jobId!==myJob){ toast("다른 기록으로 옮겨서 취소했습니다"); return false; }
     S.out.startShots=out; S.out.startVer=3;
