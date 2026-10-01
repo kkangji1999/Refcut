@@ -2493,18 +2493,26 @@ ipcMain.handle("ytSearch", async (_e, { query, count }) => {
      · 유튜브 쪽은 앞뒤에 로고 화면이 붙어 있을 수 있어서 ±8초 밀어 가며 가장 맞는 자리를 찾는다
    같은 영상이면 0.9 를 넘고, 다른 편집본은 0.4 안팎에 머문다.
    유튜브 쪽은 가장 낮은 화질로 읽으므로 한 후보에 몇 초면 끝난다. */
-const 지문W = 32, 지문H = 18, 지문FPS = 4;
+/* ★ 대조는 앞 150초만 읽는다 (그 이상은 느리기만 하고 판정은 같다).
+     그런데 예전에는 읽은 장 수로 길이를 셈해서, 150초가 넘는 영상은 모두
+     '150초짜리' 가 되어 버렸다 — 문체부 IT'S THE KOREAN WAY(3분 8초)는
+     유튜브 1등에 똑같은 영상이 있었는데도 "길이가 안 맞는다" 고 걸러졌다.
+     진짜 길이는 ffmpeg 가 처음에 알려주는 Duration 으로 따로 읽는다. */
+const 지문W = 32, 지문H = 18, 지문FPS = 4, 지문초 = 150;
 function 영상지문(src, referer) {
   return new Promise((resolve) => {
     const head = referer
       ? ["-headers", "Referer: " + referer + "\r\nUser-Agent: " + UA + "\r\n"]
       : ["-user_agent", UA];
-    const ff = spawn(ffmpegPath(), ["-v", "error", ...head, "-i", src, "-t", "150", "-an",
+    const ff = spawn(ffmpegPath(), ["-hide_banner", "-nostats", "-v", "info", ...head,
+      "-i", src, "-t", String(지문초), "-an",
       "-vf", `fps=${지문FPS},scale=${지문W}:${지문H}:flags=area,format=gray`,
       "-f", "rawvideo", "-"], { windowsHide: true });
     const 조각 = [];
+    let 알림 = "";
     const t = setTimeout(() => { try { ff.kill("SIGKILL"); } catch (x) {} }, 60000);
     ff.stdout.on("data", (d) => 조각.push(d));
+    ff.stderr.on("data", (d) => { if (알림.length < 20000) 알림 += d; });
     ff.on("error", () => { clearTimeout(t); resolve([]); });
     ff.on("close", () => {
       clearTimeout(t);
@@ -2519,6 +2527,10 @@ function 영상지문(src, referer) {
         if (s > 4) { for (let k = 0; k < N; k++) v[k] /= s; out.push(v); }
         else out.push(null);
       }
+      const d = /Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(알림);
+      /* Duration 을 못 읽었는데 끝까지 다 읽지 못했다면 길이는 '모름' (0) */
+      out.duration = d ? (+d[1]) * 3600 + (+d[2]) * 60 + (+d[3])
+                       : (n < 지문초 * 지문FPS - 지문FPS ? n / 지문FPS : 0);
       resolve(out);
     });
   });
@@ -2579,8 +2591,10 @@ ipcMain.handle("ytTwin", async (_e, { query, src, referer }) => {
       유튜브검색(exe, q, 15).catch(() => []),
     ]);
     if (원본.filter(Boolean).length < 4) return { ok: false, error: "TVCF 영상을 읽지 못했습니다" };
-    const 길이 = 원본.length / 지문FPS;
-    const 길이맞음 = (c) => !c.duration || (c.duration >= 길이 - 2 && c.duration <= 길이 + 22);
+    const 길이 = 원본.duration;
+    const 길이맞음 = (c) => !c.duration || (길이
+      ? c.duration >= 길이 - 2 && c.duration <= 길이 + 22
+      : c.duration >= 지문초 - 2);    // 길이를 모르면 대조한 만큼보다 짧은 것만 뺀다
     let 후보 = 찾음.filter(길이맞음);
     /* 긴 제목으로 못 찾으면 광고주 이름만으로 한 번 더 */
     const 첫말 = q.split(/\s+/)[0];
