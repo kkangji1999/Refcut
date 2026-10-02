@@ -1353,6 +1353,79 @@
   }
   /* 바뀐 내용처럼 읽을 것이 많은 창은 조금 넓게 편다 (줄이 덜 꺾인다) */
   .dlgBox.wide{max-width:620px}
+  /* ---------- 유튜브 짝 찾기 창 (공용 알림 창 #dlg 보다 한 칸 아래) ---------- */
+  #twinDlg{display:none; position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:590;
+    align-items:center; justify-content:center; padding:20px}
+  #twinDlg.on{display:flex}
+  .twBox{width:100%; max-width:720px; max-height:90vh; display:flex; flex-direction:column;
+    background:var(--panel); border:1px solid var(--border); border-radius:13px;
+    box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  .twHead{display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:16px 20px 10px; font-size:15px}
+  .twX{background:none; border:0; color:var(--muted); font-size:15px; cursor:pointer; padding:2px 6px}
+  .twX:hover{color:var(--fg)}
+  #twBody{padding:0 20px; overflow-y:auto; font-size:12.5px; color:var(--muted); line-height:1.7}
+  .twBtns{display:flex; justify-content:flex-end; gap:8px; padding:14px 20px 16px;
+    border-top:1px solid var(--border); margin-top:12px}
+  .twBtns button:disabled{opacity:.4; cursor:default}
+  #twYt{background:var(--accent); color:#16181d; border-color:var(--accent); font-weight:700}
+  .twWhy{margin-bottom:10px}
+  .twAd{display:flex; align-items:center; gap:8px; color:var(--fg); font-weight:600;
+    margin-bottom:12px; font-size:13px}
+  .twAd span{font-size:10px; font-weight:700; color:#16181d; background:var(--accent);
+    border-radius:4px; padding:1px 6px}
+  .twSteps{display:flex; flex-direction:column; gap:10px; margin:6px 0 14px;
+    padding:12px 14px; background:var(--panel2); border-radius:10px}
+  .twStep{display:flex; gap:10px; align-items:flex-start}
+  .twStep b{color:var(--fg); font-weight:600}
+  .twStep.wait{opacity:.45}
+  .twStepSub{display:block; font-size:11.5px; color:var(--muted)}
+  .twIco{flex:0 0 18px; height:18px; border-radius:50%; display:flex; align-items:center;
+    justify-content:center; font-size:11px; margin-top:2px; border:1.5px solid var(--border)}
+  .twStep.done .twIco{background:var(--ok); border-color:var(--ok); color:#10141a; font-weight:800}
+  .twStep.now .twIco{border-color:var(--accent); border-top-color:transparent; animation:twSpin .8s linear infinite}
+  @keyframes twSpin{to{transform:rotate(360deg)}}
+  .twBar{display:inline-block; width:120px; height:5px; border-radius:3px; background:var(--border);
+    overflow:hidden; vertical-align:middle; margin-left:8px}
+  .twBar i{display:block; height:100%; background:var(--accent); transition:width .3s}
+  .twNote{font-size:11px; color:#6b7385; margin-top:10px}
+  .twTime{font-size:11px; color:#6b7385; margin-top:4px}
+  .twCards{display:flex; flex-direction:column; gap:8px}
+  .twCard{display:flex; gap:12px; padding:10px; border:1px solid var(--border); border-radius:10px;
+    cursor:pointer; align-items:flex-start}
+  .twCard.on{border-color:var(--accent); background:rgba(255,212,0,.05)}
+  .twCard input{margin-top:24px}
+  .twThumb{width:136px; height:77px; object-fit:cover; border-radius:6px; flex:0 0 auto;
+    background:#000; cursor:zoom-in}
+  .twInfo{min-width:0; flex:1}
+  .twName{color:var(--fg); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .twMeta{font-size:11px; color:#6b7385}
+  .twTag{display:inline-block; font-size:11px; font-weight:700; border-radius:5px; padding:1px 7px; margin:4px 0}
+  .twTag.ok{background:rgba(74,222,128,.14); color:var(--ok)}
+  .twTag.warn{background:rgba(251,191,36,.14); color:var(--warn)}
+  .twTag.dim{background:var(--panel2); color:var(--muted)}
+  .twVerdict{font-size:13px; font-weight:700; margin:2px 0 3px}
+  .twVerdict.ok{color:var(--ok)} .twVerdict.warn{color:var(--warn)} .twVerdict.dim{color:#9aa3b5}
+  .twDesc{font-size:11.5px; color:#9aa3b5; line-height:1.6}
+  .twMeter{display:flex; align-items:center; gap:6px; font-size:11px; color:#6b7385; margin-top:5px}
+  .twMeter .twBar{margin-left:0; width:100px}
+  .twMeter b{color:var(--fg); font-weight:600}
+  .twActs{display:flex; gap:6px; margin-top:7px; flex-wrap:wrap}
+  .twFrames:empty{display:none}
+  .twFrames{margin-top:8px; display:flex; flex-direction:column; gap:6px}
+  .twFrWait{font-size:11px; color:#6b7385}
+  .twPair,.twOnly{display:flex; align-items:center; gap:8px}
+  .twFrames figure{margin:0; flex:1; min-width:0}
+  .twFrames img,.twNoImg{width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:5px; background:#000; display:block}
+  .twNoImg{display:flex; align-items:center; justify-content:center; font-size:10.5px; color:#6b7385}
+  .twFrames figcaption{font-size:10.5px; color:#6b7385; text-align:center}
+  .twVs{flex:0 0 74px; text-align:center; font-size:10.5px; font-weight:700; line-height:1.4}
+  .twVs.ok{color:var(--ok)} .twVs.no{color:var(--warn)}
+  .twOnly figure{flex:0 0 46%}
+  .twOnly span{font-size:11.5px; color:var(--warn)}
+  .qTwin{margin-left:6px; font-size:10.5px; border-radius:5px; padding:0 6px; border:1px solid var(--border);
+    background:var(--panel2); color:var(--muted); cursor:pointer}
+  .qTwin.pick{border-color:var(--accent); color:var(--accent)}
   .dlgBox{width:100%; max-width:440px; background:var(--panel);
     border:1px solid var(--border); border-radius:13px; padding:20px 22px;
     box-shadow:0 20px 60px rgba(0,0,0,.6)}
@@ -2521,8 +2594,8 @@ function download(blob,name){
    같은 날 두 번째로 내보내면 26.8.1602 로 올린다.
    업데이트 확인은 마디마다 숫자로 비교하므로(verNum) 자리수가 달라도 안전하다. */
 /* 앱으로 켰으면 설치된 진짜 버전을 그대로 쓴다 (여기 숫자는 웹으로 열 때의 몫) */
-const APP_VERSION = (window.CG && window.CG.version) || "26.9.1109";
-const APP_DATE    = "2026.10.01";
+const APP_VERSION = (window.CG && window.CG.version) || "26.9.1110";
+const APP_DATE    = "2026.10.02";
 /* 최신 index.html 이 올라가 있는 주소.
    여기에 넣어두면 [업데이트] 버튼이 새 버전을 확인합니다.
    설치 폴더의 update_url.txt 에 같은 주소를 적어두면
@@ -3663,7 +3736,19 @@ function sniffScore(m){
   /* 조각 목록(chunklist)보다 전체 목록(playlist)이 낫고, 화질이 높을수록 낫다 */
   return (m.master?100000:0) + (m.height||0)*10 + (m.kind==="HLS"?5:m.kind==="MP4"?3:1);
 }
-function openSniff(page){
+/* ★ 재생 창은 하나뿐이고, 그 창을 기다리는 자리(_sniffResolve)도 하나뿐이다.
+     TVCF 주소를 연달아 넣으면 뒤엣것이 앞엣것의 자리를 덮어써서, 앞 줄은
+     "재생 창에서 영상을 찾는 중" 인 채로 영영 끝나지 않았다.
+     이제는 차례를 세워 하나씩 연다. 기다리는 줄에는 차례를 기다린다고 적는다. */
+let _sniffChain=Promise.resolve(), _sniffLine=0;
+function openSniff(page, onStart){
+  _sniffLine++;
+  const run=_sniffChain.then(()=>{ _sniffLine--; if(onStart) onStart(); return openSniff1(page); });
+  _sniffChain=run.catch(()=>{}).then(()=>new Promise(r=>setTimeout(r,300)));
+  return run;
+}
+const 재생창차례=()=>!!_sniffResolve || _sniffLine>0;
+function openSniff1(page){
   return new Promise(resolve=>{
     _sniffBest=null; _sniffResolve=resolve; _sniffPageTitle="";
     $("sniffDone").style.display="";        // 이제는 그만둘 수 있다
@@ -3708,7 +3793,8 @@ async function finishSniff(best){
     ? `${info.brand||""} ${info.adTitle}`.trim() : "";
   /* 고른 주소에 딸려 온 제목을 앞세운다 — 비메오는 설정에 적힌 진짜 제목이 온다
      (창 제목은 "… | Vimeo의 동영상 및 영화" 처럼 꼬리가 붙는다) */
-  if(r) r(best ? {...best, pageTitle:본문제목||best.pageTitle||_sniffPageTitle||""} : null);
+  if(r) r(best ? {...best, pageTitle:본문제목||best.pageTitle||_sniffPageTitle||"",
+                  brand:(info&&info.brand)||"", adTitle:(info&&info.adTitle)||""} : null);
 }
 
 /* 원하는 화질과 실제 있는 화질을 맞춰 고른다.
@@ -3842,9 +3928,9 @@ async function addLink(url, referer, pageTitle, fallbackUrl){
      브라우저를 열어 재생하게 하고, 잡힌 주소로 조용히 이어서 진행한다.
      (이미 우회로 들어온 주소면 다시 시도하지 않는다) */
   if((!r||!r.ok) && !referer && window.CG.sniffOpen){
-    placeholder.name="재생 창에서 영상을 찾는 중...";
+    placeholder.name= 재생창차례() ? "앞 영상의 재생 창이 끝나면 이어서 엽니다..." : "재생 창에서 영상을 찾는 중...";
     renderQueue();
-    const best=await openSniff(url);
+    const best=await openSniff(url, ()=>{ placeholder.name="재생 창에서 영상을 찾는 중..."; renderQueue(); });
     if(!best){
       S.queue=S.queue.filter(x=>x!==placeholder); renderQueue();
       return toast("취소했습니다");
@@ -3857,7 +3943,7 @@ async function addLink(url, referer, pageTitle, fallbackUrl){
       return addLink(best.url, null, "", null);
     }
     /* ★ 영상 정보를 읽는 것과 나란히 곧바로 시작한다 — 끝까지 기다렸다 찾으면 늦다 */
-    if(isTVCF(url)) 유튜브짝시작(url, best.url, best.pageTitle||"");
+    if(isTVCF(url)) 유튜브짝시작(url, best.url, best.pageTitle||"", best);
     /* ★ 재생 창에서 잡히는 주소는 '그때 재생되던 화질' 하나뿐이다.
        플레이어가 720p 로 시작하면 1080p 가 있는 영상도 720p 로 받아졌다
        (TVCF 에서 최고 화질을 골라도 720p 로 나오던 것이 이것이다).
@@ -3967,8 +4053,11 @@ async function addLink(url, referer, pageTitle, fallbackUrl){
      이제는 재생 창이 닫히는 순간 창을 띄워 "찾는 중" 을 보여주고,
      결과가 나오면 그 창에서 곧바로 [유튜브 것으로 받기] · [TVCF 그대로] 를 고르게 한다.
      기다리기 싫으면 [기다리지 않고 TVCF 로 받기] 로 바로 넘어간다.
-     같은 것이 없으면 창은 스스로 닫히고 TVCF 영상 그대로 간다. */
-const TWIN=new Map();    // TVCF 페이지 주소 → {choice:null | "yt" | "tvcf"}
+     겹치는 것이 없으면 창은 스스로 닫히고 TVCF 영상 그대로 간다.
+   ★ 2026-10-02 — 통째로 같은 것만 권하다가 사례마다 하나씩 놓쳤다. 이제는 장면이
+     조금이라도 겹치면 보여주고, 어떤 사이인지(같은 영상 · 긴 판 · 짧은 판 · 편집본 ·
+     같은 시리즈) 설명하고, 장면을 맞대 보거나 유튜브에서 틀어 보고 고르게 한다. */
+const TWIN=new Map();    // TVCF 페이지 주소 → 짝 {choice:null|"yt"|"tvcf", state:"찾는중"|"고르기"|"끝", ...}
 function 유튜브검색어(t){
   let s=cleanSiteTitle(t)||String(t||"");
   s=s.replace(/TVCF/ig," ")
@@ -3977,61 +4066,315 @@ function 유튜브검색어(t){
      .replace(/\s+/g," ").trim();
   return s.slice(0,80);
 }
-async function 유튜브짝시작(page, stream, pageTitle){
+/* ★ 네이버플러스 스토어 노크잇(30초)은 유튜브 네이버 채널에 그대로 있었는데
+     "네이버플러스 스토어 노크잇 열어보면 전부 내 취향, 노크잇" 으로 찾으면 유튜브가
+     16초짜리 하나만 돌려줬다. 광고 제목만("노크잇 열어보면 …") 넣으면 1등이었다.
+     유튜브 검색은 긴 검색어에 박하다 — 그래서 여러 갈래로 나눠 함께 찾는다:
+     광고 제목만 · 쉼표 등으로 끊은 토막 · 광고주 이름만 */
+function 유튜브검색갈래(info){
+  const 갈래=[];
+  const 더하기=t=>{ const s=유튜브검색어(t); if(s.length>=2 && !갈래.includes(s)) 갈래.push(s); };
+  const 제목=String((info&&info.adTitle)||"");
+  if(제목){
+    더하기(제목);
+    제목.split(/[,/!?~…·]+/).forEach(더하기);
+  }
+  if(info&&info.brand) 더하기(info.brand);
+  return 갈래;
+}
+/* ---------- 짝 찾기 전용 창 ----------
+   ★ 예전에는 앱 공용 알림 창(#dlg)을 빌려 썼다. 그래서 추출 중 다른 알림이 뜨거나
+     다음 TVCF 를 넣어 그쪽 "찾는 중" 이 뜨면, 앞의 결과는 아무 말 없이 버려지고
+     그 TVCF 영상은 워터마크 판 그대로 받아졌다 — 유튜브에 있는데도.
+   이제는 따로 창을 두고, 짝마다 상태를 들고 있는다.
+     · 찾는 동안 그 TVCF 줄은 대기열에서 '붙잡혀' 추출되지 않는다 (다른 영상은 먼저 간다)
+     · 결과는 버려지지 않는다 — 창이 비면 차례로 띄우고, 대기열에서도 다시 열 수 있다
+     · 고르고 나면 그 자리에서 이어서 추출된다 */
+const TW={cur:null, tick:null};
+function 짝붙잡힘(item){
+  const t=item && item.referer && TWIN.get(item.referer);
+  return !!(t && !t.choice);
+}
+function 짝창준비(){
+  if($("twinDlg")) return;
+  const el=document.createElement("div");
+  el.id="twinDlg";
+  el.innerHTML=
+    `<div class="twBox"><div class="twHead"><b id="twTitle"></b>`+
+    `<button class="twX" id="twX" title="닫기 — 대기열에서 다시 열 수 있습니다">✕</button></div>`+
+    `<div id="twBody"></div><div class="twBtns" id="twBtns"></div></div>`;
+  document.body.appendChild(el);
+  $("twX").onclick=()=>짝창닫기();
+}
+function 짝창열기(짝){
+  짝창준비();
+  TW.cur=짝; 짝.보여줌=true;
+  $("twinDlg").classList.add("on");
+  짝그리기();
+}
+function 짝창닫기(){
+  const el=$("twinDlg"); if(el) el.classList.remove("on");
+  clearInterval(TW.tick); TW.tick=null;
+  TW.cur=null;
+  renderQueue();
+  setTimeout(다음짝띄우기, 400);
+}
+/* 고를 것이 생긴 짝을 띄운다 — 재생 창이 열려 있거나 다른 짝을 보고 있으면 기다린다 */
+function 다음짝띄우기(){
+  if(TW.cur) return;
+  const 다음=[...TWIN.values()].find(t=>t.state==="고르기" && !t.choice && !t.보여줌);
+  if(!다음) return;
+  if(재생창차례()){ setTimeout(다음짝띄우기, 1000); return; }
+  짝창열기(다음);
+}
+const 초글=s=>길이글(Math.max(0,Math.round(s||0)));
+const 몫글=v=>Math.round((v||0)*100)+"%";
+
+/* ---------- 찾는 중 화면 ---------- */
+function 찾는중그리기(짝){
+  const s=짝.steps||{};
+  const 줄=(상태,제목,설명)=>
+    `<div class="twStep ${상태}"><span class="twIco">${상태==="done"?"✓":상태==="now"?"":"·"}</span>`+
+    `<span><b>${제목}</b>${설명?`<span class="twStepSub">${설명}</span>`:""}</span></div>`;
+  const 읽음=s.읽기끝, 찾음=s.찾기끝, 대조끝=s.대조수 && s.끝난수>=s.대조수;
+  const 갈래수=(s.갈래||[]).length;
+  const 대조막대=s.대조수 ? Math.round((s.끝난수||0)/s.대조수*100) : 0;
+  $("twTitle").textContent="유튜브에서 워터마크 없는 원본을 찾는 중";
+  $("twBody").innerHTML=
+    `<div class="twWhy">TVCF 영상에는 워터마크가 박혀 있고 720p 가 한계입니다. `+
+    `광고주가 유튜브에 올린 원본이 있으면 그쪽이 더 깨끗합니다 — 찾아서 화면까지 맞대 보는 중입니다.</div>`+
+    `<div class="twAd"><span>TVCF</span>${escHtml(짝.q)}${s.길이?` · ${초글(s.길이)}`:""}</div>`+
+    `<div class="twSteps">`+
+      줄(읽음?"done":"now","TVCF 영상 살펴보기", 읽음?`길이 ${초글(s.길이)} · 장면을 읽었습니다`:"장면을 작게 줄여 읽는 중")+
+      줄(찾음?"done":"now","유튜브에서 찾기",
+        찾음?`영상 ${s.찾은수}개를 찾았습니다 — 그중 ${s.대조수}개를 화면으로 맞대 봅니다`
+            :`검색어 ${갈래수||1}가지로 함께 찾는 중`)+
+      줄(대조끝?"done":찾음?"now":"wait","화면 맞대 보기",
+        찾음 ? (s.대조수 ? `${s.끝난수||0} / ${s.대조수}개`+
+          `<span class="twBar"><i style="width:${대조막대}%"></i></span>` : "맞대 볼 후보가 없습니다")
+             : "")+
+      줄(대조끝?"now":"wait","어떤 영상인지 정리하기","")+
+    `</div>`+
+    `<div class="twNote">기다리는 동안 이 TVCF 영상은 대기열에서 기다립니다. `+
+    `추출을 돌리고 있어도 다른 영상부터 처리하고, 고르신 뒤에 이어서 합니다.</div>`+
+    `<div class="twTime" id="twTime"></div>`;
+  $("twBtns").innerHTML=
+    `<button class="mini" id="twTv">기다리지 않고 TVCF 로 받기</button>`+
+    `<button class="mini main" id="twLater">창 닫고 계속 넣기</button>`;
+  $("twTv").onclick=()=>짝정하기(짝,"tvcf");
+  $("twLater").onclick=()=>{ toast("다 찾으면 이 창이 다시 뜹니다 — 대기열에서도 열 수 있습니다"); 짝창닫기(); };
+  const 시간=()=>{ const t=$("twTime"); if(t) t.textContent=`${Math.round((Date.now()-짝.since)/1000)}초째 · 보통 10~20초 걸립니다`; };
+  시간(); clearInterval(TW.tick); TW.tick=setInterval(시간,1000);
+}
+
+/* ---------- 관계 설명 ----------
+   ★ "유튜브에 비슷한 게 있으니 받을래?" 만으로는 고를 수 없다.
+     무엇이 같고 무엇이 다른지, 받으면 무엇이 달라지는지를 말해준다. */
+const 관계표={
+  같음:        {이름:"같은 영상",            색:"ok"},
+  같음_끝멈춤: {이름:"같은 영상 · 끝 멈춤 화면", 색:"ok"},
+  같음_더:     {이름:"같은 영상 + 덧붙은 부분", 색:"ok"},
+  긴판:        {이름:"더 긴 판",             색:"warn"},
+  다른편집:    {이름:"다른 편집본",          색:"warn"},
+  짧은판:      {이름:"더 짧은 판",           색:"warn"},
+  시리즈:      {이름:"같은 시리즈의 다른 편일 수 있음", 색:"dim"},
+  못봄:        {이름:"화면 확인 못 함",      색:"dim"},
+};
+function 관계설명(c, tv){
+  const yt=c.duration||0, d=yt&&tv? yt-tv : 0;
+  const 앞더=c.offset>=1 ? ` 유튜브 쪽은 앞에 ${초글(c.offset)}가 더 붙어 있습니다.` : "";
+  /* 유튜브 쪽(앞 150초까지 읽음)에서 TVCF 에 없는 장면의 길이 */
+  const 새장면=Math.round((yt||0)*(1-(c.B||0)));     // B 는 앞 150초에서 잰 몫 — 긴 영상은 그 비율로 어림한다
+  switch(c.관계){
+    case "같음": return `TVCF 광고와 처음부터 끝까지 똑같은 영상입니다.${앞더} 워터마크 없이 받을 수 있습니다.`;
+    case "같음_끝멈춤": return `TVCF 광고와 똑같은 영상인데, 유튜브 것은 끝에 마지막 장면이 약 ${초글(c.끝멈춤)} 더 멈춰 있습니다. `+
+      `유튜브가 추천 영상 · 구독 단추를 띄우려고 비워 둔 자리이고, 장면은 TVCF 와 같습니다.${앞더}`;
+    case "같음_더": return `TVCF 광고가 통째로 들어 있고, 유튜브 것이 ${초글(d)} 더 깁니다. `+
+      `멈춘 화면이 아니라 다른 장면(로고 · 안내 화면 등)이 덧붙어 있습니다.${앞더}`;
+    case "긴판": return `같은 광고의 더 긴 판입니다 (TVCF ${초글(tv)} → 유튜브 ${초글(yt)}). `+
+      `TVCF 장면의 ${몫글(c.A)}가 들어 있고, TVCF 에는 없는 장면이 약 ${초글(새장면)} 더 있습니다. `+
+      `끝에 화면을 멈춰 둔 것이 아니라 실제 장면이 더 들어간 판이라, 받으면 TVCF 와 컷 구성이 달라집니다.`;
+    case "다른편집": return `길이는 비슷하지만 장면 순서나 일부 장면이 다른 편집본입니다. `+
+      `TVCF 장면의 ${몫글(c.A)}가 들어 있고, 유튜브 쪽 장면 중 ${몫글(1-(c.B||0))}는 TVCF 에 없습니다.`;
+    case "짧은판": return `같은 광고의 짧은 판입니다 (TVCF ${초글(tv)} → 유튜브 ${초글(yt)}). `+
+      `유튜브 것의 장면은 대부분 TVCF 에 있지만, TVCF 장면 중 ${몫글(c.A)}만 들어 있어 받으면 빠지는 장면이 있습니다.`;
+    case "시리즈": return `겹치는 장면이 약 ${초글(c.장면초)}뿐입니다. 같은 광고 시리즈의 다른 편일 가능성이 큽니다 — `+
+      `[장면 맞대 보기] 로 확인하고 고르세요.`;
+    case "못봄": return `유튜브가 화면 읽기를 막아 맞대 보지 못했습니다. 제목이 비슷해서 보여 드립니다 — `+
+      `[유튜브에서 틀어 보기] 로 확인하고 고르세요.`;
+  }
+  return "";
+}
+const 같은편=c=>/^같음/.test(c.관계);
+/* 글을 다 읽지 않아도 고를지 말지 알 수 있게 — 카드 맨 위의 한 줄 */
+const 판단글={
+  ok:  "✓ 이걸로 받으면 됩니다 — TVCF 와 같은 영상, 워터마크 없음",
+  warn:"△ 장면이 조금 다릅니다 — 아래 차이가 괜찮으면 받으세요",
+  dim: "? 다른 광고일 수 있습니다 — 장면을 맞대 보고 고르세요",
+};
+
+/* ---------- 고르기 화면 ---------- */
+function 고르기그리기(짝){
+  clearInterval(TW.tick); TW.tick=null;
+  const m=짝.result, tv=m.duration||0, list=m.list;
+  const 같은것=list.some(같은편);
+  /* ★ 대부분 유튜브 것으로 받는다 — 가장 잘 맞는 것(맨 위)을 골라 둔다.
+       고를지 말지는 카드 맨 위의 한 줄 판단으로 바로 알 수 있게 한다 */
+  if(짝.고른==null) 짝.고른=0;
+  $("twTitle").textContent= 같은것 ? "유튜브에 같은 영상이 있습니다"
+                                   : "유튜브에 비슷한 영상이 있습니다 — 차이를 확인해 주세요";
+  const 카드=list.map((c,i)=>{
+    const 표=관계표[c.관계]||{이름:c.관계,색:"dim"};
+    const d=c.duration&&tv? c.duration-tv : 0;
+    const 길이차=!c.duration||!tv ? "" : Math.abs(d)<=2 ? " (길이 같음)"
+      : d>0 ? ` (${초글(d)} 더 김)` : ` (${초글(-d)} 더 짧음)`;
+    const 막대=c.못읽음 ? "" :
+      `<div class="twMeter"><span>TVCF 장면 중 유튜브에 있는 것</span>`+
+      `<span class="twBar"><i style="width:${Math.round((c.A||0)*100)}%"></i></span><b>${몫글(c.A)}</b></div>`;
+    return `<label class="twCard${짝.고른===i?" on":""}" data-id="${escHtml(c.id)}" data-i="${i}">`+
+      `<input type="radio" name="twPick" value="${i}"${짝.고른===i?" checked":""}>`+
+      `<img class="twThumb" src="${escHtml(c.thumb)}" title="눌러서 유튜브에서 틀어 보기">`+
+      `<div class="twInfo">`+
+        `<div class="twName">${escHtml(c.title)}</div>`+
+        `<div class="twMeta">${escHtml(c.channel)} · TVCF ${초글(tv)} / 유튜브 ${c.duration?초글(c.duration):"?"}${길이차}</div>`+
+        `<span class="twTag ${표.색}">${표.이름}${c.관계==="같음"&&c.score?` · 화면 일치 ${Math.round(c.score*100)}%`:""}</span>`+
+        `<div class="twVerdict ${표.색}">${판단글[표.색]}</div>`+
+        `<div class="twDesc">${escHtml(관계설명(c,tv))}</div>`+
+        막대+
+        `<div class="twActs">`+
+          (c.못읽음?"":`<button class="mini" data-act="frames" data-i="${i}">장면 맞대 보기</button>`)+
+          `<button class="mini" data-act="play" data-i="${i}">▶ 유튜브에서 틀어 보기</button>`+
+        `</div>`+
+        `<div class="twFrames" id="twFr${i}"></div>`+
+      `</div></label>`;
+  }).join("");
+  $("twBody").innerHTML=
+    `<div class="twAd"><span>TVCF</span>${escHtml(짝.q)}${tv?` · ${초글(tv)}`:""}</div>`+
+    `<div class="twWhy">유튜브 것은 워터마크가 없고 화질도 더 높을 수 있습니다. `+
+    (같은것 ? "아래 영상은 TVCF 와 화면까지 같다고 확인했습니다."
+            : "다만 TVCF 와 똑같은 영상은 없었습니다. 어떻게 다른지 적어 두었으니 장면을 맞대 보고 고르세요.")+
+    `</div>`+
+    `<div class="twCards">${카드}</div>`+
+    `<div class="twNote">고르기 전까지 이 TVCF 영상은 대기열에서 기다립니다. ✕ 로 닫아도 대기열의 [유튜브 고르기] 로 다시 열 수 있습니다.</div>`;
+  $("twBtns").innerHTML=
+    `<button class="mini" id="twTv">TVCF 그대로 받기</button>`+
+    `<button class="mini main" id="twYt">유튜브 영상으로 받기</button>`;
+  const 단추맞춤=()=>{ $("twYt").disabled = 짝.고른<0; };
+  단추맞춤();
+  $("twBody").querySelectorAll('input[name="twPick"]').forEach(el=>el.onchange=()=>{
+    짝.고른=+el.value;
+    $("twBody").querySelectorAll(".twCard").forEach(k=>k.classList.toggle("on", +k.dataset.i===짝.고른));
+    단추맞춤();
+  });
+  $("twBody").querySelectorAll(".twThumb").forEach(el=>el.onclick=e=>{
+    e.preventDefault(); const c=list[+el.closest(".twCard").dataset.i];
+    if(window.CG.ytPreview) window.CG.ytPreview(c.url);
+  });
+  $("twBody").querySelectorAll("button[data-act]").forEach(b=>b.onclick=e=>{
+    e.preventDefault(); e.stopPropagation();
+    const c=list[+b.dataset.i];
+    if(b.dataset.act==="play"){ if(window.CG.ytPreview) window.CG.ytPreview(c.url); return; }
+    장면맞대기(짝, c, $("twFr"+b.dataset.i), b);
+  });
+  $("twTv").onclick=()=>짝정하기(짝,"tvcf");
+  $("twYt").onclick=()=>{ if(짝.고른>=0) 짝정하기(짝,"yt",list[짝.고른]); };
+}
+
+/* ---------- 장면 맞대 보기 ----------
+   TVCF 앞 · 가운데 · 뒤의 장면과, 그것이 유튜브 어디에 있는지를 실제 그림으로 나란히.
+   유튜브에만 있는 장면이 있으면 그것도 한 장 보여준다. */
+async function 장면맞대기(짝, c, box, 단추){
+  if(!box) return;
+  if(box.dataset.on==="1"){ box.dataset.on=""; box.innerHTML=""; 단추.textContent="장면 맞대 보기"; return; }
+  box.dataset.on="1"; 단추.textContent="장면 접기";
+  if(box.dataset.html){ box.innerHTML=box.dataset.html; return; }
+  box.innerHTML=`<div class="twFrWait">장면을 떠 오는 중입니다... (몇 초)</div>`;
+  const 자리=c.자리||[];
+  const 요청=[];
+  자리.forEach(p=>{
+    요청.push({src:짝.stream, referer:짝.page, t:p.tv});
+    요청.push({src:c.stream, referer:null, t:p.yt});
+  });
+  if(c.유튜브만) 요청.push({src:c.stream, referer:null, t:c.유튜브만.yt});
+  let 그림=[];
+  try{ 그림=await window.CG.twinFrames(요청); }catch(e){}
+  const 칸=(src,말)=>`<figure>${src?`<img src="${src}">`:`<div class="twNoImg">못 떠 왔습니다</div>`}<figcaption>${말}</figcaption></figure>`;
+  let html=자리.map((p,k)=>
+    `<div class="twPair">`+
+      칸(그림[k*2], `TVCF ${초글(p.tv)}`)+
+      `<span class="twVs ${p.같음?"ok":"no"}">${p.같음?"같은 장면":"가장 비슷한 장면<br>(다름)"}</span>`+
+      칸(그림[k*2+1], `유튜브 ${초글(p.yt)}`)+
+    `</div>`).join("");
+  if(c.유튜브만)
+    html+=`<div class="twOnly">`+칸(그림[자리.length*2], `유튜브 ${초글(c.유튜브만.yt)}`)+
+      `<span>TVCF 에는 없는 장면입니다 — 유튜브 쪽에 이런 장면이 약 ${초글(c.유튜브만.초)} 이어집니다.</span></div>`;
+  box.dataset.html=html;
+  if(box.dataset.on==="1") box.innerHTML=html;
+}
+
+/* ---------- 고르기 ---------- */
+function 짝정하기(짝, choice, c){
+  if(짝.choice) return;
+  짝.choice=choice;
+  if(choice==="yt" && c){
+    /* TVCF 줄을 빼고 그 자리에 유튜브 것을 넣는다 — 줄 순서가 흐트러지지 않게.
+       (TVCF 줄이 아직 '주소 확인 중' 이면 addLink 가 스스로 빠진다) */
+    const 자리=S.queue.findIndex(x=>x.referer===짝.page && x.status==="wait");
+    S.queue=S.queue.filter(x=>!(x.referer===짝.page && x.status==="wait"));
+    const 앞수=S.queue.length;
+    addLink(c.url, null, "", null);
+    if(자리>=0 && S.queue.length>앞수){
+      const it=S.queue.pop(); S.queue.splice(Math.min(자리,S.queue.length),0,it);
+    }
+    toast("유튜브 영상으로 바꿔 넣었습니다 — 워터마크 없음");
+  }else{
+    toast("TVCF 영상 그대로 받습니다");
+  }
+  renderQueue();
+  if(TW.cur===짝) 짝창닫기();
+}
+function 짝그리기(){
+  const 짝=TW.cur; if(!짝) return;
+  if(짝.state==="고르기") 고르기그리기(짝); else 찾는중그리기(짝);
+}
+
+async function 유튜브짝시작(page, stream, pageTitle, info){
   if(!window.CG.ytTwin) return;
   const q=유튜브검색어(pageTitle);
   if(!q) return;
-  const 짝={choice:null};
+  const 갈래=유튜브검색갈래(info).filter(s=>s!==q);
+  const 짝={page, stream, q, choice:null, state:"찾는중", steps:{}, since:Date.now(), 고른:null};
   TWIN.set(page, 짝);
-  let 단계="찾는중", 고른=0, 맞는것=[];
-  const 창=appDlg("유튜브에서 같은 영상을 찾는 중",
-    `TVCF 영상에는 워터마크가 있고 720p 가 한계입니다. `+
-    `유튜브에 워터마크 없는 같은 영상이 있는지 찾아서 화면을 맞대 보는 중입니다...`+
-    `<div style="font-size:11px;color:#6b7385;margin-top:6px">${escHtml(q)} · 보통 10초 안팎</div>`,
-    {ok:"기다리지 않고 TVCF 로 받기"});
-  /* ★ 기다리는 사이 다른 알림이 이 창을 차지했으면 건드리지 않는다 */
-  const 내창=_dlgResolve;
-  const 열려있나=()=>!!내창 && _dlgResolve===내창;
-  window.CG.ytTwin(q, stream, page).catch(()=>null).then(m=>{
-    if(!열려있나() || 짝.choice) return;
-    맞는것=(m&&m.ok&&m.list)||[];
-    if(!맞는것.length){
-      짝.choice="tvcf";
-      closeDlg(false);
-      toast(m&&m.ok ? "유튜브에 똑같은 영상은 없습니다 — TVCF 영상으로 받습니다"
-                    : "유튜브와 대조하지 못했습니다 — TVCF 영상으로 받습니다");
-      return;
-    }
-    단계="고르기";
-    const 줄=맞는것.map((c,i)=>
-      `<label style="display:flex;gap:10px;align-items:center;padding:7px;border-radius:8px;cursor:pointer;border:1px solid var(--border);margin-top:6px">`+
-        `<input type="radio" name="ytPick" value="${i}"${i===0?" checked":""}>`+
-        `<img src="${escHtml(c.thumb)}" style="width:112px;height:63px;object-fit:cover;border-radius:5px;flex:0 0 auto;background:#000">`+
-        `<span style="min-width:0;font-size:11.5px;line-height:1.55">`+
-          `<b style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(c.title)}</b>`+
-          `<span style="color:#6b7385">${escHtml(c.channel)}${c.duration?` · ${길이글(c.duration)}`:""}</span>`+
-          `<span style="display:block;color:#6ee7b7">화면 일치 ${Math.round(c.score*100)}%</span>`+
-        `</span></label>`).join("");
-    $("dlgTitle").textContent="유튜브에 같은 영상이 있습니다";
-    $("dlgBody").innerHTML=
-      `TVCF 영상과 화면을 맞대 보니 똑같은 영상입니다. `+
-      `유튜브 것은 워터마크가 없고 화질도 더 높을 수 있습니다.`+
-      `<div style="font-size:11px;color:#6b7385;margin-top:4px">TVCF · ${escHtml(q)}`+
-      (m.duration?` · ${길이글(m.duration)}`:"")+`</div>`+
-      `<div id="ytPicks">${줄}</div>`;
-    $("dlgYes").textContent="유튜브 것으로 받기";
-    $("dlgNo").textContent="TVCF 그대로"; $("dlgNo").style.display="";
-    document.querySelectorAll('#ytPicks input[name="ytPick"]')
-      .forEach(el=>el.onchange=()=>{ 고른=+el.value; });
-  });
-  const 답=await 창;
-  if(짝.choice) return;                       // 같은 것이 없어 이미 TVCF 로 정해졌다
-  const c=맞는것[고른];
-  if(단계!=="고르기" || !답 || !c){ 짝.choice="tvcf"; return; }
-  짝.choice="yt";
-  /* TVCF 줄이 벌써 대기열에 있으면 뺀다 (아직 읽는 중이면 addLink 가 스스로 빠진다) */
-  S.queue=S.queue.filter(x=>!(x.referer===page && x.status==="wait")); renderQueue();
-  addLink(c.url, null, "", null);
+  renderQueue();
+  /* 다른 짝을 보고 있지 않고, 다음 영상의 재생 창이 줄 서 있지도 않으면
+     곧바로 진행 상황을 보여준다 (줄 서 있으면 대기열 표시로만 — 결과가 나오면 띄운다) */
+  if(!TW.cur && !재생창차례()) 짝창열기(짝);
+  let m=null;
+  try{
+    m=await window.CG.ytTwin(q, stream, page, 갈래, st=>{
+      Object.assign(짝.steps, st);
+      if(st.단계==="읽기끝") 짝.steps.읽기끝=true;
+      if(st.단계==="찾기끝") 짝.steps.찾기끝=true;
+      if(TW.cur===짝 && 짝.state==="찾는중") 찾는중그리기(짝);
+    });
+  }catch(e){}
+  if(짝.choice || TWIN.get(page)!==짝) return;        // 기다리지 않고 TVCF 로 정했거나, 다시 넣었다
+  const list=(m&&m.ok&&m.list)||[];
+  if(!list.length){
+    짝.choice="tvcf"; 짝.state="끝";
+    if(TW.cur===짝) 짝창닫기(); else renderQueue();
+    toast(!m||!m.ok ? "유튜브와 대조하지 못했습니다 — TVCF 영상으로 받습니다"
+      : m.checked ? `유튜브 영상 ${m.found}개 중 ${m.checked}개를 화면으로 맞대 봤지만 겹치는 장면이 없습니다 — TVCF 영상으로 받습니다`
+                  : "유튜브에서 이 광고를 찾지 못했습니다 — TVCF 영상으로 받습니다");
+    return;
+  }
+  짝.result=m; 짝.state="고르기"; 짝.보여줌=false;
+  renderQueue();
+  if(TW.cur===짝){ 짝.보여줌=true; 짝그리기(); }
+  else{
+    toast("유튜브에서 찾은 영상이 있습니다 — 대기열의 [유튜브 고르기] 를 눌러 확인하세요");
+    다음짝띄우기();
+  }
 }
 if(IS_EL){
   /* ★ on$ 는 이 아래에서 정의되므로 여기서 쓰면 스크립트가 통째로 멈춘다.
@@ -4191,6 +4534,17 @@ function renderQueue(){
       b.onclick=ev=>{ ev.stopPropagation(); loadJob(it.dup.id); };
       sub.appendChild(b);
     }
+    /* TVCF 줄 — 유튜브 원본을 찾는 동안 · 고르기 전까지는 추출하지 않고 붙잡아 둔다 */
+    if(it.status==="wait" && 짝붙잡힘(it)){
+      const 짝=TWIN.get(it.referer);
+      const b=document.createElement("button");
+      b.className="qTwin"+(짝.state==="고르기"?" pick blink":"");
+      b.textContent= 짝.state==="고르기" ? "유튜브 고르기" : "🔎 유튜브 원본 찾는 중";
+      b.title= 짝.state==="고르기" ? "유튜브에서 찾은 영상을 확인하고 고릅니다 — 고르기 전에는 추출하지 않습니다"
+                                   : "찾는 동안 이 영상은 기다리고, 추출은 다른 영상부터 합니다";
+      b.onclick=ev=>{ ev.stopPropagation(); if(TW.cur!==짝){ if(TW.cur) 짝창닫기(); 짝창열기(짝); } };
+      sub.appendChild(b);
+    }
     if(it.status==="doing") sub.append(" · 추출 중");
     if(it.status==="done")  sub.append(" · 완료");
     body.appendChild(sub);
@@ -4198,7 +4552,7 @@ function renderQueue(){
     /* 단추는 아랫줄에 따로 모은다 — 글칸을 밀어내지 않게 */
     const acts=document.createElement("div"); acts.className="qacts";
     /* 주소로 넣은 것은 '받기만' 도 고를 수 있게 한다 */
-    if(it.status==="wait" && it.isLink && !it.checking){
+    if(it.status==="wait" && it.isLink && !it.checking && !짝붙잡힘(it)){
       const dl=document.createElement("button");
       dl.className="mini"; dl.textContent="⬇ 영상다운";
       dl.title="추출하지 않고 영상 파일만 받습니다 (저장 폴더 안의 [받은 영상])";
@@ -4209,7 +4563,11 @@ function renderQueue(){
     if(it.status==="wait"){
       const del=document.createElement("button");
       del.className="mini"; del.textContent="✕ 빼기"; del.title="대기열에서 빼기";
-      del.onclick=()=>{ S.queue.splice(i,1); hidePreview(); renderQueue(); };
+      del.onclick=()=>{
+        /* 뺀 TVCF 줄의 유튜브 짝 찾기도 함께 접는다 — 빼고 나서 "고르세요" 가 뜨지 않게 */
+        const 짝=it.referer && TWIN.get(it.referer);
+        if(짝 && !짝.choice){ 짝.choice="빼기"; if(TW.cur===짝) 짝창닫기(); }
+        S.queue.splice(i,1); hidePreview(); renderQueue(); };
       acts.appendChild(del);
     }
     if(acts.children.length) row.appendChild(acts);
@@ -4264,8 +4622,23 @@ async function startRun(){
      매번 대기열을 다시 확인해 남아 있는 것을 계속 이어서 처리한다. */
   while(true){
     if(ABORT){ stopped=true; break; }
-    const item=S.queue.find(x=>x.status==="wait" && !x.checking);
-    if(!item) break;
+    /* ★ 유튜브 원본을 찾는 중이거나 고르기 전인 TVCF 줄은 건너뛴다.
+         예전에는 연달아 넣고 추출을 돌리면 그 줄을 곧바로 가져가서,
+         유튜브에 있어도 워터마크 판(TVCF)을 먼저 받아 버렸다. */
+    const item=S.queue.find(x=>x.status==="wait" && !x.checking && !짝붙잡힘(x));
+    if(!item){
+      /* 남은 것이 주소 확인 중이거나 붙잡힌 줄뿐이면 끝내지 말고 기다린다
+         (예전에는 여기서 끝나 버려서, 확인이 끝난 줄이 대기열에 그냥 남았다) */
+      const 기다림=S.queue.filter(x=>x.status==="wait" && (x.checking || 짝붙잡힘(x)));
+      if(!기다림.length) break;
+      const 고를것=기다림.some(x=>짝붙잡힘(x) && TWIN.get(x.referer).state==="고르기");
+      statusEl.style.color="var(--muted)";
+      prog(null, 고를것 ? "유튜브 원본을 고르시면 이어서 추출합니다 — 대기열의 [유튜브 고르기]"
+                 : 기다림.some(짝붙잡힘) ? "유튜브 원본을 찾는 중입니다 — 끝나면 이어서 추출합니다"
+                 : "영상 주소를 확인하는 중입니다 — 끝나면 이어서 추출합니다", "");
+      await new Promise(r=>setTimeout(r,500));
+      continue;
+    }
     const left=S.queue.filter(x=>x.status==="wait").length;
     item.status="doing"; renderQueue();
     if(done>0 && res.classList.contains("on")) S.keepView=true;

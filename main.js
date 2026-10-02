@@ -2457,11 +2457,15 @@ ipcMain.handle("ytDiag", async () => {
    ========================================================================= */
 async function 유튜브검색(exe, q, n) {
   const out = await runYt(exe, [
-    "--no-warnings", "--flat-playlist", "-J", `ytsearch${n}:${q}`,
+    "--no-warnings", "--flat-playlist", "-J",
+    /* ★ 이것이 없으면 제목이 영어 자동 번역으로 온다 — "열어보면 전부 내 취향, 노크잇"
+       이 "Open it up and it's all to my taste, KNOCK IT" 이 되어 제목 비교가 헛돈다 */
+    "--extractor-args", "youtube:lang=ko",
+    `ytsearch${n}:${q}`,
   ], 30000);
   const j = JSON.parse(out);
   return (j.entries || [])
-    .filter((x) => x && x.id && x.live_status !== "is_live")
+    .filter((x) => x && /^[\w-]{11}$/.test(x.id || "") && x.live_status !== "is_live")    // 채널(UC…) 은 영상이 아니다
     .map((x) => ({
       url: "https://www.youtube.com/watch?v=" + x.id,
       id: x.id,
@@ -2554,6 +2558,99 @@ function 지문대조(a, b) {
   }
   return 최선;
 }
+/* ---------- 두 영상이 어떤 사이인가 ----------
+   ★ 통째로 같은 영상만 권하면, 조금만 어긋나도(다른 편집본 · 앞뒤가 잘린 판 ·
+     장면 순서가 바뀐 판) 아무것도 안 보여주고 넘어간다. 사용자는 "한두 장면만
+     겹쳐도 찾아 놓고 고르게 해 달라" 고 했다.
+   ★ 그런데 보여주기만 하고 무엇인지 말해주지 않으면 고를 수가 없다.
+     GH 경기주택도시공사(TVCF 20초)는 유튜브에 31초 판만 있었다 — 끝에 멈춤 화면을
+     붙인 것이 아니라 장면이 더 들어 있는 '긴 판' 이다. 그런 것을 가려 말해준다.
+   그래서 자리를 맞추지 않고, 양쪽 장마다 상대 쪽 어느 장이 가장 닮았는지 찾는다.
+     · TVCF 장면 중 유튜브에 들어 있는 몫 (A)
+     · 유튜브 장면 중 TVCF 에 들어 있는 몫 (B)
+     · 유튜브 끝이 멈춘 화면인가 (유튜브가 추천 영상을 띄우는 '최종 화면' 자리)
+     · 비교해 볼 장면 자리 — TVCF 앞·가운데·뒤가 유튜브 어디에 있는지,
+       그리고 유튜브에만 있는 장면 */
+const 같은장기준 = 0.92;
+function 닮음(x, y) {
+  const N = 지문W * 지문H;
+  let c = 0;
+  for (let k = 0; k < N; k++) c += x[k] * y[k];
+  return c / N;
+}
+/* a 의 장마다 b 에서 가장 닮은 장의 자리와 닮은 정도 */
+function 장면짝(a, b) {
+  return a.map((x) => {
+    if (!x) return null;
+    let s = -1, at = -1;
+    for (let j = 0; j < b.length; j++) {
+      if (!b[j]) continue;
+      const v = 닮음(x, b[j]);
+      if (v > s) { s = v; at = j; }
+    }
+    return at < 0 ? null : { at, s };
+  });
+}
+function 관계재기(원본, 지문, tv, 정렬) {
+  const 앞 = 장면짝(원본, 지문), 뒤 = 장면짝(지문, 원본);
+  const 몫 = (짝) => {
+    const 쓸 = 짝.filter(Boolean);
+    return 쓸.length ? 쓸.filter((m) => m.s >= 같은장기준).length / 쓸.length : 0;
+  };
+  const 장면초 = 앞.filter((m) => m && m.s >= 같은장기준).length / 지문FPS;
+  /* TVCF 앞 · 가운데 · 뒤 — 그 장이 유튜브 어디에 있는지 */
+  const 자리 = [];
+  [0.15, 0.5, 0.85].forEach((p) => {
+    const n = 앞.length;
+    const i0 = Math.round(p * (n - 1));
+    for (let d = 0; d < n; d++) {
+      const i = [i0 + d, i0 - d].find((k) => k >= 0 && k < n && 앞[k]);
+      if (i === undefined) continue;
+      const m = 앞[i];
+      자리.push({ tv: i / 지문FPS, yt: m.at / 지문FPS, s: m.s, 같음: m.s >= 같은장기준 });
+      return;
+    }
+  });
+  /* 유튜브에만 있는 장면 — TVCF 에 닮은 것이 없는 가장 긴 구간의 가운데 */
+  let 긴 = null, 시작 = -1;
+  for (let j = 0; j <= 뒤.length; j++) {
+    const 없음 = j < 뒤.length && !!뒤[j] && 뒤[j].s < 0.8;
+    if (없음 && 시작 < 0) 시작 = j;
+    if (!없음 && 시작 >= 0) {
+      if (!긴 || j - 시작 > 긴.len) 긴 = { from: 시작, len: j - 시작 };
+      시작 = -1;
+    }
+  }
+  const 유튜브만 = 긴 && 긴.len >= 지문FPS
+    ? { yt: (긴.from + 긴.len / 2) / 지문FPS, 초: 긴.len / 지문FPS } : null;
+  /* 통째로 맞는다면 — TVCF 가 끝난 뒤 유튜브 쪽은 멈춘 화면인가 */
+  let 끝멈춤 = 0;
+  if (정렬.score >= 0.8 && tv && tv < 지문초 - 1) {
+    const j0 = Math.round((tv + 정렬.offset) * 지문FPS);
+    if (j0 > 0 && j0 < 지문.length) {
+      let 기준 = null;
+      for (let j = j0 - 1; j >= 0 && !기준; j--) 기준 = 지문[j];
+      const 꼬리 = 지문.slice(j0);
+      if (기준 && 꼬리.every((f) => !f || 닮음(기준, f) >= 0.85)) 끝멈춤 = 꼬리.length / 지문FPS;
+    }
+  }
+  return { A: 몫(앞), B: 몫(뒤), 장면초, 자리, 유튜브만, 끝멈춤 };
+}
+/* 관계 이름 — 화면 쪽이 이것으로 설명을 붙인다 */
+function 관계판정(c, tv) {
+  if (c.못읽음) return c.겹침 >= 0.5 ? "못봄" : "";
+  const d = c.duration && tv ? c.duration - tv : 0;
+  if (c.score >= 0.8 && c.cover >= 0.8) {
+    if (d <= 2) return "같음";
+    return c.끝멈춤 > 0 && c.끝멈춤 >= d - Math.max(0, c.offset) - 2 ? "같음_끝멈춤" : "같음_더";
+  }
+  if (c.A >= 0.4 && d > 2) return "긴판";        // 문체부 30초 편은 3분 판에 57% 가 들어 있었다 — 그것을 줄인 판이다
+  if (c.B >= 0.4 && d < -2) return "짧은판";
+  if (c.A >= 0.6) return "다른편집";
+  if (c.장면초 >= 1.5) return "시리즈";
+  return "";
+}
+const 관계순서 = { 같음: 0, 같음_끝멈춤: 1, 같음_더: 2, 긴판: 3, 다른편집: 4, 짧은판: 5, 시리즈: 6, 못봄: 7 };
 /* 제목이 얼마나 겹치는가 (0~1) — 화면 대조에 넘길 순서를 정하는 데만 쓴다 */
 const 낱말모음 = (t) => new Set(String(t || "").toLowerCase()
   .replace(/[^0-9a-z가-힣]+/g, " ").split(" ").filter((w) => w.length >= 2));
@@ -2579,43 +2676,145 @@ function 제목겹침(q, c) {
      띄우는 '최종 화면' 자리다. 최종 화면은 20초까지 둘 수 있고, 목록에 적힌 길이는
      1초쯤 어긋나기도 해서(58초가 59초로 적혔다) 22초까지 본다.
      덧붙은 꼬리는 대조를 흐리지 않는다 — 일치율은 TVCF 쪽 장면을 기준으로 잰다. */
-ipcMain.handle("ytTwin", async (_e, { query, src, referer }) => {
+/* 짝 찾기가 무엇을 찾고 왜 뺐는지 남긴다 — "있는데 못 찾았다" 를 다시 따라가 보려고.
+   설정 폴더의 유튜브짝찾기.log 에, 너무 커지면 뒤쪽 절반만 남긴다. */
+function 짝찾기기록(줄) {
+  const 글 = 줄.join("\n") + "\n";
+  if (process.env.TWIN_TRACE) console.log(글);
+  try {
+    const f = path.join(app.getPath("userData"), "유튜브짝찾기.log");
+    let 옛 = ""; try { 옛 = fs.readFileSync(f, "utf8"); } catch (e) {}
+    if (옛.length > 200000) 옛 = 옛.slice(-100000);
+    fs.writeFileSync(f, 옛 + 글, "utf8");
+  } catch (e) {}
+}
+ipcMain.handle("ytTwin", async (_e, { query, src, referer, alts }) => {
   const q = String(query || "").trim();
   if (!q || !src) return { ok: false, error: "찾을 제목이 없습니다" };
+  /* 지금 어느 단계인지 화면에 알린다 — 글만 주르륵 흘리지 않고 단계를 짚어 보여주려고 */
+  const 알림 = (m) => { try { _e.sender.send("ytTwinStep", { page: referer, ...m }); } catch (x) {} };
   let exe;
   try { exe = await ensureYtdlp(null); await ensureQuickjs(null); }
   catch (e) { return { ok: false, error: friendlyYtError(String(e.message || e)) }; }
   try {
-    const [원본, 찾음] = await Promise.all([
-      영상지문(src, referer),
-      유튜브검색(exe, q, 15).catch(() => []),
+    /* ★ 유튜브 검색은 긴 검색어에 박하다 — 전체 제목으로는 안 나오던 것이
+         광고 제목만, 또는 그 한 토막으로 찾으면 1등으로 나왔다.
+         그래서 여러 갈래로 함께 찾고 합친다. 갈래가 없으면 광고주 이름(첫 낱말)으로. */
+    const 첫말 = q.split(/\s+/)[0];
+    const 갈래 = [...new Set([q, ...(Array.isArray(alts) ? alts : []).map((x) => String(x || "").trim())
+      .filter((x) => x.length >= 2).slice(0, 5)])];
+    if (갈래.length === 1 && 첫말 && 첫말 !== q) 갈래.push(첫말);
+    알림({ 단계: "시작", 갈래 });
+    const [원본, 결과] = await Promise.all([
+      영상지문(src, referer).then((r) => { 알림({ 단계: "읽기끝", 길이: r.duration || 0 }); return r; }),
+      Promise.all(갈래.map((x) => 유튜브검색(exe, x, 15).catch(() => []))),
     ]);
     if (원본.filter(Boolean).length < 4) return { ok: false, error: "TVCF 영상을 읽지 못했습니다" };
+    /* 합친다 — 여러 갈래에서 나온 것일수록, 앞 순위일수록 먼저 */
+    const 모음 = new Map();
+    결과.forEach((list) => list.forEach((c, i) => {
+      const o = 모음.get(c.id);
+      if (o) { o.갈래수 += 1; o.순위 = Math.min(o.순위, i); }
+      else 모음.set(c.id, { ...c, 갈래수: 1, 순위: i });
+    }));
+    const 찾음 = [...모음.values()];
     const 길이 = 원본.duration;
     const 길이맞음 = (c) => !c.duration || (길이
       ? c.duration >= 길이 - 2 && c.duration <= 길이 + 22
       : c.duration >= 지문초 - 2);    // 길이를 모르면 대조한 만큼보다 짧은 것만 뺀다
-    let 후보 = 찾음.filter(길이맞음);
-    /* 긴 제목으로 못 찾으면 광고주 이름만으로 한 번 더 */
-    const 첫말 = q.split(/\s+/)[0];
-    if (!후보.length && 첫말 && 첫말 !== q)
-      후보 = (await 유튜브검색(exe, 첫말, 15).catch(() => [])).filter(길이맞음);
-    후보 = 후보.map((c) => ({ ...c, 겹침: 제목겹침(q, c) }))
-      .sort((x, y) => y.겹침 - x.겹침).slice(0, 4);
+    /* 화면 대조는 길이가 맞는 것 여섯까지.
+       ★ 길이가 다른 판(긴 판 · 짧은 판 · 편집본)도 장면이 겹칠 수 있다 — 제목이 꽤 겹치면
+         길이가 안 맞아도 셋까지 함께 본다 (10분 넘는 것은 광고가 아니니 뺀다) */
+    const 점수매김 = (c) => ({ ...c, 겹침: 제목겹침(q, c) });
+    const 차례 = (x, y) => (y.겹침 - x.겹침) || (y.갈래수 - x.갈래수) || (x.순위 - y.순위);
+    const 맞는길이 = 찾음.filter(길이맞음).map(점수매김).sort(차례).slice(0, 6);
+    const 다른길이 = 찾음.filter((c) => !길이맞음(c) && c.duration && c.duration <= 600)
+      .map(점수매김).filter((c) => c.겹침 >= 0.4).sort(차례).slice(0, 3);
+    const 후보 = [...맞는길이, ...다른길이];
+    알림({ 단계: "찾기끝", 찾은수: 찾음.length, 대조수: 후보.length });
+    const 기록 = ["[" + new Date().toISOString() + "] " + q + " · TVCF " + (길이 ? 길이.toFixed(1) + "초" : "길이 모름"),
+      "  찾은 갈래  " + 갈래.join(" | "),
+      ...찾음.map((c) => "  검색 " + c.id + " " + c.duration + "초 ×" + c.갈래수 +
+        (길이맞음(c) ? "" : " (길이 다름)") + " " + c.title)];
+    /* ★ 기본 통로로 받은 주소는 영상에 따라 403 으로 막혀 화면을 한 장도 못 읽었다 —
+         그러면 똑같은 영상도 '0점' 으로 떨어진다. 받기(재시도 조합)와 같은 순서로
+         통로를 바꿔 가며, 화면이 읽힐 때까지 시도한다. */
+    const 통로 = ["web_embedded", "android", ""];
+    let 끝난수 = 0;
     const 대조 = await Promise.all(후보.map(async (c) => {
-      try {
-        const 주소 = String(await runYt(exe, ["--no-warnings", ...jsArgs(), "-g",
-          "-f", "wv*[height>=144]/bv*[height<=360]/worst", c.url], 30000)).trim().split(/\r?\n/)[0];
-        return { ...c, ...지문대조(원본, await 영상지문(주소, null)) };
-      } catch (e) { return { ...c, score: 0, cover: 0 }; }
+      let r = { ...c, score: 0, cover: 0, 장면초: 0, 못읽음: true };
+      for (const v of 통로) {
+        try {
+          const 주소 = String(await runYt(exe, ["--no-warnings", ...jsArgs(),
+            ...(v ? ["--extractor-args", "youtube:player_client=" + v] : []), "-g",
+            "-f", "wv*[height>=144]/bv*[height<=360]/worst", c.url], 30000)).trim().split(/\r?\n/)[0];
+          const 지문 = await 영상지문(주소, null);
+          if (지문.filter(Boolean).length < 4) continue;
+          const 정렬 = 지문대조(원본, 지문);
+          r = { ...c, 통로: v || "기본", stream: 주소, ...정렬, ...관계재기(원본, 지문, 길이, 정렬) };
+          break;
+        } catch (e) {}
+      }
+      알림({ 단계: "대조", 끝난수: ++끝난수, 대조수: 후보.length });
+      return r;
     }));
-    /* 같은 영상이면 0.9 를 넘고 다른 편집본은 0.4 안팎이다 — 0.8 로 가른다 */
-    const list = 대조.filter((c) => c.score >= 0.8 && c.cover >= 0.8)
-      .sort((x, y) => y.score - x.score);
-    return { ok: true, duration: 길이, checked: 대조.length, list };
+    /* ★ 고르는 것은 사용자가 한다 — 조금이라도 닮은 것은 다 보여주되,
+         어떤 사이인지(같은 영상 · 긴 판 · 짧은 판 · 다른 편집본 · 같은 시리즈) 함께 넘긴다 */
+    const list = 대조.map((c) => ({ ...c, 관계: 관계판정(c, 길이) })).filter((c) => c.관계)
+      .sort((x, y) => (관계순서[x.관계] - 관계순서[y.관계]) || (y.score - x.score) || (y.A - x.A));
+    대조.forEach((c) => 기록.push("  대조 " + c.id + (c.못읽음 ? " 화면 못 읽음" :
+      " 일치 " + c.score.toFixed(3) + " 덮음 " + c.cover.toFixed(2) + " 밀림 " + c.offset + "초" +
+      " · TVCF 장면 중 " + Math.round(c.A * 100) + "% 있음 · 유튜브 장면 중 " + Math.round(c.B * 100) + "% 있음" +
+      (c.끝멈춤 ? " · 끝 멈춤 " + c.끝멈춤 + "초" : "") + " · " + c.통로) +
+      " → " + (관계판정(c, 길이) || "뺌")));
+    짝찾기기록(기록);
+    return { ok: true, duration: 길이, found: 찾음.length, checked: 대조.length, list };
   } catch (e) {
     return { ok: false, error: friendlyYtError(String(e.message || e)) };
   } finally { 갱신예약(5000); }
+});
+/* ---------- 비교할 장면을 그림으로 ----------
+   ★ "유튜브에 있으니 이걸로 받을래?" 라고 묻고서 확인할 길을 안 주면 일방적이다.
+     같은 자리의 TVCF 장면과 유튜브 장면을 실제 그림으로 나란히 보여준다. */
+function 장면한장(src, referer, t) {
+  return new Promise((resolve) => {
+    const head = referer
+      ? ["-headers", "Referer: " + referer + "\r\nUser-Agent: " + UA + "\r\n"]
+      : ["-user_agent", UA];
+    const ff = spawn(ffmpegPath(), ["-hide_banner", "-v", "error", ...head,
+      "-ss", String(Math.max(0, +t || 0)), "-i", src, "-frames:v", "1", "-an",
+      "-vf", "scale=320:-2", "-f", "image2pipe", "-c:v", "mjpeg", "-q:v", "4", "-"], { windowsHide: true });
+    const 조각 = [];
+    const 시계 = setTimeout(() => { try { ff.kill("SIGKILL"); } catch (x) {} }, 20000);
+    ff.stdout.on("data", (d) => 조각.push(d));
+    ff.on("error", () => { clearTimeout(시계); resolve(""); });
+    ff.on("close", () => {
+      clearTimeout(시계);
+      const b = Buffer.concat(조각);
+      resolve(b.length ? "data:image/jpeg;base64," + b.toString("base64") : "");
+    });
+  });
+}
+ipcMain.handle("twinFrames", async (_e, items) =>
+  Promise.all((Array.isArray(items) ? items : []).slice(0, 12)
+    .map((x) => x && x.src ? 장면한장(String(x.src), x.referer || null, x.t) : "")));
+/* ---------- 유튜브 영상을 프로그램 안에서 틀어 보기 ---------- */
+let 미리보기창 = null;
+ipcMain.handle("ytPreview", (_e, u) => {
+  const m = /[?&]v=([\w-]{11})/.exec(String(u || ""));
+  if (!m) return { ok: false };
+  const 주소 = "https://www.youtube.com/watch?v=" + m[1];
+  if (!미리보기창 || 미리보기창.isDestroyed()) {
+    미리보기창 = new BrowserWindow({
+      width: 1000, height: 640, parent: win || undefined, autoHideMenuBar: true,
+      title: "유튜브 미리보기", backgroundColor: "#000",
+      webPreferences: { contextIsolation: true, nodeIntegration: false },
+    });
+    미리보기창.on("closed", () => { 미리보기창 = null; });
+  }
+  미리보기창.loadURL(주소);
+  미리보기창.show(); 미리보기창.focus();
+  return { ok: true };
 });
 /* 재생 창에 떠 있는 페이지에서 광고 제목을 읽는다.
    ★ TVCF 는 창 제목이 "세리안 | TVCF" 처럼 광고주 이름뿐이다. 그것으로 찾으면

@@ -159,10 +159,18 @@ contextBridge.exposeInMainWorld("CG", {
   ytCancel: (jobId) => ipcRenderer.invoke("ytCancel", jobId),
   /* 유튜브에서 제목으로 찾기 (TVCF 영상의 워터마크 없는 짝을 찾을 때) */
   ytSearch: (query, count) => ipcRenderer.invoke("ytSearch", { query, count }),
-  /* TVCF 영상의 유튜브 짝 — 찾기 · 길이 거르기 · 화면 대조를 한 번에
-     (list 에는 화면까지 같다고 판명된 것만, score 0~1) */
-  ytTwin: (query, src, referer) =>
-    ipcRenderer.invoke("ytTwin", { query, src, referer }),
+  /* TVCF 영상의 유튜브 짝 — 찾기 · 화면 대조 · 관계 판정을 한 번에.
+     onStep 은 지금 어느 단계인지 받는다 (TVCF 살펴보기 → 유튜브 찾기 → 화면 맞대기) */
+  ytTwin: (query, src, referer, alts, onStep) => {
+    const h = (_e, msg) => { if (msg.page === referer && onStep) onStep(msg); };
+    ipcRenderer.on("ytTwinStep", h);
+    return ipcRenderer.invoke("ytTwin", { query, src, referer, alts })
+      .finally(() => ipcRenderer.removeListener("ytTwinStep", h));
+  },
+  /* 두 영상의 장면을 실제 그림으로 떠 온다 — [{src, referer, t}] → 그림(data URL) */
+  twinFrames: (items) => ipcRenderer.invoke("twinFrames", items),
+  /* 유튜브 영상을 프로그램 안의 작은 창에서 틀어 본다 */
+  ytPreview: (url) => ipcRenderer.invoke("ytPreview", url),
   /* 재생 창 본문에서 광고 제목 읽기 (TVCF 창 제목에는 광고주 이름뿐이다) */
   sniffPageInfo: () => ipcRenderer.invoke("sniffPageInfo"),
   /* 같은 이름이 이미 있으면 번호를 붙여 비어 있는 자리를 알려준다 */
